@@ -175,72 +175,166 @@ export default function App() {
   // Auth State
   const [authUser, setAuthUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [guestMode, setGuestMode] = useState<boolean>(() => {
+    return localStorage.getItem('finlev_guest_mode') === 'true';
+  });
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Sync Supabase user data
   const syncFromSupabase = React.useCallback(async () => {
-    const data = await fetchUserDataFromSupabase();
-    if (data) {
-      if (data.transactions && data.transactions.length > 0) setTransactions(data.transactions);
-      if (data.categories && data.categories.length > 0) setCategories(data.categories);
-      if (data.accounts && data.accounts.length > 0) setAccounts(data.accounts);
-      if (data.budgets && data.budgets.length > 0) setBudgets(data.budgets);
+    try {
+      const data = await fetchUserDataFromSupabase();
+      if (data) {
+        if (data.transactions && data.transactions.length > 0) setTransactions(data.transactions);
+        if (data.categories && data.categories.length > 0) setCategories(data.categories);
+        if (data.accounts && data.accounts.length > 0) setAccounts(data.accounts);
+        if (data.budgets && data.budgets.length > 0) setBudgets(data.budgets);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch user data from Supabase:', err);
     }
   }, []);
 
   useEffect(() => {
     const client = getSupabaseClient();
-    
-    // Handle hash cleanup once on load if needed
-    if (window.location.hash) {
-      window.history.replaceState(null, '', window.location.pathname);
-    }
 
-    if (client) {
-      // 1. Initial Session Check
-      client.auth.getSession().then(async ({ data: { session } }) => {
-        setAuthUser(session?.user || null);
-        if (session?.user) {
-          await syncFromSupabase();
-        }
-        setAuthLoading(false);
-      });
-
-      // 2. Auth Subscription
-      const { data: { subscription } } = client.auth.onAuthStateChange(async (_e, session) => {
-        setAuthUser(prev => (prev?.id === session?.user?.id ? prev : (session?.user || null)));
-        if (session?.user) {
-          await syncFromSupabase();
-        }
-        setAuthLoading(false);
-      });
-      return () => subscription.unsubscribe();
-    } else {
+    if (!client) {
       setAuthLoading(false);
+      return;
     }
+
+    let isMounted = true;
+
+    async function initSession() {
+      try {
+        const { data: { session }, error } = await client.auth.getSession();
+        if (error) {
+          console.warn('Supabase getSession error:', error.message);
+          if (isMounted) setAuthError(error.message);
+        }
+        if (isMounted) {
+          setAuthUser(session?.user || null);
+          if (session?.user) {
+            await syncFromSupabase();
+          }
+        }
+      } catch (err: any) {
+        console.warn('Auth init error:', err);
+      } finally {
+        if (isMounted) {
+          setAuthLoading(false);
+          // Clean hash after session is processed
+          if (window.location.hash && (window.location.hash.includes('access_token') || window.location.hash.includes('error'))) {
+            setTimeout(() => {
+              window.history.replaceState(null, '', window.location.pathname);
+            }, 300);
+          }
+        }
+      }
+    }
+
+    initSession();
+
+    const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
+      setAuthUser(session?.user || null);
+      if (session?.user) {
+        try {
+          await syncFromSupabase();
+        } catch (e) {
+          console.warn('Sync error on auth state change:', e);
+        }
+      }
+      setAuthLoading(false);
+      if (window.location.hash && (window.location.hash.includes('access_token') || window.location.hash.includes('error'))) {
+        setTimeout(() => {
+          window.history.replaceState(null, '', window.location.pathname);
+        }, 300);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [syncFromSupabase]);
+
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center text-slate-400">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mb-4" />
-        <p className="font-bold">Loading Finlev...</p>
+      <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center text-slate-400 p-4">
+        <Loader2 className="w-10 h-10 animate-spin text-emerald-500 mb-4" />
+        <p className="font-bold text-slate-200">Loading Finlev...</p>
+        <p className="text-xs text-slate-500 mt-2">Checking authentication & syncing data</p>
       </div>
     );
   }
 
-  if (!authUser) {
+  if (!authUser && !guestMode) {
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
+
     return (
       <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center p-6 text-center">
-        <h1 className="text-4xl font-black text-white mb-6">Finlev</h1>
-        <p className="text-slate-400 mb-8 max-w-sm">Securely manage your personal finances with persistent data synchronization.</p>
-        <button
-          onClick={async () => {
-            const { error } = await signInWithGoogle();
-            if (error) alert(`Login failed: ${error.message}`);
-          }}
-          className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2"
-        >
-          Sign in with Google SSO
-        </button>
+        <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center mb-6">
+          <span className="text-emerald-400 font-black text-3xl">F</span>
+        </div>
+        <h1 className="text-4xl font-black text-white mb-2">Welcome to Finlev</h1>
+        <p className="text-slate-400 mb-8 max-w-md text-sm">
+          Personal finance &amp; expense tracker with multi-currency support, inflation adjustments, and cloud sync.
+        </p>
+
+        {authError && (
+          <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs max-w-sm text-left">
+            <strong className="block font-semibold mb-1">Auth Error:</strong>
+            {authError}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3 w-full max-w-xs mb-8">
+          <button
+            onClick={async () => {
+              setAuthError(null);
+              const { error } = await signInWithGoogle();
+              if (error) {
+                setAuthError(error.message || 'Login failed');
+              }
+            }}
+            className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            Sign in with Google SSO
+          </button>
+
+          <button
+            onClick={() => {
+              setGuestMode(true);
+              localStorage.setItem('finlev_guest_mode', 'true');
+            }}
+            className="w-full px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-slate-700 text-sm"
+          >
+            Continue in Guest Mode (Offline)
+          </button>
+        </div>
+
+        {/* Redirect URL Configuration Guide */}
+        <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-5 text-left text-xs text-slate-400 shadow-xl">
+          <h3 className="font-bold text-slate-200 text-sm mb-2 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            OAuth &amp; Redirect URL Setup
+          </h3>
+          <p className="mb-3 text-slate-400">
+            Ensure your Supabase project and Google OAuth credentials match this application&apos;s current origin:
+          </p>
+          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-emerald-400 font-mono text-[11px] break-all select-all mb-3">
+            {currentOrigin}
+          </div>
+          <ul className="space-y-2 text-slate-400 list-disc list-inside">
+            <li>
+              <strong className="text-slate-300">Supabase Redirect URL:</strong> Go to Supabase Dashboard &gt; <em>Authentication &gt; URL Configuration</em>, add <code className="text-emerald-400">{currentOrigin}</code> to <strong>Redirect URLs</strong>.
+            </li>
+            <li>
+              <strong className="text-slate-300">Google OAuth Callback:</strong> Ensure Authorized Redirect URI in Google Cloud Console is <code className="text-emerald-400">https://&lt;your-project-ref&gt;.supabase.co/auth/v1/callback</code>.
+            </li>
+          </ul>
+        </div>
       </div>
     );
   }

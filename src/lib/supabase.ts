@@ -15,7 +15,7 @@ export function getSupabaseCredentials(): { url: string; anonKey: string } {
   const finalKey = envKey || localKey;
 
   if (!finalUrl || !finalKey) {
-    console.error('Supabase credentials missing:', { envUrl, localUrl, envKey, localKey });
+    // Supabase credentials not provided yet
   }
 
   return {
@@ -62,7 +62,7 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
   }
 
   try {
-    const redirectTo = window.location.origin;
+    const redirectTo = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
     const { error } = await client.auth.signInWithOAuth({
       provider: 'google',
       options: {
