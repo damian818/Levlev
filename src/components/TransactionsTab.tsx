@@ -263,7 +263,7 @@ export function TransactionsTab({
                         )}
                       </td>
                       <td className="p-3 text-right font-semibold text-slate-200">
-                        {tx.currency} {tx.amount.toLocaleString()}
+                        {formatCurrency(tx.amount, tx.currency as DisplayCurrency)}
                       </td>
                       <td className="p-3 text-right font-bold text-slate-100">
                         <div>{formatCurrency(converted, displayCurrency)}</div>

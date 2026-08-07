@@ -244,7 +244,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                     </div>
 
                     <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono">
-                      <span>Native: {item.currency} {item.latestAmount.toLocaleString()}</span>
+                      <span>Native: {formatCurrency(item.latestAmount, item.currency as DisplayCurrency)}</span>
                       <span className="text-emerald-400 font-sans font-semibold flex items-center gap-0.5 group-hover:underline">
                         <TrendingUp className="w-3 h-3" />
                         <span>View Trend History ({item.distinctMonthsCount} mos)</span>

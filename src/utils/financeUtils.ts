@@ -483,7 +483,39 @@ export function convertCurrency(
   return amountInUSD;
 }
 
-export function formatCurrency(amount: number, currency: DisplayCurrency): string {
+let globalPrivacyMode = false;
+
+export function setGlobalPrivacyMode(enabled: boolean) {
+  globalPrivacyMode = enabled;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('levlev_privacy_mode', enabled ? 'true' : 'false');
+  }
+}
+
+export function getGlobalPrivacyMode(): boolean {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('levlev_privacy_mode');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+  }
+  return globalPrivacyMode;
+}
+
+export function maskValue(val: string | number, forcePrivacy?: boolean): string {
+  const isPrivate = forcePrivacy !== undefined ? forcePrivacy : getGlobalPrivacyMode();
+  if (isPrivate) {
+    return '••••••';
+  }
+  return String(val);
+}
+
+export function formatCurrency(amount: number, currency: DisplayCurrency, forcePrivacy?: boolean): string {
+  const isPrivate = forcePrivacy !== undefined ? forcePrivacy : getGlobalPrivacyMode();
+  if (isPrivate) {
+    return '••••••';
+  }
+
   const curr = (currency || 'USD').toUpperCase();
   const localeMap: Record<string, string> = {
     ARS: 'es-AR',
@@ -521,7 +553,12 @@ export function formatCurrency(amount: number, currency: DisplayCurrency): strin
   }
 }
 
-export function formatCurrencyCompact(amount: number, currency: DisplayCurrency): string {
+export function formatCurrencyCompact(amount: number, currency: DisplayCurrency, forcePrivacy?: boolean): string {
+  const isPrivate = forcePrivacy !== undefined ? forcePrivacy : getGlobalPrivacyMode();
+  if (isPrivate) {
+    return '••••••';
+  }
+
   const curr = (currency || 'USD').toUpperCase();
   const localeMap: Record<string, string> = {
     ARS: 'es-AR',
@@ -549,7 +586,7 @@ export function formatCurrencyCompact(amount: number, currency: DisplayCurrency)
   const currencyCode = currencyMap[curr] || 'USD';
   
   if (Math.abs(amount) < 1000) {
-    return formatCurrency(amount, currency);
+    return formatCurrency(amount, currency, forcePrivacy);
   }
 
   try {

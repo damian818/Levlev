@@ -169,7 +169,7 @@ export function MonthlyHeatmap({
                     <div className="text-right">
                       <p className="text-xs font-bold text-rose-400">-{formatCurrency(converted, displayCurrency)}</p>
                       {tx.currency !== displayCurrency && (
-                        <p className="text-[9px] text-slate-500 font-mono">{tx.currency} {tx.amount.toLocaleString()}</p>
+                        <p className="text-[9px] text-slate-500 font-mono">{formatCurrency(tx.amount, tx.currency as DisplayCurrency)}</p>
                       )}
                     </div>
                   </div>

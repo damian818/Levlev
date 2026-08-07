@@ -36,7 +36,10 @@ import {
   Globe,
   Key,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Shield
 } from 'lucide-react';
 import { 
   getSupabaseCredentials, 
@@ -55,6 +58,8 @@ interface SettingsTabProps {
   transactions: Transaction[];
   budgets: BudgetGoal[];
   usdArsRate: number;
+  privacyMode?: boolean;
+  onTogglePrivacyMode?: () => void;
   onUpdateRate: (rate: number) => void;
   onAddCategory: (category: CategoryItem) => void;
   onEditCategory: (oldName: string, updatedCategory: CategoryItem, updateTransactions: boolean) => void;
@@ -75,6 +80,8 @@ export function SettingsTab({
   transactions,
   budgets,
   usdArsRate,
+  privacyMode = false,
+  onTogglePrivacyMode,
   onUpdateRate,
   onAddCategory,
   onEditCategory,
@@ -631,6 +638,64 @@ export function SettingsTab({
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Privacy Mode & Guest Protection Box */}
+          <div className="bg-[#121720] border border-amber-500/30 rounded-2xl p-6 space-y-4 md:col-span-2 shadow-lg shadow-amber-950/10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 shrink-0 mt-0.5">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-100">Privacy Mode & Guest Shield</h3>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                      privacyMode
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {privacyMode ? 'Active (Masked)' : 'Disabled'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed max-w-2xl">
+                    Mask sensitive financial figures (total account balances, net worth, individual transaction amounts, and budget limits) with placeholder characters (<code className="text-amber-300 font-mono">••••••</code>) when viewing in Guest mode or presenting to observers.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onTogglePrivacyMode}
+                className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 border ${
+                  privacyMode
+                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-400 shadow-md shadow-amber-950/50'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
+              >
+                {privacyMode ? (
+                  <>
+                    <EyeOff className="w-4 h-4 text-slate-950" />
+                    <span>Disable Privacy Mask</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4 text-amber-400" />
+                    <span>Enable Privacy Mask</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="bg-[#0f131a] p-3 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+              <span className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-amber-400/80 shrink-0" />
+                <span>Sample masked display preview:</span>
+              </span>
+              <span className="font-mono font-bold text-amber-300 bg-amber-500/10 px-3 py-1 rounded border border-amber-500/20">
+                {privacyMode ? '••••••' : '$ 12,450.00 USD'}
+              </span>
             </div>
           </div>
 

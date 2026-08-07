@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { rawCsvSample, parseTransactions, defaultBudgets, defaultRecurringRules, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
-import { deriveBudgetsFromTransactions } from './utils/financeUtils';
+import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode } from './utils/financeUtils';
 import { getSupabaseClient, signInWithGoogle } from './lib/supabase';
 import { fetchUserDataFromSupabase, saveAllUserDataToSupabase } from './services/supabaseSync';
 import { Navbar } from './components/Navbar';
@@ -171,6 +171,19 @@ export default function App() {
       console.warn('Failed to save transactions to localStorage', e);
     }
   }, [transactions]);
+
+  // Privacy Mode State
+  const [privacyMode, setPrivacyMode] = useState<boolean>(() => {
+    return getGlobalPrivacyMode();
+  });
+
+  const handleTogglePrivacyMode = () => {
+    setPrivacyMode(prev => {
+      const next = !prev;
+      setGlobalPrivacyMode(next);
+      return next;
+    });
+  };
 
   // Auth State
   const [authUser, setAuthUser] = useState<any>(null);
@@ -649,6 +662,8 @@ export default function App() {
         setDisplayCurrency={setDisplayCurrency}
         usdArsRate={usdArsRate}
         setUsdArsRate={setUsdArsRate}
+        privacyMode={privacyMode}
+        onTogglePrivacyMode={handleTogglePrivacyMode}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onFileUpload={handleFileUpload}
         onResetData={handleResetData}
@@ -731,6 +746,8 @@ export default function App() {
             transactions={transactions}
             budgets={budgets}
             usdArsRate={usdArsRate}
+            privacyMode={privacyMode}
+            onTogglePrivacyMode={handleTogglePrivacyMode}
             onUpdateRate={setUsdArsRate}
             onAddCategory={handleAddCategory}
             onEditCategory={handleEditCategory}
