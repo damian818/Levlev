@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authenticating with Finlev...</title>
+  <style>
+    body {
+      background-color: #0a0b0d;
+      color: #94a3b8;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(16, 185, 129, 0.2);
+      border-top-color: #10b981;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+  <script>
+    // Forward the current URL hash (#access_token=...) and search query params (?code=...) back to root /
+    (function() {
+      const targetUrl = window.location.origin + '/' + window.location.search + window.location.hash;
+      window.location.replace(targetUrl);
+    })();
+  </script>
+</head>
+<body>
+  <div class="spinner"></div>
+  <p style="font-weight: 600; color: #f1f5f9; margin: 0 0 6px 0;">Completing Google authentication...</p>
+  <p style="font-size: 13px; color: #64748b; margin: 0;">Redirecting to Finlev workspace...</p>
+</body>
+</html>

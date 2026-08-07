@@ -29,14 +29,14 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     if (budRes.error) console.warn('Supabase fetch budgets error:', budRes.error);
 
     const transactions: Transaction[] = (txRes.data || []).map((row: any) => ({
-      id: row.id,
-      date: row.date,
-      title: row.title,
-      amount: Number(row.amount),
+      id: row.id || `tx-${Math.random().toString(36).substring(2)}`,
+      date: row.date || new Date().toISOString().substring(0, 10),
+      title: row.title || 'Untitled',
+      amount: Number(row.amount) || 0,
       currency: row.currency || 'ARS',
-      category: row.category,
-      account: row.account,
-      type: row.type,
+      category: row.category || 'General',
+      account: row.account || 'Main',
+      type: row.type || 'EXPENSE',
       toAccount: row.to_account || undefined,
       installments: row.installments ? String(row.installments) : undefined,
       statementCloseDate: row.statement_close_date || undefined,
@@ -46,23 +46,23 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     }));
 
     const categories: CategoryItem[] = (catRes.data || []).map((row: any) => ({
-      id: row.id,
-      name: row.name,
+      id: row.id || `cat-${Math.random().toString(36).substring(2)}`,
+      name: row.name || 'Category',
       type: row.type || 'BOTH',
-      description: row.color,
+      description: row.color || '#64748b',
     }));
 
     const accounts: AccountItem[] = (accRes.data || []).map((row: any) => ({
-      id: row.id,
-      name: row.name,
+      id: row.id || `acc-${Math.random().toString(36).substring(2)}`,
+      name: row.name || 'Account',
       type: row.type || 'CHECKING',
       currency: row.currency || 'ARS',
       initialBalance: row.initial_balance ? Number(row.initial_balance) : undefined,
     }));
 
     const budgets: BudgetGoal[] = (budRes.data || []).map((row: any) => ({
-      category: row.category,
-      monthlyLimitARS: Number(row.monthly_limit),
+      category: row.category || 'General',
+      monthlyLimitARS: Number(row.monthly_limit) || 0,
     }));
 
     return { transactions, categories, accounts, budgets };
