@@ -259,86 +259,6 @@ export default function App() {
     };
   }, [syncFromSupabase]);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center text-slate-400 p-4">
-        <Loader2 className="w-10 h-10 animate-spin text-emerald-500 mb-4" />
-        <p className="font-bold text-slate-200">Loading Finlev...</p>
-        <p className="text-xs text-slate-500 mt-2">Checking authentication & syncing data</p>
-      </div>
-    );
-  }
-
-  if (!authUser && !guestMode) {
-    const currentOrigin = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
-
-    return (
-      <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center mb-6">
-          <span className="text-emerald-400 font-black text-3xl">F</span>
-        </div>
-        <h1 className="text-4xl font-black text-white mb-2">Welcome to Finlev</h1>
-        <p className="text-slate-400 mb-8 max-w-md text-sm">
-          Personal finance &amp; expense tracker with multi-currency support, inflation adjustments, and cloud sync.
-        </p>
-
-        {authError && (
-          <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs max-w-sm text-left">
-            <strong className="block font-semibold mb-1">Auth Error:</strong>
-            {authError}
-          </div>
-        )}
-
-        <div className="flex flex-col gap-3 w-full max-w-xs mb-8">
-          <button
-            onClick={async () => {
-              setAuthError(null);
-              const { error } = await signInWithGoogle();
-              if (error) {
-                setAuthError(error.message || 'Login failed');
-              }
-            }}
-            className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-          >
-            Sign in with Google SSO
-          </button>
-
-          <button
-            onClick={() => {
-              setGuestMode(true);
-              localStorage.setItem('finlev_guest_mode', 'true');
-            }}
-            className="w-full px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-slate-700 text-sm"
-          >
-            Continue in Guest Mode (Offline)
-          </button>
-        </div>
-
-        {/* Redirect URL Configuration Guide */}
-        <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-5 text-left text-xs text-slate-400 shadow-xl">
-          <h3 className="font-bold text-slate-200 text-sm mb-2 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            OAuth &amp; Redirect URL Setup
-          </h3>
-          <p className="mb-3 text-slate-400">
-            Ensure your Supabase project and Google OAuth credentials match this application&apos;s current origin:
-          </p>
-          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-emerald-400 font-mono text-[11px] break-all select-all mb-3">
-            {currentOrigin}
-          </div>
-          <ul className="space-y-2 text-slate-400 list-disc list-inside">
-            <li>
-              <strong className="text-slate-300">Supabase Redirect URL:</strong> Go to Supabase Dashboard &gt; <em>Authentication &gt; URL Configuration</em>, add <code className="text-emerald-400">{currentOrigin}</code> to <strong>Redirect URLs</strong>.
-            </li>
-            <li>
-              <strong className="text-slate-300">Google OAuth Callback:</strong> Ensure Authorized Redirect URI in Google Cloud Console is <code className="text-emerald-400">https://&lt;your-project-ref&gt;.supabase.co/auth/v1/callback</code>.
-            </li>
-          </ul>
-        </div>
-      </div>
-    );
-  }
-
   // Sync budgets to localStorage on update
   useEffect(() => {
     try {
@@ -441,15 +361,94 @@ export default function App() {
       .catch(err => console.warn('Using default historical data fallback:', err));
   }, []);
 
-  // Sync Supabase user data on auth login - redundant logic removed
-
   // Save changes to Supabase when user is authenticated
   useEffect(() => {
+    if (!authUser) return;
     const timer = setTimeout(() => {
       saveAllUserDataToSupabase({ transactions, categories, accounts, budgets });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [transactions, categories, accounts, budgets]);
+  }, [transactions, categories, accounts, budgets, authUser]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center text-slate-400 p-4">
+        <Loader2 className="w-10 h-10 animate-spin text-emerald-500 mb-4" />
+        <p className="font-bold text-slate-200">Loading Finlev...</p>
+        <p className="text-xs text-slate-500 mt-2">Checking authentication & syncing data</p>
+      </div>
+    );
+  }
+
+  if (!authUser && !guestMode) {
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
+
+    return (
+      <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center mb-6">
+          <span className="text-emerald-400 font-black text-3xl">F</span>
+        </div>
+        <h1 className="text-4xl font-black text-white mb-2">Welcome to Finlev</h1>
+        <p className="text-slate-400 mb-8 max-w-md text-sm">
+          Personal finance &amp; expense tracker with multi-currency support, inflation adjustments, and cloud sync.
+        </p>
+
+        {authError && (
+          <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs max-w-sm text-left">
+            <strong className="block font-semibold mb-1">Auth Error:</strong>
+            {authError}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3 w-full max-w-xs mb-8">
+          <button
+            onClick={async () => {
+              setAuthError(null);
+              const { error } = await signInWithGoogle();
+              if (error) {
+                setAuthError(error.message || 'Login failed');
+              }
+            }}
+            className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            Sign in with Google SSO
+          </button>
+
+          <button
+            onClick={() => {
+              setGuestMode(true);
+              localStorage.setItem('finlev_guest_mode', 'true');
+            }}
+            className="w-full px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-slate-700 text-sm"
+          >
+            Continue in Guest Mode (Offline)
+          </button>
+        </div>
+
+        {/* Redirect URL Configuration Guide */}
+        <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-5 text-left text-xs text-slate-400 shadow-xl">
+          <h3 className="font-bold text-slate-200 text-sm mb-2 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            OAuth &amp; Redirect URL Setup
+          </h3>
+          <p className="mb-3 text-slate-400">
+            Ensure your Supabase project and Google OAuth credentials match this application&apos;s current origin:
+          </p>
+          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-emerald-400 font-mono text-[11px] break-all select-all mb-3">
+            {currentOrigin}
+          </div>
+          <ul className="space-y-2 text-slate-400 list-disc list-inside">
+            <li>
+              <strong className="text-slate-300">Supabase Redirect URL:</strong> Go to Supabase Dashboard &gt; <em>Authentication &gt; URL Configuration</em>, add <code className="text-emerald-400">{currentOrigin}</code> to <strong>Redirect URLs</strong>.
+            </li>
+            <li>
+              <strong className="text-slate-300">Google OAuth Callback:</strong> Ensure Authorized Redirect URI in Google Cloud Console is <code className="text-emerald-400">https://&lt;your-project-ref&gt;.supabase.co/auth/v1/callback</code>.
+            </li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
 
   const handleUpdateAccountBalance = (accountName: string, currentBalance: number, currency: string) => {
     setCustomBalances(prev => {
