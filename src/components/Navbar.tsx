@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ViewTab, DisplayCurrency } from '../types';
-import { LayoutDashboard, Receipt, Wallet, Target, Repeat, TrendingUp, Sparkles, Upload, PlusCircle, RefreshCw, Trash2, Sliders, BarChart3, UserCheck, LogIn, Eye, EyeOff, Shield } from 'lucide-react';
-import { getSupabaseClient, signInWithGoogle } from '../lib/supabase';
+import { LayoutDashboard, Receipt, Wallet, Target, Repeat, TrendingUp, Sparkles, Upload, PlusCircle, RefreshCw, Trash2, Sliders, BarChart3, UserCheck, LogIn, LogOut, Eye, EyeOff, Shield } from 'lucide-react';
+import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from '../lib/supabase';
 import { LevLevLogo } from './LevLevLogo';
 
 interface NavbarProps {
@@ -17,6 +17,7 @@ interface NavbarProps {
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onResetData: () => void;
   onOpenDeleteModal: () => void;
+  onLogout?: () => void;
 }
 
 export function Navbar({
@@ -32,6 +33,7 @@ export function Navbar({
   onFileUpload,
   onResetData,
   onOpenDeleteModal,
+  onLogout,
 }: NavbarProps) {
   const [user, setUser] = useState<any>(null);
 
@@ -56,6 +58,17 @@ export function Navbar({
       if (error) {
         setTab('settings');
       }
+    }
+  };
+
+  const handleLogoutClick = async () => {
+    try {
+      await signOutFromSupabase();
+    } catch (e) {
+      console.warn('Logout error:', e);
+    }
+    if (onLogout) {
+      onLogout();
     }
   };
 
@@ -169,6 +182,18 @@ export function Navbar({
                 </>
               )}
             </button>
+
+            {/* Logout Button */}
+            {(user || onLogout) && (
+              <button
+                onClick={handleLogoutClick}
+                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-slate-800/80 hover:bg-rose-500/10 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-500/30 transition-all shrink-0 active:scale-95"
+                title="Log out of session"
+              >
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden lg:inline">Logout</span>
+              </button>
+            )}
 
             <div className="flex items-center gap-1 sm:gap-2">
               <button

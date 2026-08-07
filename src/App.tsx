@@ -8,7 +8,7 @@ import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { rawCsvSample, parseTransactions, defaultBudgets, defaultRecurringRules, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
 import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode } from './utils/financeUtils';
-import { getSupabaseClient, signInWithGoogle } from './lib/supabase';
+import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
 import { fetchUserDataFromSupabase, saveAllUserDataToSupabase } from './services/supabaseSync';
 import { Navbar } from './components/Navbar';
 import { OverviewTab } from './components/OverviewTab';
@@ -650,6 +650,18 @@ export default function App() {
     setTransactions(prev => [newTx, ...prev]);
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOutFromSupabase();
+    } catch (e) {
+      console.warn('Sign out error:', e);
+    }
+    setAuthUser(null);
+    setGuestMode(false);
+    localStorage.removeItem('levlev_guest_mode');
+    localStorage.removeItem('finlev_guest_mode');
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-slate-100 flex flex-col font-sans">
       <Navbar
@@ -668,6 +680,7 @@ export default function App() {
         onFileUpload={handleFileUpload}
         onResetData={handleResetData}
         onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -677,6 +690,7 @@ export default function App() {
             displayCurrency={displayCurrency}
             usdArsRate={usdArsRate}
             historyData={historyData}
+            recurringRules={defaultRecurringRules}
             onNavigateTab={setCurrentTab}
             onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
           />
@@ -757,7 +771,7 @@ export default function App() {
             onDeleteAccount={handleDeleteAccount}
             onResetData={handleResetData}
             onImportBackup={handleImportBackup}
-            onLogout={() => setAuthUser(null)}
+            onLogout={handleLogout}
           />
         )}
       </main>

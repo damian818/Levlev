@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint } from '../types';
+import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule } from '../types';
 import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon } from 'lucide-react';
@@ -13,6 +13,7 @@ interface OverviewTabProps {
   displayCurrency: DisplayCurrency;
   usdArsRate: number;
   historyData?: InflationPoint[];
+  recurringRules?: RecurringRule[];
   onNavigateTab: (tab: ViewTab) => void;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
 }
@@ -24,6 +25,7 @@ export function OverviewTab({
   displayCurrency,
   usdArsRate,
   historyData,
+  recurringRules,
   onNavigateTab,
   onNavigateToTransactionsWithFilter,
 }: OverviewTabProps) {
@@ -70,7 +72,7 @@ export function OverviewTab({
 
   const spending = analyzeSpending(transactions, displayCurrency, usdArsRate, selectedMonth);
   const accounts = computeAccountBalances(transactions, usdArsRate);
-  const { trendData, metrics } = computePredictiveTrend(transactions, displayCurrency, usdArsRate, undefined, undefined, historyData);
+  const { trendData, metrics } = computePredictiveTrend(transactions, displayCurrency, usdArsRate, recurringRules, undefined, historyData);
 
   // Filter trend data based on date filters
   const filteredTrendData = useMemo(() => {
@@ -571,9 +573,16 @@ export function OverviewTab({
                       })}
                       className="hover:bg-slate-800/60 transition-colors cursor-pointer group"
                     >
-                      <td className="py-3 font-medium text-slate-200 group-hover:text-emerald-400 transition-colors flex items-center">
-                        <span>{m.merchant}</span>
-                        <ExternalLink className="w-3 h-3 ml-1.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <td className="py-3 font-medium text-slate-200 group-hover:text-emerald-400 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{m.merchant}</span>
+                          {m.category && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/60 shrink-0">
+                              {m.category}
+                            </span>
+                          )}
+                          <ExternalLink className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
                       </td>
                       <td className="py-3 text-right font-semibold text-slate-100">{formatCurrency(m.amount, displayCurrency)}</td>
                       <td className="py-3 text-right text-slate-400">
@@ -601,6 +610,7 @@ export function OverviewTab({
             selectedMonth={selectedMonth}
             displayCurrency={displayCurrency}
             usdArsRate={usdArsRate}
+            recurringRules={recurringRules}
           />
         </div>
       </div>

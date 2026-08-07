@@ -766,7 +766,7 @@ export function analyzeSpending(
   let totalIncome = 0;
   let totalExpenses = 0;
   const categoryMap: { [cat: string]: number } = {};
-  const merchantMap: { [merchant: string]: number } = {};
+  const merchantMap: { [merchant: string]: { amount: number; category: string } } = {};
   const monthlyMap: { [month: string]: { income: number; expense: number } } = {};
 
   transactions.forEach(tx => {
@@ -794,7 +794,10 @@ export function analyzeSpending(
         categoryMap[cat] = (categoryMap[cat] || 0) + converted;
 
         const merch = tx.title || 'Unknown';
-        merchantMap[merch] = (merchantMap[merch] || 0) + converted;
+        if (!merchantMap[merch]) {
+          merchantMap[merch] = { amount: 0, category: cat };
+        }
+        merchantMap[merch].amount += converted;
       }
     }
   });
@@ -806,7 +809,11 @@ export function analyzeSpending(
     .sort((a, b) => b.amount - a.amount);
 
   const topMerchants = Object.keys(merchantMap)
-    .map(merch => ({ merchant: merch, amount: merchantMap[merch] }))
+    .map(merch => ({ 
+      merchant: merch, 
+      amount: merchantMap[merch].amount,
+      category: merchantMap[merch].category
+    }))
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 10);
 
@@ -879,53 +886,85 @@ export function computePredictiveTrend(
   const daysInMonth = new Date(year, monthIdx, 0).getDate();
   const daysRemaining = Math.max(0, daysInMonth - currentDayOfMonth);
 
-  const currentActualIncome = monthlyMap[currentMonthKey]?.income || 0;
-  const currentActualExpense = monthlyMap[currentMonthKey]?.expense || 0;
+  const currentDayStr = `${currentMonthKey}-${String(currentDayOfMonth).padStart(2, '0')}`;
 
-  // Identify recurring transactions that have already occurred this month to isolate variable velocity
-  let recurringAlreadyHappenedExpense = 0;
+  // Filter current month transactions into PAST (<= today) and FUTURE (> today)
   const currentMonthTransactions = transactions.filter(t => t.date && t.date.substring(0, 7) === currentMonthKey);
-  
-  recurringRules.forEach(rule => {
+  const pastTransactions = currentMonthTransactions.filter(t => {
+    const tDayStr = t.date.substring(0, 10);
+    return tDayStr <= currentDayStr;
+  });
+  const futureTransactions = currentMonthTransactions.filter(t => {
+    const tDayStr = t.date.substring(0, 10);
+    return tDayStr > currentDayStr;
+  });
+
+  // Calculate actual income and expense so far this month
+  let currentActualIncome = 0;
+  let currentActualExpense = 0;
+
+  pastTransactions.forEach(t => {
+    const amt = convertCurrency(t.amount, t.currency, displayCurrency, usdArsRate, t.date, transactions);
+    if (t.type === 'INCOME') {
+      currentActualIncome += amt;
+    } else if (t.type === 'EXPENSE') {
+      currentActualExpense += amt;
+    }
+  });
+
+  // Identify recurring / fixed expenses that already happened in pastTransactions to isolate variable velocity
+  let recurringPastExpense = 0;
+  const activeRules = recurringRules && recurringRules.length > 0 ? recurringRules : defaultRecurringRules;
+
+  activeRules.forEach(rule => {
     if (rule.type === 'EXPENSE') {
-      // Find if this rule has been satisfied by any transaction this month
-      const match = currentMonthTransactions.find(t => 
+      const match = pastTransactions.find(t => 
         t.type === 'EXPENSE' && 
-        (t.title?.toLowerCase().includes(rule.title.split(' ')[0].toLowerCase()) || 
-         t.category === rule.category) &&
-        Math.abs(convertCurrency(t.amount, t.currency, displayCurrency, usdArsRate, t.date) - 
-                 convertCurrency(rule.amount, rule.currency, displayCurrency, usdArsRate)) / 
-                 convertCurrency(rule.amount, rule.currency, displayCurrency, usdArsRate) < 0.2 // 20% variance allowance
+        t.title?.toLowerCase().includes(rule.title.split(' ')[0].toLowerCase())
       );
       if (match) {
-        recurringAlreadyHappenedExpense += convertCurrency(match.amount, match.currency, displayCurrency, usdArsRate, match.date);
+        recurringPastExpense += convertCurrency(match.amount, match.currency, displayCurrency, usdArsRate, match.date, transactions);
       }
     }
   });
 
-  const variableExpenseSoFar = Math.max(0, currentActualExpense - recurringAlreadyHappenedExpense);
+  // Variable expenses so far = past actual expenses minus identified fixed recurring bills
+  const variableExpenseSoFar = Math.max(0, currentActualExpense - recurringPastExpense);
 
-  // Daily spending velocity & prorated variable projection
+  // Daily spending velocity (run-rate of variable expenses per elapsed day)
   const dailyExpenseVelocity = currentDayOfMonth > 0 ? variableExpenseSoFar / currentDayOfMonth : 0;
   const projectedRemainingVariableExpense = dailyExpenseVelocity * daysRemaining;
 
-  // Pending recurring items for remaining days of month (dayOfMonth > currentDayOfMonth)
+  // Calculate pending recurring items for the remaining portion of the month:
+  // 1. Explicit future scheduled transactions logged in the dataset
   let pendingRecurringIncome = 0;
   let pendingRecurringExpense = 0;
 
-  recurringRules.forEach(rule => {
-    // A rule is pending if its scheduled day is in the future OR if it hasn't happened yet this month
-    const hasHappened = currentMonthTransactions.some(t => 
-      t.type === rule.type && 
-      (t.title?.toLowerCase().includes(rule.title.split(' ')[0].toLowerCase()) || t.category === rule.category)
-    );
+  futureTransactions.forEach(t => {
+    const amt = convertCurrency(t.amount, t.currency, displayCurrency, usdArsRate, t.date, transactions);
+    if (t.type === 'INCOME') {
+      pendingRecurringIncome += amt;
+    } else if (t.type === 'EXPENSE') {
+      pendingRecurringExpense += amt;
+    }
+  });
 
-    if (!hasHappened) {
-      const amt = convertCurrency(rule.amount, rule.currency, displayCurrency, usdArsRate);
-      if (rule.type === 'INCOME') {
-        pendingRecurringIncome += amt;
-      } else if (rule.type === 'EXPENSE') {
-        pendingRecurringExpense += amt;
+  // 2. Unlogged recurring rules scheduled for future days of this month that haven't been matched
+  activeRules.forEach(rule => {
+    const ruleDay = rule.dayOfMonth || 15;
+    if (ruleDay >= currentDayOfMonth) {
+      // Check if any transaction in current month already matches this rule
+      const exists = currentMonthTransactions.some(t => 
+        t.type === rule.type && 
+        t.title?.toLowerCase().includes(rule.title.split(' ')[0].toLowerCase())
+      );
+      if (!exists) {
+        const amt = convertCurrency(rule.amount, rule.currency, displayCurrency, usdArsRate);
+        if (rule.type === 'INCOME') {
+          pendingRecurringIncome += amt;
+        } else if (rule.type === 'EXPENSE') {
+          pendingRecurringExpense += amt;
+        }
       }
     }
   });
