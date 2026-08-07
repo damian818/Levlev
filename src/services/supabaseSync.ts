@@ -82,7 +82,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
   const userId = session.user.id;
 
   try {
-    // 1. Transactions upsert
+    // 1. Transactions upsert or clear
     if (data.transactions && data.transactions.length > 0) {
       const txRows = data.transactions.map(t => ({
         id: t.id,
@@ -104,6 +104,9 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
 
       const { error: txErr } = await client.from('transactions').upsert(txRows, { onConflict: 'id' });
       if (txErr) console.error('Error upserting transactions to Supabase:', txErr);
+    } else if (data.transactions && data.transactions.length === 0) {
+      const { error: delTxErr } = await client.from('transactions').delete().eq('user_id', userId);
+      if (delTxErr) console.error('Error clearing transactions in Supabase:', delTxErr);
     }
 
     // 2. Categories upsert
@@ -135,7 +138,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       if (accErr) console.error('Error upserting accounts to Supabase:', accErr);
     }
 
-    // 4. Budgets upsert
+    // 4. Budgets upsert or clear
     if (data.budgets && data.budgets.length > 0) {
       const budRows = data.budgets.map(b => ({
         id: b.category, // using category name as ID for budget rows
@@ -147,6 +150,9 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
 
       const { error: budErr } = await client.from('budgets').upsert(budRows, { onConflict: 'id' });
       if (budErr) console.error('Error upserting budgets to Supabase:', budErr);
+    } else if (data.budgets && data.budgets.length === 0) {
+      const { error: delBudErr } = await client.from('budgets').delete().eq('user_id', userId);
+      if (delBudErr) console.error('Error clearing budgets in Supabase:', delBudErr);
     }
 
     return true;
@@ -168,6 +174,29 @@ export async function deleteTransactionFromSupabase(txId: string): Promise<boole
     }
     return true;
   } catch (e) {
+    return false;
+  }
+}
+
+export async function deleteAllUserDataFromSupabase(): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.user) return false;
+
+    const userId = session.user.id;
+
+    await Promise.all([
+      client.from('transactions').delete().eq('user_id', userId),
+      client.from('budgets').delete().eq('user_id', userId),
+      client.from('categories').delete().eq('user_id', userId),
+      client.from('accounts').delete().eq('user_id', userId),
+    ]);
+    return true;
+  } catch (err) {
+    console.error('Error deleting user data from Supabase:', err);
     return false;
   }
 }

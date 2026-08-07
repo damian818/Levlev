@@ -9,7 +9,7 @@ import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, Arrow
 import { rawCsvSample, parseTransactions, defaultBudgets, defaultRecurringRules, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
 import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode } from './utils/financeUtils';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
-import { fetchUserDataFromSupabase, saveAllUserDataToSupabase } from './services/supabaseSync';
+import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase } from './services/supabaseSync';
 import { Navbar } from './components/Navbar';
 import { OverviewTab } from './components/OverviewTab';
 import { ReportsTab } from './components/ReportsTab';
@@ -27,10 +27,14 @@ import { AiChatWidget } from './components/AiChatWidget';
 export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
+      const isCleared = localStorage.getItem('finance_app_is_cleared');
+      if (isCleared === 'true') {
+        return [];
+      }
       const saved = localStorage.getItem('finance_app_transactions');
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {
       console.warn('Failed to load transactions from localStorage', e);
@@ -40,10 +44,14 @@ export default function App() {
 
   const [budgets, setBudgets] = useState<BudgetGoal[]>(() => {
     try {
+      const isCleared = localStorage.getItem('finance_app_is_cleared');
+      if (isCleared === 'true') {
+        return [];
+      }
       const saved = localStorage.getItem('finance_app_budgets');
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {
       console.warn('Failed to load budgets from localStorage', e);
@@ -166,6 +174,9 @@ export default function App() {
   // Sync transactions to localStorage on update
   useEffect(() => {
     try {
+      if (transactions.length > 0) {
+        localStorage.removeItem('finance_app_is_cleared');
+      }
       localStorage.setItem('finance_app_transactions', JSON.stringify(transactions));
     } catch (e) {
       console.warn('Failed to save transactions to localStorage', e);
@@ -198,10 +209,16 @@ export default function App() {
     try {
       const data = await fetchUserDataFromSupabase();
       if (data) {
-        if (data.transactions && data.transactions.length > 0) setTransactions(data.transactions);
-        if (data.categories && data.categories.length > 0) setCategories(data.categories);
-        if (data.accounts && data.accounts.length > 0) setAccounts(data.accounts);
-        if (data.budgets && data.budgets.length > 0) setBudgets(data.budgets);
+        const isClearedLocally = localStorage.getItem('finance_app_is_cleared') === 'true';
+        if (isClearedLocally) {
+          setTransactions([]);
+          setBudgets([]);
+        } else {
+          if (data.transactions) setTransactions(data.transactions);
+          if (data.categories && data.categories.length > 0) setCategories(data.categories);
+          if (data.accounts && data.accounts.length > 0) setAccounts(data.accounts);
+          if (data.budgets) setBudgets(data.budgets);
+        }
       }
     } catch (err) {
       console.warn('Failed to fetch user data from Supabase:', err);
@@ -627,19 +644,28 @@ export default function App() {
   };
 
   const handleResetData = () => {
-    localStorage.removeItem('finance_app_transactions');
-    localStorage.removeItem('finance_app_budgets');
-    setTransactions(parseTransactions(rawCsvSample));
+    localStorage.removeItem('finance_app_is_cleared');
+    const demo = parseTransactions(rawCsvSample);
+    setTransactions(demo);
     setBudgets(defaultBudgets);
     setActiveFilter(undefined);
+    localStorage.setItem('finance_app_transactions', JSON.stringify(demo));
+    localStorage.setItem('finance_app_budgets', JSON.stringify(defaultBudgets));
   };
 
-  const handleDeleteAllData = () => {
-    localStorage.removeItem('finance_app_transactions');
-    localStorage.removeItem('finance_app_budgets');
+  const handleDeleteAllData = async () => {
+    localStorage.setItem('finance_app_is_cleared', 'true');
+    localStorage.setItem('finance_app_transactions', JSON.stringify([]));
+    localStorage.setItem('finance_app_budgets', JSON.stringify([]));
     setTransactions([]);
     setBudgets([]);
     setActiveFilter(undefined);
+
+    try {
+      await deleteAllUserDataFromSupabase();
+    } catch (e) {
+      console.warn('Failed to delete user data from Supabase:', e);
+    }
   };
 
   const handleDeleteTransaction = (id: string) => {
