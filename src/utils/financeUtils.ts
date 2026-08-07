@@ -437,6 +437,16 @@ export function getHistoricalFxRate(
   return fallbackRate;
 }
 
+const GLOBAL_USD_RATES: Record<string, number> = {
+  USD: 1,
+  USDT: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  BRL: 5.60,
+  MXN: 18.5,
+  CLP: 950,
+};
+
 export function convertCurrency(
   amount: number,
   fromCurrency: string,
@@ -446,50 +456,114 @@ export function convertCurrency(
   transactions?: Transaction[],
   historyOverride?: InflationPoint[]
 ): number {
-  const isUSD = (c: string) => c.toUpperCase().includes('USD');
-  const fromIsUSD = isUSD(fromCurrency);
-  const toIsUSD = toCurrency === 'USD';
+  const fromCode = (fromCurrency || 'ARS').toUpperCase();
+  const toCode = (toCurrency || 'ARS').toUpperCase();
 
-  if (fromIsUSD && toIsUSD) return amount;
-  if (!fromIsUSD && !toIsUSD) return amount;
+  if (fromCode === toCode) return amount;
 
-  const effectiveRate = getHistoricalFxRate(dateStr, usdArsRate, transactions, historyOverride);
+  const effectiveUsdArsRate = getHistoricalFxRate(dateStr, usdArsRate, transactions, historyOverride);
 
-  if (fromIsUSD && !toIsUSD) {
-    // USD to ARS
-    return amount * effectiveRate;
-  } else {
-    // ARS to USD
-    return effectiveRate > 0 ? amount / effectiveRate : 0;
+  // Convert 'fromCurrency' amount to USD first
+  let amountInUSD = amount;
+  if (fromCode === 'ARS') {
+    amountInUSD = effectiveUsdArsRate > 0 ? amount / effectiveUsdArsRate : 0;
+  } else if (GLOBAL_USD_RATES[fromCode]) {
+    amountInUSD = amount / GLOBAL_USD_RATES[fromCode];
   }
+
+  // Convert USD amount to 'toCurrency'
+  if (toCode === 'USD' || toCode === 'USDT') {
+    return amountInUSD;
+  } else if (toCode === 'ARS') {
+    return amountInUSD * effectiveUsdArsRate;
+  } else if (GLOBAL_USD_RATES[toCode]) {
+    return amountInUSD * GLOBAL_USD_RATES[toCode];
+  }
+
+  return amountInUSD;
 }
 
 export function formatCurrency(amount: number, currency: DisplayCurrency): string {
-  const locale = currency === 'USD' ? 'en-US' : 'es-AR';
-  const currencyCode = currency === 'USD' ? 'USD' : 'ARS';
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: currencyCode,
-    maximumFractionDigits: 0,
-  }).format(amount);
+  const curr = (currency || 'USD').toUpperCase();
+  const localeMap: Record<string, string> = {
+    ARS: 'es-AR',
+    USD: 'en-US',
+    USDT: 'en-US',
+    EUR: 'de-DE',
+    BRL: 'pt-BR',
+    GBP: 'en-GB',
+    MXN: 'es-MX',
+    CLP: 'es-CL',
+  };
+
+  const currencyMap: Record<string, string> = {
+    ARS: 'ARS',
+    USD: 'USD',
+    USDT: 'USD',
+    EUR: 'EUR',
+    BRL: 'BRL',
+    GBP: 'GBP',
+    MXN: 'MXN',
+    CLP: 'CLP',
+  };
+
+  const locale = localeMap[curr] || 'en-US';
+  const currencyCode = currencyMap[curr] || 'USD';
+
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currencyCode,
+      maximumFractionDigits: curr === 'ARS' || curr === 'CLP' ? 0 : 2,
+    }).format(amount);
+  } catch (e) {
+    return `${curr} ${amount.toFixed(2)}`;
+  }
 }
 
 export function formatCurrencyCompact(amount: number, currency: DisplayCurrency): string {
-  const locale = currency === 'USD' ? 'en-US' : 'es-AR';
-  const currencyCode = currency === 'USD' ? 'USD' : 'ARS';
+  const curr = (currency || 'USD').toUpperCase();
+  const localeMap: Record<string, string> = {
+    ARS: 'es-AR',
+    USD: 'en-US',
+    USDT: 'en-US',
+    EUR: 'de-DE',
+    BRL: 'pt-BR',
+    GBP: 'en-GB',
+    MXN: 'es-MX',
+    CLP: 'es-CL',
+  };
+
+  const currencyMap: Record<string, string> = {
+    ARS: 'ARS',
+    USD: 'USD',
+    USDT: 'USD',
+    EUR: 'EUR',
+    BRL: 'BRL',
+    GBP: 'GBP',
+    MXN: 'MXN',
+    CLP: 'CLP',
+  };
+
+  const locale = localeMap[curr] || 'en-US';
+  const currencyCode = currencyMap[curr] || 'USD';
   
   if (Math.abs(amount) < 1000) {
     return formatCurrency(amount, currency);
   }
 
-  const formatter = new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: currencyCode,
-    notation: 'compact',
-    compactDisplay: 'short',
-    maximumFractionDigits: 1,
-  });
-  return formatter.format(amount);
+  try {
+    const formatter = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currencyCode,
+      notation: 'compact',
+      compactDisplay: 'short',
+      maximumFractionDigits: 1,
+    });
+    return formatter.format(amount);
+  } catch (e) {
+    return `${curr} ${(amount / 1000).toFixed(1)}k`;
+  }
 }
 
 export interface AccountSummary {

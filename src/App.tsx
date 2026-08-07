@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem } from './types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { rawCsvSample, parseTransactions, defaultBudgets, defaultRecurringRules, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
 import { deriveBudgetsFromTransactions } from './utils/financeUtils';
 import { getSupabaseClient, signInWithGoogle } from './lib/supabase';
@@ -176,7 +176,7 @@ export default function App() {
   const [authUser, setAuthUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [guestMode, setGuestMode] = useState<boolean>(() => {
-    return localStorage.getItem('finlev_guest_mode') === 'true';
+    return localStorage.getItem('levlev_guest_mode') === 'true' || localStorage.getItem('finlev_guest_mode') === 'true';
   });
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -373,79 +373,177 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center text-slate-400 p-4">
-        <Loader2 className="w-10 h-10 animate-spin text-emerald-500 mb-4" />
-        <p className="font-bold text-slate-200">Loading Finlev...</p>
-        <p className="text-xs text-slate-500 mt-2">Checking authentication & syncing data</p>
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-rose-500/20 to-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-lg shadow-emerald-950/40">
+          <Heart className="w-6 h-6 text-rose-500 fill-rose-500/20 animate-pulse" />
+        </div>
+        <Loader2 className="w-6 h-6 animate-spin text-emerald-500 mb-2" />
+        <p className="font-bold text-slate-200 text-sm">Loading LevLev...</p>
+        <p className="text-xs text-slate-500 mt-1">Personal finance with heart</p>
       </div>
     );
   }
 
   if (!authUser && !guestMode) {
-    const currentOrigin = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
-
     return (
-      <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center mb-6">
-          <span className="text-emerald-400 font-black text-3xl">F</span>
-        </div>
-        <h1 className="text-4xl font-black text-white mb-2">Welcome to Finlev</h1>
-        <p className="text-slate-400 mb-8 max-w-md text-sm">
-          Personal finance &amp; expense tracker with multi-currency support, inflation adjustments, and cloud sync.
-        </p>
+      <div className="min-h-screen bg-[#0a0b0d] text-slate-100 flex flex-col justify-between selection:bg-rose-500 selection:text-white">
+        {/* Navigation Header */}
+        <header className="border-b border-slate-800/80 bg-[#0f131a]/80 backdrop-blur-md sticky top-0 z-50">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 via-rose-500/20 to-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/40">
+                <Heart className="w-5 h-5 text-rose-500 fill-rose-500/20" />
+              </div>
+              <div>
+                <h1 className="text-xl font-black text-white tracking-tight leading-none flex items-center gap-1.5">
+                  LevLev
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    GLOBAL
+                  </span>
+                </h1>
+                <p className="text-[10px] text-slate-400 font-medium">Personal Finance with Heart</p>
+              </div>
+            </div>
 
-        {authError && (
-          <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs max-w-sm text-left">
-            <strong className="block font-semibold mb-1">Auth Error:</strong>
-            {authError}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setGuestMode(true);
+                  localStorage.setItem('finlev_guest_mode', 'true');
+                  localStorage.setItem('levlev_guest_mode', 'true');
+                }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs sm:text-sm rounded-xl transition-all border border-slate-700"
+              >
+                Try Guest Mode
+              </button>
+              <button
+                onClick={async () => {
+                  setAuthError(null);
+                  const { error } = await signInWithGoogle();
+                  if (error) setAuthError(error.message || 'Login failed');
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-lg shadow-emerald-900/30 flex items-center gap-1.5 active:scale-95"
+              >
+                Sign In <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        )}
+        </header>
 
-        <div className="flex flex-col gap-3 w-full max-w-xs mb-8">
-          <button
-            onClick={async () => {
-              setAuthError(null);
-              const { error } = await signInWithGoogle();
-              if (error) {
-                setAuthError(error.message || 'Login failed');
-              }
-            }}
-            className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-          >
-            Sign in with Google SSO
-          </button>
+        {/* Hero & Features Body */}
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 flex-1 flex flex-col items-center justify-center text-center">
+          {/* Top Badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-semibold mb-6 shadow-inner">
+            <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400" />
+            <span>Multi-Currency &amp; Inflation Intelligence Engine</span>
+          </div>
 
-          <button
-            onClick={() => {
-              setGuestMode(true);
-              localStorage.setItem('finlev_guest_mode', 'true');
-            }}
-            className="w-full px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-slate-700 text-sm"
-          >
-            Continue in Guest Mode (Offline)
-          </button>
-        </div>
+          {/* Headline */}
+          <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight max-w-3xl leading-[1.15] mb-6">
+            Master your net worth with <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-rose-400 bg-clip-text text-transparent">clarity &amp; heart</span>
+          </h2>
 
-        {/* Redirect URL Configuration Guide */}
-        <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-5 text-left text-xs text-slate-400 shadow-xl">
-          <h3 className="font-bold text-slate-200 text-sm mb-2 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            OAuth &amp; Redirect URL Setup
-          </h3>
-          <p className="mb-3 text-slate-400">
-            Ensure your Supabase project and Google OAuth credentials match this application&apos;s current origin:
+          {/* Subheadline */}
+          <p className="text-slate-400 text-sm sm:text-lg max-w-2xl mb-10 leading-relaxed font-normal">
+            Track multi-currency accounts in ARS &amp; USD, monitor live MEP exchange rates, evaluate real inflation purchasing power, and manage installments effortlessly.
           </p>
-          <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-emerald-400 font-mono text-[11px] break-all select-all mb-3">
-            {currentOrigin}
+
+          {/* Auth Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md mb-6">
+            <button
+              onClick={async () => {
+                setAuthError(null);
+                const { error } = await signInWithGoogle();
+                if (error) setAuthError(error.message || 'Login failed');
+              }}
+              className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-900/30 transition-all active:scale-95 flex items-center justify-center gap-2.5 text-sm sm:text-base"
+            >
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/>
+              </svg>
+              <span>Sign in with Google</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setGuestMode(true);
+                localStorage.setItem('finlev_guest_mode', 'true');
+                localStorage.setItem('levlev_guest_mode', 'true');
+              }}
+              className="px-6 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-2xl border border-slate-700 transition-all active:scale-95 text-sm"
+            >
+              Explore Guest Mode
+            </button>
           </div>
-          <ul className="space-y-2 text-slate-400 list-disc list-inside">
-            <li>
-              <strong className="text-slate-300">Supabase Redirect URL:</strong> Go to Supabase Dashboard &gt; <em>Authentication &gt; URL Configuration</em>, add <code className="text-emerald-400">{currentOrigin}</code> to <strong>Redirect URLs</strong>.
-            </li>
-            <li>
-              <strong className="text-slate-300">Google OAuth Callback:</strong> Ensure Authorized Redirect URI in Google Cloud Console is <code className="text-emerald-400">https://&lt;your-project-ref&gt;.supabase.co/auth/v1/callback</code>.
-            </li>
-          </ul>
-        </div>
+
+          {authError && (
+            <div className="mb-6 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs max-w-md text-left">
+              <strong className="block font-semibold mb-0.5">Authentication Note:</strong>
+              {authError}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 text-xs text-slate-500 mb-16">
+            <Lock className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Private &amp; Secure. Guest mode runs 100% locally in your browser.</span>
+          </div>
+
+          {/* Feature Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 w-full text-left">
+            <div className="bg-[#11151f] border border-slate-800/90 rounded-2xl p-5 hover:border-emerald-500/40 transition-all group">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4 group-hover:scale-110 transition-transform">
+                <Wallet className="w-5 h-5" />
+              </div>
+              <h3 className="text-slate-100 font-bold text-sm mb-1.5">Multi-Currency ARS/USD</h3>
+              <p className="text-slate-400 text-xs leading-relaxed">
+                Live MEP, Blue &amp; Official rates automatically convert balances across accounts like Deel, DollarApp, and local banks.
+              </p>
+            </div>
+
+            <div className="bg-[#11151f] border border-slate-800/90 rounded-2xl p-5 hover:border-rose-500/40 transition-all group">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-4 group-hover:scale-110 transition-transform">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <h3 className="text-slate-100 font-bold text-sm mb-1.5">Inflation Adjustment</h3>
+              <p className="text-slate-400 text-xs leading-relaxed">
+                Historical INDEC/IPC inflation tracking reveals your real purchasing power adjusted for economic fluctuations.
+              </p>
+            </div>
+
+            <div className="bg-[#11151f] border border-slate-800/90 rounded-2xl p-5 hover:border-teal-500/40 transition-all group">
+              <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 mb-4 group-hover:scale-110 transition-transform">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <h3 className="text-slate-100 font-bold text-sm mb-1.5">Cuotas &amp; Closing Dates</h3>
+              <p className="text-slate-400 text-xs leading-relaxed">
+                Track installment periods, credit card statement closing dates, and settled balances with zero confusion.
+              </p>
+            </div>
+
+            <div className="bg-[#11151f] border border-slate-800/90 rounded-2xl p-5 hover:border-amber-500/40 transition-all group">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4 group-hover:scale-110 transition-transform">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <h3 className="text-slate-100 font-bold text-sm mb-1.5">AI Financial Companion</h3>
+              <p className="text-slate-400 text-xs leading-relaxed">
+                Contextual AI assistant analyzes trends, compares category spikes, and guides your monthly budget targets.
+              </p>
+            </div>
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="border-t border-slate-800/60 py-6 bg-[#0f131a]/60 text-center text-xs text-slate-500">
+          <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center space-x-2">
+              <Heart className="w-4 h-4 text-rose-500 fill-rose-500/20" />
+              <span className="font-bold text-slate-300">LevLev</span>
+              <span>— Personal Finance with Heart</span>
+            </div>
+            <p className="text-[11px] text-slate-600">
+              Multi-currency intelligence tracker for ARS &amp; USD
+            </p>
+          </div>
+        </footer>
       </div>
     );
   }

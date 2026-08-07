@@ -90,14 +90,14 @@ export interface AccountItem {
   id: string;
   name: string;
   type: 'CHECKING' | 'SAVINGS' | 'CREDIT_CARD' | 'WALLET' | 'INVESTMENT' | 'OTHER';
-  currency: 'ARS' | 'USD';
+  currency: string;
   initialBalance?: number;
   closingRule?: CreditCardClosingRule;
   description?: string;
 }
 
 export type ViewTab = 'overview' | 'transactions' | 'accounts' | 'budgets' | 'recurring' | 'inflation' | 'ai-advisor' | 'settings' | 'reports';
-export type DisplayCurrency = 'ARS' | 'USD';
+export type DisplayCurrency = 'ARS' | 'USD' | 'EUR' | 'BRL' | 'GBP' | 'MXN' | 'CLP' | 'USDT' | string;
 
 export interface AccountCustomBalance {
   accountName: string;

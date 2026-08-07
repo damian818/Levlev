@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ViewTab, DisplayCurrency } from '../types';
-import { LayoutDashboard, Receipt, Wallet, Target, Repeat, TrendingUp, Sparkles, Upload, PlusCircle, RefreshCw, Trash2, Sliders, BarChart3, UserCheck, LogIn } from 'lucide-react';
+import { LayoutDashboard, Receipt, Wallet, Target, Repeat, TrendingUp, Sparkles, Upload, PlusCircle, RefreshCw, Trash2, Sliders, BarChart3, UserCheck, LogIn, Heart } from 'lucide-react';
 import { getSupabaseClient, signInWithGoogle } from '../lib/supabase';
 
 interface NavbarProps {
@@ -71,18 +71,18 @@ export function Navbar({
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 sm:h-20 gap-2">
           {/* Logo / Title */}
-          <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden border border-slate-700 shadow-lg">
-              <img 
-                src="/finlev_logo.jpg" 
-                alt="Finlev Logo" 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+          <div className="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-emerald-500/20 via-rose-500/20 to-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/40 shrink-0">
+              <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-rose-500 fill-rose-500/20" />
             </div>
             <div className="hidden xs:block">
-              <h1 className="text-base sm:text-xl font-bold text-slate-100 tracking-tight leading-none">Finlev</h1>
-              <p className="hidden sm:block text-[10px] text-slate-400 mt-1">Multi-Currency Intelligence</p>
+              <h1 className="text-base sm:text-xl font-black text-white tracking-tight leading-none flex items-center gap-1.5">
+                LevLev
+                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  GLOBAL
+                </span>
+              </h1>
+              <p className="hidden sm:block text-[10px] text-slate-400 font-medium mt-1">Personal Finance with Heart</p>
             </div>
           </div>
 
@@ -98,27 +98,22 @@ export function Navbar({
               />
             </div>
 
-            <div className="flex bg-[#161b22] p-0.5 sm:p-1 rounded-lg border border-slate-800 shrink-0">
-              <button
-                onClick={() => setDisplayCurrency('ARS')}
-                className={`px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
-                  displayCurrency === 'ARS'
-                    ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
-                    : 'text-slate-500 hover:text-slate-300'
-                }`}
+            <div className="flex bg-[#161b22] p-0.5 sm:p-1 rounded-lg border border-slate-800 shrink-0 items-center">
+              <select
+                value={displayCurrency}
+                onChange={(e) => setDisplayCurrency(e.target.value)}
+                className="bg-[#0f131a] text-slate-200 text-[10px] sm:text-xs font-bold px-2 py-1 rounded border border-slate-700 focus:outline-none cursor-pointer hover:border-slate-600 transition-colors"
+                title="Select active view currency"
               >
-                ARS
-              </button>
-              <button
-                onClick={() => setDisplayCurrency('USD')}
-                className={`px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-md transition-all ${
-                  displayCurrency === 'USD'
-                    ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
-                    : 'text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                USD
-              </button>
+                <option value="ARS">ARS ($)</option>
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="BRL">BRL (R$)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="MXN">MXN ($)</option>
+                <option value="CLP">CLP ($)</option>
+                <option value="USDT">USDT (₮)</option>
+              </select>
             </div>
 
             <label className="cursor-pointer inline-flex items-center px-2 sm:px-3 py-1.5 border border-slate-800 rounded-lg text-[10px] sm:text-xs font-medium text-slate-300 bg-[#161b22] hover:bg-slate-800 transition-colors shrink-0">

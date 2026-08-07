@@ -103,7 +103,7 @@ export function SettingsTab({
   const [editingAcc, setEditingAcc] = useState<AccountItem | null>(null);
   const [accNameInput, setAccNameInput] = useState('');
   const [accTypeInput, setAccTypeInput] = useState<'CHECKING' | 'SAVINGS' | 'CREDIT_CARD' | 'WALLET' | 'INVESTMENT' | 'OTHER'>('CHECKING');
-  const [accCurrencyInput, setAccCurrencyInput] = useState<'ARS' | 'USD'>('ARS');
+  const [accCurrencyInput, setAccCurrencyInput] = useState<string>('ARS');
   const [accBalanceInput, setAccBalanceInput] = useState<string>('0');
   const [accRuleTypeInput, setAccRuleTypeInput] = useState<ClosingRuleType>('FIXED_DAY');
   const [accFixedDayInput, setAccFixedDayInput] = useState<number>(25);

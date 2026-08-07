@@ -34,6 +34,7 @@ export class ErrorBoundary extends Component<Props, State> {
       localStorage.removeItem('finance_app_budgets');
       localStorage.removeItem('finance_app_account_balances');
       localStorage.setItem('finlev_guest_mode', 'true');
+      localStorage.setItem('levlev_guest_mode', 'true');
     } catch (e) {
       console.warn('Cache clear error:', e);
     }
@@ -48,6 +49,7 @@ export class ErrorBoundary extends Component<Props, State> {
     }
     try {
       localStorage.setItem('finlev_guest_mode', 'false');
+      localStorage.setItem('levlev_guest_mode', 'false');
     } catch (e) {
       console.warn('Storage set error:', e);
     }

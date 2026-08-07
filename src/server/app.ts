@@ -33,6 +33,20 @@ const FALLBACK_FX_RATES = {
   ccl: { buy: 1420, sell: 1445, name: "Contado con Liqui", updated: new Date().toISOString() },
 };
 
+const FALLBACK_GLOBAL_RATES: Record<string, number> = {
+  USD: 1.0,
+  EUR: 0.92,
+  GBP: 0.78,
+  BRL: 5.45,
+  MXN: 18.20,
+  CLP: 930.0,
+  COP: 3950.0,
+  CAD: 1.36,
+  JPY: 154.5,
+  USDT: 1.0,
+  ARS: 1410.0,
+};
+
 const FALLBACK_INFLATION_HISTORY = [
   { month: '2024-09', inflationIndex: 100, usdArsRate: 1250 },
   { month: '2024-10', inflationIndex: 103.5, usdArsRate: 1280 },
@@ -63,40 +77,124 @@ const FALLBACK_INFLATION_HISTORY = [
 // API Routes
 app.get(["/api/fx-rates", "/fx-rates"], async (req, res) => {
   try {
-    const response = await fetchWithTimeout("https://dolarapi.com/v1/dolares", {
-      headers: { 'User-Agent': 'Finlev-App/1.0' }
-    }, 3500);
+    const [dolarRes, globalRes] = await Promise.allSettled([
+      fetchWithTimeout("https://dolarapi.com/v1/dolares", {
+        headers: { 'User-Agent': 'LevLev-App/1.0' }
+      }, 3500),
+      fetchWithTimeout("https://open.er-api.com/v6/latest/USD", {
+        headers: { 'User-Agent': 'LevLev-App/1.0' }
+      }, 3500)
+    ]);
 
-    if (!response.ok) {
-      throw new Error(`DolarApi responded with status ${response.status}`);
-    }
-    const data = await response.json();
-    
     const ratesMap: Record<string, { buy: number; sell: number; name: string; updated: string }> = {};
-    if (Array.isArray(data)) {
-      data.forEach((item: any) => {
-        ratesMap[item.casa] = {
-          buy: item.compra,
-          sell: item.venta,
-          name: item.nombre,
-          updated: item.fechaActualizacion,
-        };
-      });
+    if (dolarRes.status === 'fulfilled' && dolarRes.value.ok) {
+      const data = await dolarRes.value.json();
+      if (Array.isArray(data)) {
+        data.forEach((item: any) => {
+          ratesMap[item.casa] = {
+            buy: item.compra,
+            sell: item.venta,
+            name: item.nombre,
+            updated: item.fechaActualizacion,
+          };
+        });
+      }
+    }
+
+    let globalRates: Record<string, number> = { ...FALLBACK_GLOBAL_RATES };
+    if (globalRes.status === 'fulfilled' && globalRes.value.ok) {
+      const globalData = await globalRes.value.json();
+      if (globalData && globalData.rates) {
+        globalRates = { ...globalData.rates, USDT: 1.0 };
+      }
+    }
+
+    const mepRate = ratesMap['bolsa']?.sell || ratesMap['blue']?.sell || 1410;
+    if (mepRate) {
+      globalRates['ARS'] = mepRate;
     }
 
     res.json({
       rates: Object.keys(ratesMap).length > 0 ? ratesMap : FALLBACK_FX_RATES,
-      raw: data,
+      globalRates,
       fetchedAt: new Date().toISOString()
     });
   } catch (error: any) {
     console.warn("Using fallback FX rates due to upstream timeout/error:", error?.message || error);
     res.json({
       rates: FALLBACK_FX_RATES,
+      globalRates: FALLBACK_GLOBAL_RATES,
       fallback: true,
       error: error?.message || "Using cached fallback exchange rates",
       fetchedAt: new Date().toISOString()
     });
+  }
+});
+
+// Universal Currency Pair Converter API Endpoint
+app.get(["/api/fx-convert", "/fx-convert", "/api/fx-pair", "/fx-pair"], async (req, res) => {
+  try {
+    const from = ((req.query.from as string) || 'USD').toUpperCase();
+    const to = ((req.query.to as string) || 'EUR').toUpperCase();
+    const amount = parseFloat(req.query.amount as string) || 1;
+
+    let baseRates: Record<string, number> = { ...FALLBACK_GLOBAL_RATES };
+
+    try {
+      const globalRes = await fetchWithTimeout(`https://open.er-api.com/v6/latest/${from}`, {
+        headers: { 'User-Agent': 'LevLev-App/1.0' }
+      }, 3500);
+
+      if (globalRes.ok) {
+        const data = await globalRes.json();
+        if (data && data.rates) {
+          baseRates = data.rates;
+        }
+      }
+    } catch (e) {
+      console.warn(`Could not fetch live base ${from}, using fallback cross rate calculation`);
+    }
+
+    if (from === 'ARS' || to === 'ARS') {
+      try {
+        const dolarRes = await fetchWithTimeout("https://dolarapi.com/v1/dolares/bolsa", {
+          headers: { 'User-Agent': 'LevLev-App/1.0' }
+        }, 3000);
+        if (dolarRes.ok) {
+          const mep = await dolarRes.json();
+          if (mep && mep.venta) {
+            if (from === 'USD' && to === 'ARS') baseRates['ARS'] = mep.venta;
+            else if (from === 'ARS' && to === 'USD') baseRates['USD'] = 1 / mep.venta;
+          }
+        }
+      } catch (e) {
+        // ignore fallback
+      }
+    }
+
+    let rate = 1;
+    if (from === to) {
+      rate = 1;
+    } else if (baseRates[to]) {
+      rate = baseRates[to];
+    } else {
+      const fromInUsd = baseRates[from] ? (1 / baseRates[from]) : (from === 'ARS' ? 1/1410 : 1);
+      const toInUsd = baseRates[to] ? (1 / baseRates[to]) : (to === 'ARS' ? 1/1410 : 1);
+      rate = fromInUsd / toInUsd;
+    }
+
+    const convertedAmount = Math.round(amount * rate * 100) / 100;
+
+    res.json({
+      from,
+      to,
+      amount,
+      rate,
+      convertedAmount,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || "Failed to convert currency pair" });
   }
 });
 
