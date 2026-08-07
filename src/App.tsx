@@ -684,8 +684,13 @@ export default function App() {
     }
     setAuthUser(null);
     setGuestMode(false);
+    setTransactions([]);
+    setBudgets([]);
     localStorage.removeItem('levlev_guest_mode');
     localStorage.removeItem('finlev_guest_mode');
+    localStorage.removeItem('finance_app_transactions');
+    localStorage.removeItem('finance_app_budgets');
+    localStorage.removeItem('finance_app_is_cleared');
   };
 
   return (
