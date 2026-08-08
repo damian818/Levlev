@@ -362,7 +362,7 @@ export function getCreditCardStatements(
 
   return result.sort((a, b) => b.closeDate.localeCompare(a.closeDate));
 }
-import { defaultRecurringRules, defaultBudgets, historicalInflationAndFX } from '../data/defaultTransactions';
+import { historicalInflationAndFX } from '../data/defaultTransactions';
 
 // Cache for historical rates derived from explicit user transfers
 const transferFxCache = new Map<string, number>();
@@ -737,7 +737,7 @@ export function deriveBudgetsFromTransactions(
   });
 
   if (expenseCategories.size === 0 && existingBudgets.length === 0) {
-    return defaultBudgets;
+    return [];
   }
 
   const result: BudgetGoal[] = [...existingBudgets];
@@ -751,7 +751,7 @@ export function deriveBudgetsFromTransactions(
   });
 
   if (result.length === 0) {
-    return defaultBudgets;
+    return [];
   }
 
   return result;
@@ -841,7 +841,7 @@ export function computePredictiveTrend(
   transactions: Transaction[],
   displayCurrency: DisplayCurrency,
   usdArsRate: number,
-  recurringRules: RecurringRule[] = defaultRecurringRules,
+  recurringRules: RecurringRule[] = [],
   customBalances?: Record<string, { currentBalance: number; currency: string }>,
   historyOverride?: InflationPoint[]
 ): {
@@ -914,7 +914,7 @@ export function computePredictiveTrend(
 
   // Identify recurring / fixed expenses that already happened in pastTransactions to isolate variable velocity
   let recurringPastExpense = 0;
-  const activeRules = recurringRules && recurringRules.length > 0 ? recurringRules : defaultRecurringRules;
+  const activeRules = recurringRules || [];
 
   activeRules.forEach(rule => {
     if (rule.type === 'EXPENSE') {

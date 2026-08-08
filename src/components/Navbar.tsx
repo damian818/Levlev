@@ -15,7 +15,6 @@ interface NavbarProps {
   onTogglePrivacyMode?: () => void;
   onOpenAddModal: () => void;
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onResetData: () => void;
   onOpenDeleteModal: () => void;
   onLogout?: () => void;
 }
@@ -31,7 +30,6 @@ export function Navbar({
   onTogglePrivacyMode,
   onOpenAddModal,
   onFileUpload,
-  onResetData,
   onOpenDeleteModal,
   onLogout,
 }: NavbarProps) {
@@ -196,14 +194,6 @@ export function Navbar({
             )}
 
             <div className="flex items-center gap-1 sm:gap-2">
-              <button
-                onClick={onResetData}
-                title="Reset to sample data"
-                className="p-1.5 sm:p-2 text-slate-500 hover:text-slate-200 transition-colors rounded-lg hover:bg-[#161b22] border border-transparent hover:border-slate-800"
-              >
-                <RefreshCw className="w-3.5 h-3.5 sm:w-4 h-4" />
-              </button>
-
               <button
                 onClick={onOpenDeleteModal}
                 title="Delete data"

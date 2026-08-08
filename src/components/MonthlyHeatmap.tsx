@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { Transaction, DisplayCurrency, RecurringRule } from '../types';
 import { convertCurrency, formatCurrency, formatCurrencyCompact } from '../utils/financeUtils';
 import { Calendar as CalendarIcon, X, Zap, ArrowDownRight, ArrowUpRight, Repeat } from 'lucide-react';
-import { defaultRecurringRules } from '../data/defaultTransactions';
-
 interface MonthlyHeatmapProps {
   transactions: Transaction[];
   selectedMonth: string; // e.g. "2026-08" or "ALL"
@@ -17,7 +15,7 @@ export function MonthlyHeatmap({
   selectedMonth,
   displayCurrency,
   usdArsRate,
-  recurringRules = defaultRecurringRules,
+  recurringRules = [],
 }: MonthlyHeatmapProps) {
   const activeMonth = selectedMonth === 'ALL' ? new Date().toISOString().substring(0, 7) : selectedMonth;
   const [yearStr, monthStr] = activeMonth.split('-');
@@ -54,7 +52,7 @@ export function MonthlyHeatmap({
 
   // Map expected recurring rules by day of month
   const dailyRecurringMap: Record<number, RecurringRule[]> = {};
-  const activeRulesList = recurringRules && recurringRules.length > 0 ? recurringRules : defaultRecurringRules;
+  const activeRulesList = recurringRules || [];
 
   activeRulesList.forEach(rule => {
     const day = rule.dayOfMonth || 15;

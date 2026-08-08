@@ -5,14 +5,12 @@ interface ConfirmDeleteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirmDeleteAll: () => void;
-  onConfirmResetSample: () => void;
 }
 
 export function ConfirmDeleteModal({
   isOpen,
   onClose,
   onConfirmDeleteAll,
-  onConfirmResetSample,
 }: ConfirmDeleteModalProps) {
   if (!isOpen) return null;
 
@@ -58,17 +56,6 @@ export function ConfirmDeleteModal({
           >
             <Trash2 className="w-4 h-4" />
             <span>Yes, Delete All Data</span>
-          </button>
-
-          <button
-            onClick={() => {
-              onConfirmResetSample();
-              onClose();
-            }}
-            className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-[#0f131a] hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-xl text-xs font-medium transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
-            <span>Reset to Default Demo Sample Data</span>
           </button>
 
           <button

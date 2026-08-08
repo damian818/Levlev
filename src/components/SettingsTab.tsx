@@ -67,7 +67,6 @@ interface SettingsTabProps {
   onAddAccount: (account: AccountItem) => void;
   onEditAccount: (oldName: string, updatedAccount: AccountItem, updateTransactions: boolean) => void;
   onDeleteAccount: (accountName: string) => void;
-  onResetData: () => void;
   onImportBackup?: (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[] }) => void;
   onLogout: () => void;
 }
@@ -89,7 +88,6 @@ export function SettingsTab({
   onAddAccount,
   onEditAccount,
   onDeleteAccount,
-  onResetData,
   onImportBackup,
   onLogout,
 }: SettingsTabProps) {
@@ -753,29 +751,6 @@ export function SettingsTab({
                   <input type="file" accept=".json" onChange={handleFileImport} className="hidden" />
                 </label>
               )}
-            </div>
-          </div>
-
-          {/* Reset System Data */}
-          <div className="bg-[#121720] border border-rose-950/40 rounded-2xl p-6 space-y-4 md:col-span-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400">
-                  <RefreshCw className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-100">Reset Application State</h3>
-                  <p className="text-xs text-slate-400">Restore default transactions, initial budgets, categories, and account settings.</p>
-                </div>
-              </div>
-
-              <button
-                onClick={onResetData}
-                className="flex items-center gap-2 px-4 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl text-xs font-bold transition-all active:scale-95"
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span>Reset to Sample Data</span>
-              </button>
             </div>
           </div>
         </div>

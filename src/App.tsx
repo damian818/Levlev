@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
-import { rawCsvSample, parseTransactions, defaultBudgets, defaultRecurringRules, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
+import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
 import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode } from './utils/financeUtils';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
 import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase } from './services/supabaseSync';
@@ -39,7 +39,7 @@ export default function App() {
     } catch (e) {
       console.warn('Failed to load transactions from localStorage', e);
     }
-    return parseTransactions(rawCsvSample);
+    return [];
   });
 
   const [budgets, setBudgets] = useState<BudgetGoal[]>(() => {
@@ -56,7 +56,7 @@ export default function App() {
     } catch (e) {
       console.warn('Failed to load budgets from localStorage', e);
     }
-    return defaultBudgets;
+    return [];
   });
 
   // Custom categories list state
@@ -211,16 +211,10 @@ export default function App() {
     try {
       const data = await fetchUserDataFromSupabase();
       if (data) {
-        const isClearedLocally = localStorage.getItem('finance_app_is_cleared') === 'true';
-        if (isClearedLocally) {
-          setTransactions([]);
-          setBudgets([]);
-        } else {
-          if (data.transactions) setTransactions(data.transactions);
-          if (data.categories && data.categories.length > 0) setCategories(data.categories);
-          if (data.accounts && data.accounts.length > 0) setAccounts(data.accounts);
-          if (data.budgets) setBudgets(data.budgets);
-        }
+        setTransactions(data.transactions || []);
+        if (data.categories && data.categories.length > 0) setCategories(data.categories);
+        if (data.accounts && data.accounts.length > 0) setAccounts(data.accounts);
+        setBudgets(data.budgets || []);
       }
     } catch (err) {
       console.warn('Failed to fetch user data from Supabase:', err);
@@ -645,16 +639,6 @@ export default function App() {
     textReader.readAsText(file);
   };
 
-  const handleResetData = () => {
-    localStorage.removeItem('finance_app_is_cleared');
-    const demo = parseTransactions(rawCsvSample);
-    setTransactions(demo);
-    setBudgets(defaultBudgets);
-    setActiveFilter(undefined);
-    localStorage.setItem('finance_app_transactions', JSON.stringify(demo));
-    localStorage.setItem('finance_app_budgets', JSON.stringify(defaultBudgets));
-  };
-
   const handleDeleteAllData = async () => {
     localStorage.setItem('finance_app_is_cleared', 'true');
     localStorage.setItem('finance_app_transactions', JSON.stringify([]));
@@ -712,7 +696,6 @@ export default function App() {
         onTogglePrivacyMode={handleTogglePrivacyMode}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onFileUpload={handleFileUpload}
-        onResetData={handleResetData}
         onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
         onLogout={handleLogout}
       />
@@ -724,7 +707,7 @@ export default function App() {
             displayCurrency={displayCurrency}
             usdArsRate={usdArsRate}
             historyData={historyData}
-            recurringRules={defaultRecurringRules}
+            recurringRules={[]}
             onNavigateTab={setCurrentTab}
             onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
           />
@@ -775,7 +758,7 @@ export default function App() {
         {currentTab === 'recurring' && (
           <RecurringTab
             transactions={transactions}
-            recurringRules={defaultRecurringRules}
+            recurringRules={[]}
             displayCurrency={displayCurrency}
             usdArsRate={usdArsRate}
             historyData={historyData}
@@ -803,7 +786,6 @@ export default function App() {
             onAddAccount={handleAddAccount}
             onEditAccount={handleEditAccount}
             onDeleteAccount={handleDeleteAccount}
-            onResetData={handleResetData}
             onImportBackup={handleImportBackup}
             onLogout={handleLogout}
           />
@@ -822,7 +804,6 @@ export default function App() {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirmDeleteAll={handleDeleteAllData}
-        onConfirmResetSample={handleResetData}
       />
 
       <AiChatWidget
