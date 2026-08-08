@@ -23,6 +23,8 @@ import { SettingsTab } from './components/SettingsTab';
 import { AddTransactionModal } from './components/AddTransactionModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { AiChatWidget } from './components/AiChatWidget';
+import { AppPreview } from './components/AppPreview';
+import { LevLevIcon } from './components/LevLevLogo';
 
 export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -201,9 +203,7 @@ export default function App() {
   // Auth State
   const [authUser, setAuthUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [guestMode, setGuestMode] = useState<boolean>(() => {
-    return localStorage.getItem('levlev_guest_mode') === 'true' || localStorage.getItem('finlev_guest_mode') === 'true';
-  });
+
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Sync Supabase user data
@@ -400,7 +400,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center text-slate-400 p-4">
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-rose-500/20 to-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-lg shadow-emerald-950/40">
-          <Heart className="w-6 h-6 text-rose-500 fill-rose-500/20 animate-pulse" />
+          <LevLevIcon className="w-6 h-6" variant="emerald" />
         </div>
         <Loader2 className="w-6 h-6 animate-spin text-emerald-500 mb-2" />
         <p className="font-bold text-slate-200 text-sm">Loading LevLev...</p>
@@ -409,7 +409,7 @@ export default function App() {
     );
   }
 
-  if (!authUser && !guestMode) {
+  if (!authUser) {
     return (
       <div className="min-h-screen bg-[#0a0b0d] text-slate-100 flex flex-col justify-between selection:bg-rose-500 selection:text-white">
         {/* Navigation Header */}
@@ -431,16 +431,6 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setGuestMode(true);
-                  localStorage.setItem('finlev_guest_mode', 'true');
-                  localStorage.setItem('levlev_guest_mode', 'true');
-                }}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs sm:text-sm rounded-xl transition-all border border-slate-700"
-              >
-                Try Guest Mode
-              </button>
               <button
                 onClick={async () => {
                   setAuthError(null);
@@ -481,23 +471,12 @@ export default function App() {
                 const { error } = await signInWithGoogle();
                 if (error) setAuthError(error.message || 'Login failed');
               }}
-              className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-900/30 transition-all active:scale-95 flex items-center justify-center gap-2.5 text-sm sm:text-base"
+              className="px-8 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-900/30 transition-all active:scale-95 flex items-center justify-center gap-2.5 text-base sm:text-lg w-full"
             >
               <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                 <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/>
               </svg>
               <span>Sign in with Google</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setGuestMode(true);
-                localStorage.setItem('finlev_guest_mode', 'true');
-                localStorage.setItem('levlev_guest_mode', 'true');
-              }}
-              className="px-6 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-2xl border border-slate-700 transition-all active:scale-95 text-sm"
-            >
-              Explore Guest Mode
             </button>
           </div>
 
@@ -510,8 +489,10 @@ export default function App() {
 
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-16">
             <Lock className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Private &amp; Secure. Guest mode runs 100% locally in your browser.</span>
+            <span>Private &amp; Secure. Your data is encrypted and accessible only by you.</span>
           </div>
+
+          <AppPreview />
 
           {/* Feature Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 w-full text-left">
@@ -684,7 +665,6 @@ export default function App() {
       console.warn('Sign out error:', e);
     }
     setAuthUser(null);
-    setGuestMode(false);
     setTransactions([]);
     setBudgets([]);
     localStorage.removeItem('levlev_guest_mode');

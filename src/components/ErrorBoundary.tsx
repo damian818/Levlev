@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, LogOut, UserCheck } from 'lucide-react';
+import { AlertTriangle, RefreshCw, LogOut } from 'lucide-react';
 import { signOutFromSupabase } from '../lib/supabase';
 
 interface Props {
@@ -33,8 +33,6 @@ export class ErrorBoundary extends Component<Props, State> {
       localStorage.removeItem('finance_app_transactions');
       localStorage.removeItem('finance_app_budgets');
       localStorage.removeItem('finance_app_account_balances');
-      localStorage.setItem('finlev_guest_mode', 'true');
-      localStorage.setItem('levlev_guest_mode', 'true');
     } catch (e) {
       console.warn('Cache clear error:', e);
     }
@@ -46,12 +44,6 @@ export class ErrorBoundary extends Component<Props, State> {
       await signOutFromSupabase();
     } catch (e) {
       console.warn('Sign out failed:', e);
-    }
-    try {
-      localStorage.setItem('finlev_guest_mode', 'false');
-      localStorage.setItem('levlev_guest_mode', 'false');
-    } catch (e) {
-      console.warn('Storage set error:', e);
     }
     window.location.href = window.location.origin;
   };
@@ -94,7 +86,7 @@ export class ErrorBoundary extends Component<Props, State> {
               onClick={this.handleResetCache}
               className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-400 font-semibold rounded-xl text-xs flex items-center gap-2 border border-slate-800 transition-all"
             >
-              <UserCheck className="w-4 h-4" /> Reset Cache &amp; Guest Mode
+              <RefreshCw className="w-4 h-4" /> Clear Local Cache
             </button>
           </div>
         </div>

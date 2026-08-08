@@ -639,7 +639,7 @@ export function SettingsTab({
             </div>
           </div>
 
-          {/* Privacy Mode & Guest Protection Box */}
+          {/* Privacy Mode Shield */}
           <div className="bg-[#121720] border border-amber-500/30 rounded-2xl p-6 space-y-4 md:col-span-2 shadow-lg shadow-amber-950/10">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
@@ -648,7 +648,7 @@ export function SettingsTab({
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-100">Privacy Mode & Guest Shield</h3>
+                    <h3 className="text-base font-bold text-slate-100">Privacy Mode Shield</h3>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
                       privacyMode
                         ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
@@ -658,7 +658,7 @@ export function SettingsTab({
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-1 leading-relaxed max-w-2xl">
-                    Mask sensitive financial figures (total account balances, net worth, individual transaction amounts, and budget limits) with placeholder characters (<code className="text-amber-300 font-mono">••••••</code>) when viewing in Guest mode or presenting to observers.
+                    Mask sensitive financial figures (total account balances, net worth, individual transaction amounts, and budget limits) with placeholder characters (<code className="text-amber-300 font-mono">••••••</code>) when presenting screen or viewing in public places.
                   </p>
                 </div>
               </div>
