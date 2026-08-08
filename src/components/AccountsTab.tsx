@@ -411,7 +411,6 @@ export function AccountsTab({
                         <button
                           onClick={() => handleStartEdit(acc.accountName, acc.currentBalance)}
                           className="p-1.5 text-slate-400 hover:text-slate-100 bg-[#161b22] hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors text-xs flex items-center"
-                          title="Set current balance"
                         >
                           <Edit3 className="w-3.5 h-3.5 mr-1" />
                           <span className="text-[11px]">Set Balance</span>

@@ -555,12 +555,14 @@ export default function App() {
     );
   }
 
-  const handleUpdateAccountBalance = (accountName: string, currentBalance: number, currency: string) => {
+  const handleUpdateAccountBalance = (accountName: string, currentBalance: number | undefined, currency: string) => {
     setCustomBalances(prev => {
-      const updated = {
-        ...prev,
-        [accountName]: { accountName, currentBalance, currency }
-      };
+      const updated = { ...prev };
+      if (currentBalance === undefined) {
+        delete updated[accountName];
+      } else {
+        updated[accountName] = { accountName, currentBalance, currency };
+      }
       try {
         localStorage.setItem('finance_app_account_balances', JSON.stringify(updated));
       } catch (e) {
