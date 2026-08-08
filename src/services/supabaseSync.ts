@@ -167,9 +167,63 @@ export async function deleteTransactionFromSupabase(txId: string): Promise<boole
   if (!client) return false;
 
   try {
-    const { error } = await client.from('transactions').delete().eq('id', txId);
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.user) return false;
+
+    const { error } = await client
+      .from('transactions')
+      .delete()
+      .eq('id', txId)
+      .eq('user_id', session.user.id);
     if (error) {
       console.error('Error deleting transaction from Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('Exception deleting transaction from Supabase:', e);
+    return false;
+  }
+}
+
+export async function deleteCategoryFromSupabase(catName: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.user) return false;
+
+    const { error } = await client
+      .from('categories')
+      .delete()
+      .eq('name', catName)
+      .eq('user_id', session.user.id);
+    if (error) {
+      console.error('Error deleting category from Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function deleteAccountFromSupabase(accName: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.user) return false;
+
+    const { error } = await client
+      .from('accounts')
+      .delete()
+      .eq('name', accName)
+      .eq('user_id', session.user.id);
+    if (error) {
+      console.error('Error deleting account from Supabase:', error);
       return false;
     }
     return true;
@@ -188,12 +242,18 @@ export async function deleteAllUserDataFromSupabase(): Promise<boolean> {
 
     const userId = session.user.id;
 
-    await Promise.all([
+    const [txDel, budDel, catDel, accDel] = await Promise.all([
       client.from('transactions').delete().eq('user_id', userId),
       client.from('budgets').delete().eq('user_id', userId),
       client.from('categories').delete().eq('user_id', userId),
       client.from('accounts').delete().eq('user_id', userId),
     ]);
+
+    if (txDel.error) console.error('Error deleting transactions from Supabase:', txDel.error);
+    if (budDel.error) console.error('Error deleting budgets from Supabase:', budDel.error);
+    if (catDel.error) console.error('Error deleting categories from Supabase:', catDel.error);
+    if (accDel.error) console.error('Error deleting accounts from Supabase:', accDel.error);
+
     return true;
   } catch (err) {
     console.error('Error deleting user data from Supabase:', err);

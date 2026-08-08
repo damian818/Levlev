@@ -9,7 +9,7 @@ import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, Arrow
 import { rawCsvSample, parseTransactions, defaultBudgets, defaultRecurringRules, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
 import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode } from './utils/financeUtils';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
-import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase } from './services/supabaseSync';
+import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase } from './services/supabaseSync';
 import { Navbar } from './components/Navbar';
 import { OverviewTab } from './components/OverviewTab';
 import { ReportsTab } from './components/ReportsTab';
@@ -126,6 +126,7 @@ export default function App() {
     if (reassignTo) {
       setTransactions(prev => prev.map(t => t.category === catName ? { ...t, category: reassignTo } : t));
     }
+    deleteCategoryFromSupabase(catName);
   };
 
   // Account Handlers
@@ -155,6 +156,7 @@ export default function App() {
 
   const handleDeleteAccount = (accName: string) => {
     setAccounts(prev => prev.filter(a => a.name !== accName));
+    deleteAccountFromSupabase(accName);
   };
 
   const handleImportBackup = (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[] }) => {
@@ -670,6 +672,7 @@ export default function App() {
 
   const handleDeleteTransaction = (id: string) => {
     setTransactions(prev => prev.filter(t => t.id !== id));
+    deleteTransactionFromSupabase(id);
   };
 
   const handleAddTransaction = (newTx: Transaction) => {
