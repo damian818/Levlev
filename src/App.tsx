@@ -643,12 +643,26 @@ export default function App() {
     localStorage.setItem('finance_app_is_cleared', 'true');
     localStorage.setItem('finance_app_transactions', JSON.stringify([]));
     localStorage.setItem('finance_app_budgets', JSON.stringify([]));
+
+    const zeroedAccounts = accounts.map(a => ({ ...a, initialBalance: 0 }));
+    setAccounts(zeroedAccounts);
+    localStorage.setItem('finance_app_custom_accounts', JSON.stringify(zeroedAccounts));
+
+    setCustomBalances({});
+    localStorage.removeItem('finance_app_account_balances');
+
     setTransactions([]);
     setBudgets([]);
     setActiveFilter(undefined);
 
     try {
       await deleteAllUserDataFromSupabase();
+      await saveAllUserDataToSupabase({
+        transactions: [],
+        categories,
+        accounts: zeroedAccounts,
+        budgets: [],
+      });
     } catch (e) {
       console.warn('Failed to delete user data from Supabase:', e);
     }

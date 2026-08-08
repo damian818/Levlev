@@ -57,7 +57,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       name: row.name || 'Account',
       type: row.type || 'CHECKING',
       currency: row.currency || 'ARS',
-      initialBalance: row.initial_balance ? Number(row.initial_balance) : undefined,
+      initialBalance: (row.initial_balance !== undefined && row.initial_balance !== null) ? Number(row.initial_balance) : 0,
     }));
 
     const budgets: BudgetGoal[] = (budRes.data || []).map((row: any) => ({

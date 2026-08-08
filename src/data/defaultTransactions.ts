@@ -187,14 +187,14 @@ export const defaultCategoryItems: CategoryItem[] = [
 ];
 
 export const defaultAccountItems: AccountItem[] = [
-  { id: 'acc-1', name: 'Main Checking (ARS)', type: 'CHECKING', currency: 'ARS', initialBalance: 280000 },
-  { id: 'acc-2', name: 'Secondary Checking (ARS)', type: 'CHECKING', currency: 'ARS', initialBalance: 450000 },
-  { id: 'acc-3', name: 'Savings Account (ARS)', type: 'CHECKING', currency: 'ARS', initialBalance: 150000 },
-  { id: 'acc-4', name: 'USD Digital Wallet', type: 'WALLET', currency: 'USD', initialBalance: 3200 },
-  { id: 'acc-5', name: 'Global Treasury (USD)', type: 'WALLET', currency: 'USD', initialBalance: 12450 },
-  { id: 'acc-6', name: 'Investment Fund (ARS)', type: 'INVESTMENT', currency: 'ARS', initialBalance: 1850000 },
-  { id: 'acc-7', name: 'Primary Credit Card (Visa)', type: 'CREDIT_CARD', currency: 'ARS', closingRule: { ruleType: 'FIXED_DAY', fixedDay: 25 } },
-  { id: 'acc-8', name: 'Secondary Credit Card (MasterCard)', type: 'CREDIT_CARD', currency: 'ARS', closingRule: { ruleType: 'FIXED_DAY', fixedDay: 25 } },
-  { id: 'acc-9', name: 'Travel Credit Card (Visa)', type: 'CREDIT_CARD', currency: 'ARS', closingRule: { ruleType: 'FIXED_DAY', fixedDay: 25 } },
-  { id: 'acc-10', name: 'Rewards Credit Card (Visa)', type: 'CREDIT_CARD', currency: 'ARS', closingRule: { ruleType: 'NTH_WEEKDAY', weekday: 4, nth: 4 } },
+  { id: 'acc-1', name: 'Main Checking (ARS)', type: 'CHECKING', currency: 'ARS', initialBalance: 0 },
+  { id: 'acc-2', name: 'Secondary Checking (ARS)', type: 'CHECKING', currency: 'ARS', initialBalance: 0 },
+  { id: 'acc-3', name: 'Savings Account (ARS)', type: 'CHECKING', currency: 'ARS', initialBalance: 0 },
+  { id: 'acc-4', name: 'USD Digital Wallet', type: 'WALLET', currency: 'USD', initialBalance: 0 },
+  { id: 'acc-5', name: 'Global Treasury (USD)', type: 'WALLET', currency: 'USD', initialBalance: 0 },
+  { id: 'acc-6', name: 'Investment Fund (ARS)', type: 'INVESTMENT', currency: 'ARS', initialBalance: 0 },
+  { id: 'acc-7', name: 'Primary Credit Card (Visa)', type: 'CREDIT_CARD', currency: 'ARS', closingRule: { ruleType: 'FIXED_DAY', fixedDay: 25 }, initialBalance: 0 },
+  { id: 'acc-8', name: 'Secondary Credit Card (MasterCard)', type: 'CREDIT_CARD', currency: 'ARS', closingRule: { ruleType: 'FIXED_DAY', fixedDay: 25 }, initialBalance: 0 },
+  { id: 'acc-9', name: 'Travel Credit Card (Visa)', type: 'CREDIT_CARD', currency: 'ARS', closingRule: { ruleType: 'FIXED_DAY', fixedDay: 25 }, initialBalance: 0 },
+  { id: 'acc-10', name: 'Rewards Credit Card (Visa)', type: 'CREDIT_CARD', currency: 'ARS', closingRule: { ruleType: 'NTH_WEEKDAY', weekday: 4, nth: 4 }, initialBalance: 0 },
 ];
