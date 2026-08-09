@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
-import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode } from './utils/financeUtils';
+import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions } from './utils/financeUtils';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
 import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase } from './services/supabaseSync';
 import { Navbar } from './components/Navbar';
@@ -572,6 +572,16 @@ export default function App() {
     });
   };
 
+  const handleRecalculateAllBalances = () => {
+    const recalculated = recalculateAccountBalancesFromTransactions(accounts, transactions);
+    setCustomBalances(recalculated);
+    try {
+      localStorage.setItem('finance_app_account_balances', JSON.stringify(recalculated));
+    } catch (e) {
+      console.warn('Failed to save recalculated balances to localStorage');
+    }
+  };
+
   const handleNavigateToTransactionsWithFilter = (filter: TransactionFilter) => {
     setActiveFilter(filter);
     setCurrentTab('transactions');
@@ -784,6 +794,7 @@ export default function App() {
             onEditAccount={handleEditAccount}
             onDeleteAccount={handleDeleteAccount}
             onImportBackup={handleImportBackup}
+            onRecalculateBalances={handleRecalculateAllBalances}
             onLogout={handleLogout}
           />
         )}

@@ -1,4 +1,4 @@
-import { Transaction, DisplayCurrency, RecurringRule, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem } from '../types';
+import { Transaction, DisplayCurrency, RecurringRule, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem, AccountCustomBalance } from '../types';
 
 export function isCreditCardAccount(accountName: string, customCCMap?: Record<string, boolean>): boolean {
   if (customCCMap && customCCMap[accountName] !== undefined) {
@@ -1500,6 +1500,62 @@ export function verifyAccountBalances(
       hasDiscrepancy,
     };
   });
+}
+
+/**
+  * Re-synchronizes account balances by recalculating them from the ground up:
+  * starting with each account's initial balance and applying every associated transaction cumulatively.
+  */
+export function recalculateAccountBalancesFromTransactions(
+  accounts: AccountItem[] = [],
+  transactions: Transaction[] = []
+): Record<string, AccountCustomBalance> {
+  const recalculated: Record<string, AccountCustomBalance> = {};
+
+  // Track all unique account names from both registered accounts and transactions
+  const nameSet = new Set<string>();
+  accounts.forEach(a => { if (a.name) nameSet.add(a.name); });
+  transactions.forEach(t => {
+    if (t.account) nameSet.add(t.account);
+    if (t.toAccount) nameSet.add(t.toAccount);
+  });
+
+  nameSet.forEach(accName => {
+    const accItem = accounts.find(a => a.name === accName);
+    const initialBalance = accItem?.initialBalance ?? 0;
+    const currency = accItem?.currency || 'ARS';
+
+    let netBalance = initialBalance;
+
+    transactions.forEach(tx => {
+      const amt = tx.amount || 0;
+      if (tx.account === accName) {
+        if (tx.type === 'INCOME') {
+          netBalance += amt;
+        } else if (tx.type === 'EXPENSE') {
+          netBalance -= amt;
+        } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
+          const outflow = (tx.transferAmount && tx.transferAmount > 0) ? tx.transferAmount : amt;
+          netBalance -= outflow;
+        }
+      }
+
+      if (tx.toAccount === accName && (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT')) {
+        const inflow = (tx.receiveAmount && tx.receiveAmount > 0)
+          ? tx.receiveAmount
+          : ((tx.transferAmount && tx.transferAmount > 0) ? tx.transferAmount : amt);
+        netBalance += inflow;
+      }
+    });
+
+    recalculated[accName] = {
+      accountName: accName,
+      currentBalance: Number(netBalance.toFixed(4)),
+      currency,
+    };
+  });
+
+  return recalculated;
 }
 
 

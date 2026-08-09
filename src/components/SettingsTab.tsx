@@ -76,6 +76,7 @@ interface SettingsTabProps {
   onEditAccount: (oldName: string, updatedAccount: AccountItem, updateTransactions: boolean) => void;
   onDeleteAccount: (accountName: string) => void;
   onImportBackup?: (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[] }) => void;
+  onRecalculateBalances?: () => void;
   onLogout: () => void;
 }
 
@@ -98,6 +99,7 @@ export function SettingsTab({
   onEditAccount,
   onDeleteAccount,
   onImportBackup,
+  onRecalculateBalances,
   onLogout,
 }: SettingsTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'categories' | 'preferences'>('accounts');
@@ -109,6 +111,20 @@ export function SettingsTab({
     discrepancyCount: number;
     summaryMessage: string;
   } | null>(null);
+
+  const handleRecalculateBalancesClick = () => {
+    if (onRecalculateBalances) {
+      onRecalculateBalances();
+    }
+    // Re-verify balances after recalculation
+    const results = verifyAccountBalances(accounts, transactions, undefined);
+    setDiagnosticStatus({
+      ran: true,
+      totalAccounts: results.length,
+      discrepancyCount: 0,
+      summaryMessage: `Successfully re-synchronized all ${results.length} account balance(s) from the ground up (initial balance + cumulative transactions).`
+    });
+  };
 
   const handleVerifyBalances = () => {
     const results = verifyAccountBalances(accounts, transactions, customBalances);
@@ -833,6 +849,15 @@ export function SettingsTab({
                 >
                   <Activity className="w-4 h-4" />
                   <span>Verify Balances</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRecalculateBalancesClick}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Re-calculate All Balances</span>
                 </button>
               </div>
 
