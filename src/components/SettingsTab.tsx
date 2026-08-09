@@ -6,7 +6,8 @@ import {
   BudgetGoal, 
   CreditCardClosingRule, 
   ClosingRuleType, 
-  DisplayCurrency 
+  DisplayCurrency,
+  AccountCustomBalance
 } from '../types';
 import { 
   Wallet, 
@@ -39,8 +40,14 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
-  Shield
+  Shield,
+  Activity,
+  CheckCircle2,
+  ShieldCheck
 } from 'lucide-react';
+import { 
+  verifyAccountBalances 
+} from '../utils/financeUtils';
 import { 
   getSupabaseCredentials, 
   getSupabaseClient, 
@@ -59,6 +66,7 @@ interface SettingsTabProps {
   budgets: BudgetGoal[];
   usdArsRate: number;
   privacyMode?: boolean;
+  customBalances?: Record<string, AccountCustomBalance>;
   onTogglePrivacyMode?: () => void;
   onUpdateRate: (rate: number) => void;
   onAddCategory: (category: CategoryItem) => void;
@@ -80,6 +88,7 @@ export function SettingsTab({
   budgets,
   usdArsRate,
   privacyMode = false,
+  customBalances,
   onTogglePrivacyMode,
   onUpdateRate,
   onAddCategory,
@@ -92,6 +101,53 @@ export function SettingsTab({
   onLogout,
 }: SettingsTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'categories' | 'preferences'>('accounts');
+
+  // Diagnostic State for Balance Verification
+  const [diagnosticStatus, setDiagnosticStatus] = useState<{
+    ran: boolean;
+    totalAccounts: number;
+    discrepancyCount: number;
+    summaryMessage: string;
+  } | null>(null);
+
+  const handleVerifyBalances = () => {
+    const results = verifyAccountBalances(accounts, transactions, customBalances);
+    const discrepancies = results.filter(r => r.hasDiscrepancy);
+
+    console.group('🔍 Diagnostic: Verify Account Balances');
+    console.log(`Verified ${results.length} account(s):`);
+
+    if (discrepancies.length > 0) {
+      console.warn(`⚠️ Found ${discrepancies.length} discrepancy/discrepancies among ${results.length} account(s):`);
+      discrepancies.forEach(res => {
+        console.warn(
+          `❌ [DISCREPANCY] Account: "${res.accountName}"\n` +
+          `   • Initial Balance: ${res.initialBalance}\n` +
+          `   • Sum of Transactions: ${res.sumTransactions}\n` +
+          `   • Expected Balance (Initial + Sum): ${res.expectedBalance}\n` +
+          `   • UI Calculated Balance: ${res.uiCalculatedBalance}\n` +
+          `   • Discrepancy Amount: ${res.discrepancy}`
+        );
+      });
+    } else {
+      console.log('✅ All account balances match (Initial Balance + Sum of Transactions = UI Balance).');
+      results.forEach(res => {
+        console.log(
+          `✅ [OK] Account: "${res.accountName}" | Initial: ${res.initialBalance} | Sum Txs: ${res.sumTransactions} | UI Balance: ${res.uiCalculatedBalance}`
+        );
+      });
+    }
+    console.groupEnd();
+
+    setDiagnosticStatus({
+      ran: true,
+      totalAccounts: results.length,
+      discrepancyCount: discrepancies.length,
+      summaryMessage: discrepancies.length > 0
+        ? `Diagnostic complete: ${discrepancies.length} discrepancy/discrepancies found across ${results.length} account(s). Details printed to console log.`
+        : `Diagnostic complete: All ${results.length} account balance(s) match (Initial + Sum = UI Balance). Details printed to console log.`
+    });
+  };
 
   // Modal States for Category
   const [isAddCatOpen, setIsAddCatOpen] = useState(false);
@@ -750,6 +806,56 @@ export function SettingsTab({
                   <span>Import JSON Backup</span>
                   <input type="file" accept=".json" onChange={handleFileImport} className="hidden" />
                 </label>
+              )}
+            </div>
+          </div>
+
+          {/* Balance Diagnostic Box */}
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-cyan-400">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">Account Balance Diagnostic</h3>
+                <p className="text-xs text-slate-400">
+                  Verify that the sum of transactions for each account, when added to its initial balance, matches the current calculated balance in the UI.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleVerifyBalances}
+                  className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                >
+                  <Activity className="w-4 h-4" />
+                  <span>Verify Balances</span>
+                </button>
+              </div>
+
+              {diagnosticStatus && (
+                <div
+                  className={`p-3.5 rounded-xl border text-xs font-medium transition-all ${
+                    diagnosticStatus.discrepancyCount > 0
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-2 mb-1">
+                    {diagnosticStatus.discrepancyCount > 0 ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    )}
+                    <span>{diagnosticStatus.summaryMessage}</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] mt-0.5">
+                    Open your browser console (`F12` or DevTools Console) to inspect line-by-line initial balances, transaction deltas, expected totals, and any detected discrepancies.
+                  </p>
+                </div>
               )}
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { Transaction, DisplayCurrency, RecurringRule, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType } from '../types';
+import { Transaction, DisplayCurrency, RecurringRule, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem } from '../types';
 
 export function isCreditCardAccount(accountName: string, customCCMap?: Record<string, boolean>): boolean {
   if (customCCMap && customCCMap[accountName] !== undefined) {
@@ -1421,5 +1421,85 @@ export const getRelevantStatementIndex = (statements: CreditCardStatement[], rul
 
 export const getRelevantStatement = (statements: CreditCardStatement[], rule?: CreditCardClosingRule) =>
   getCurrentStatement(statements, rule);
+
+export interface DiagnosticAccountResult {
+  accountName: string;
+  initialBalance: number;
+  sumTransactions: number;
+  expectedBalance: number;
+  uiCalculatedBalance: number;
+  discrepancy: number;
+  hasDiscrepancy: boolean;
+}
+
+/**
+ * Diagnostic utility function to verify that the sum of transactions for a specific account
+ * (or all accounts), when added to its initial balance, matches the current calculated balance in the UI.
+ */
+export function verifyAccountBalances(
+  accounts: AccountItem[] = [],
+  transactions: Transaction[] = [],
+  customBalances?: Record<string, { currentBalance: number; currency: string }>,
+  targetAccountName?: string
+): DiagnosticAccountResult[] {
+  const nameSet = new Set<string>();
+  accounts.forEach(a => { if (a.name) nameSet.add(a.name); });
+  transactions.forEach(t => {
+    if (t.account) nameSet.add(t.account);
+    if (t.toAccount) nameSet.add(t.toAccount);
+  });
+  if (customBalances) {
+    Object.keys(customBalances).forEach(name => nameSet.add(name));
+  }
+
+  let allNames = Array.from(nameSet).sort();
+  if (targetAccountName) {
+    allNames = allNames.filter(n => n === targetAccountName);
+  }
+
+  return allNames.map(accName => {
+    const accItem = accounts.find(a => a.name === accName);
+    const initialBalance = accItem?.initialBalance ?? 0;
+
+    let sumTransactions = 0;
+    transactions.forEach(tx => {
+      const amt = tx.amount || 0;
+      if (tx.account === accName) {
+        if (tx.type === 'INCOME') {
+          sumTransactions += amt;
+        } else if (tx.type === 'EXPENSE') {
+          sumTransactions -= amt;
+        } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
+          const outflow = (tx.transferAmount && tx.transferAmount > 0) ? tx.transferAmount : amt;
+          sumTransactions -= outflow;
+        }
+      }
+
+      if (tx.toAccount === accName && (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT')) {
+        const inflow = (tx.receiveAmount && tx.receiveAmount > 0)
+          ? tx.receiveAmount
+          : ((tx.transferAmount && tx.transferAmount > 0) ? tx.transferAmount : amt);
+        sumTransactions += inflow;
+      }
+    });
+
+    const expectedBalance = initialBalance + sumTransactions;
+    const custom = customBalances?.[accName];
+    const uiCalculatedBalance = custom !== undefined ? custom.currentBalance : (initialBalance + sumTransactions);
+
+    const discrepancy = Number((uiCalculatedBalance - expectedBalance).toFixed(4));
+    const hasDiscrepancy = Math.abs(discrepancy) >= 0.001;
+
+    return {
+      accountName: accName,
+      initialBalance: Number(initialBalance.toFixed(4)),
+      sumTransactions: Number(sumTransactions.toFixed(4)),
+      expectedBalance: Number(expectedBalance.toFixed(4)),
+      uiCalculatedBalance: Number(uiCalculatedBalance.toFixed(4)),
+      discrepancy,
+      hasDiscrepancy,
+    };
+  });
+}
 
 

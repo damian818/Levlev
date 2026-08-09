@@ -774,6 +774,7 @@ export default function App() {
             budgets={budgets}
             usdArsRate={usdArsRate}
             privacyMode={privacyMode}
+            customBalances={customBalances}
             onTogglePrivacyMode={handleTogglePrivacyMode}
             onUpdateRate={setUsdArsRate}
             onAddCategory={handleAddCategory}
