@@ -110,6 +110,7 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
     Papa.parse(content, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: (header) => header.trim(),
       complete: (results) => {
         setCsvHeaders(results.meta.fields || []);
         setRawData(results.data);
