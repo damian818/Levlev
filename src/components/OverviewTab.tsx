@@ -544,77 +544,76 @@ export function OverviewTab({
       </div>
 
       {/* Biggest Expenses (Top Merchants Table) - Clickable Rows */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-100">Biggest Expenses (Top Merchants)</h3>
-              <p className="text-xs text-slate-400">Click any merchant row to filter its individual transactions.</p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-400 uppercase">
-                  <th className="pb-3 font-medium">Merchant / Title</th>
-                  <th className="pb-3 font-medium text-right">Total Spent</th>
-                  <th className="pb-3 font-medium text-right">% of Total Expenses</th>
-                  <th className="pb-3 font-medium text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {spending.topMerchants.slice(0, 6).map((m, idx) => {
-                  const percentage = spending.totalExpenses > 0 ? (m.amount / spending.totalExpenses) * 100 : 0;
-                  return (
-                    <tr 
-                      key={idx} 
-                      onClick={() => onNavigateToTransactionsWithFilter({ 
-                        search: m.merchant, 
-                        month: selectedMonth !== 'ALL' ? selectedMonth : undefined 
-                      })}
-                      className="hover:bg-slate-800/60 transition-colors cursor-pointer group"
-                    >
-                      <td className="py-3 font-medium text-slate-200 group-hover:text-emerald-400 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{m.merchant}</span>
-                          {m.category && (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/60 shrink-0">
-                              {m.category}
-                            </span>
-                          )}
-                          <ExternalLink className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                      </td>
-                      <td className="py-3 text-right font-semibold text-slate-100">{formatCurrency(m.amount, displayCurrency)}</td>
-                      <td className="py-3 text-right text-slate-400">
-                        <div className="flex items-center justify-end space-x-2">
-                          <span>{percentage.toFixed(1)}%</span>
-                          <div className="w-16 bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-emerald-400 h-full rounded-full" style={{ width: `${Math.min(percentage, 100)}%` }} />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 text-center text-slate-500 group-hover:text-slate-300">
-                        <span className="text-[10px] px-2 py-0.5 bg-slate-800 rounded border border-slate-700">Filter →</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-100">Biggest Expenses (Top Merchants)</h3>
+            <p className="text-xs text-slate-400">Click any merchant row to filter its individual transactions.</p>
           </div>
         </div>
 
-        <div>
-          <MonthlyHeatmap
-            transactions={transactions}
-            selectedMonth={selectedMonth}
-            displayCurrency={displayCurrency}
-            usdArsRate={usdArsRate}
-            recurringRules={recurringRules}
-          />
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400 uppercase">
+                <th className="pb-3 font-medium">Merchant / Title</th>
+                <th className="pb-3 font-medium text-right">Total Spent</th>
+                <th className="pb-3 font-medium text-right">% of Total Expenses</th>
+                <th className="pb-3 font-medium text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60">
+              {spending.topMerchants.slice(0, 6).map((m, idx) => {
+                const percentage = spending.totalExpenses > 0 ? (m.amount / spending.totalExpenses) * 100 : 0;
+                return (
+                  <tr 
+                    key={idx} 
+                    onClick={() => onNavigateToTransactionsWithFilter({ 
+                      search: m.merchant, 
+                      month: selectedMonth !== 'ALL' ? selectedMonth : undefined 
+                    })}
+                    className="hover:bg-slate-800/60 transition-colors cursor-pointer group"
+                  >
+                    <td className="py-3 font-medium text-slate-200 group-hover:text-emerald-400 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{m.merchant}</span>
+                        {m.category && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/60 shrink-0">
+                            {m.category}
+                          </span>
+                        )}
+                        <ExternalLink className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </td>
+                    <td className="py-3 text-right font-semibold text-slate-100">{formatCurrency(m.amount, displayCurrency)}</td>
+                    <td className="py-3 text-right text-slate-400">
+                      <div className="flex items-center justify-end space-x-2">
+                        <span>{percentage.toFixed(1)}%</span>
+                        <div className="w-16 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                          <div className="bg-emerald-400 h-full rounded-full" style={{ width: `${Math.min(percentage, 100)}%` }} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 text-center text-slate-500 group-hover:text-slate-300">
+                      <span className="text-[10px] px-2 py-0.5 bg-slate-800 rounded border border-slate-700">Filter →</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+      </div>
+
+      {/* Daily Spending & Scheduled Bills Dashlet */}
+      <div>
+        <MonthlyHeatmap
+          transactions={transactions}
+          selectedMonth={selectedMonth}
+          displayCurrency={displayCurrency}
+          usdArsRate={usdArsRate}
+          recurringRules={recurringRules}
+        />
       </div>
 
       <CategoryTrendModal
