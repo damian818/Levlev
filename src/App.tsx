@@ -24,7 +24,7 @@ import { AddTransactionModal } from './components/AddTransactionModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { ShareWorkspaceModal } from './components/ShareWorkspaceModal';
 import { AiChatWidget } from './components/AiChatWidget';
-import { AppPreview } from './components/AppPreview';
+import { LandingPage } from './components/LandingPage';
 import ImportWizardModal from './components/ImportWizardModal';
 import { LevLevIcon, LevLevLogo } from './components/LevLevLogo';
 
@@ -462,134 +462,23 @@ export default function App() {
 
   if (!authUser) {
     return (
-      <div className="min-h-screen bg-[#0a0b0d] text-slate-100 flex flex-col justify-between selection:bg-rose-500 selection:text-white">
-        {/* Navigation Header */}
-        <header className="border-b border-slate-800/80 bg-[#0f131a]/80 backdrop-blur-md sticky top-0 z-50">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
-            <LevLevLogo badgeText="GLOBAL" size="md" />
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={async () => {
-                  setAuthError(null);
-                  const { error } = await signInWithGoogle();
-                  if (error) setAuthError(error.message || 'Login failed');
-                }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-lg shadow-emerald-900/30 flex items-center gap-1.5 active:scale-95"
-              >
-                Sign In <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Hero & Features Body */}
-        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 flex-1 flex flex-col items-center justify-center text-center">
-          {/* Top Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/80 text-rose-300 text-xs font-semibold mb-6 shadow-inner">
-            <LevLevIcon className="w-4 h-4 shrink-0" variant="white" />
-            <span>Multi-Currency &amp; Inflation Intelligence Engine</span>
-          </div>
-
-          {/* Headline */}
-          <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight max-w-3xl leading-[1.15] mb-6">
-            Master your net worth with <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-rose-400 bg-clip-text text-transparent">clarity &amp; heart</span>
-          </h2>
-
-          {/* Subheadline */}
-          <p className="text-slate-400 text-sm sm:text-lg max-w-2xl mb-10 leading-relaxed font-normal">
-            Track multi-currency accounts in ARS &amp; USD, monitor live MEP exchange rates, evaluate real inflation purchasing power, and manage installments effortlessly.
-          </p>
-
-          {/* Auth Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md mb-6">
-            <button
-              onClick={async () => {
-                setAuthError(null);
-                const { error } = await signInWithGoogle();
-                if (error) setAuthError(error.message || 'Login failed');
-              }}
-              className="px-8 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-900/30 transition-all active:scale-95 flex items-center justify-center gap-2.5 text-base sm:text-lg w-full"
-            >
-              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/>
-              </svg>
-              <span>Sign in with Google</span>
-            </button>
-          </div>
-
-          {authError && (
-            <div className="mb-6 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs max-w-md text-left">
-              <strong className="block font-semibold mb-0.5">Authentication Note:</strong>
-              {authError}
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-16">
-            <Lock className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Private &amp; Secure. Your data is encrypted and accessible only by you.</span>
-          </div>
-
-          <AppPreview />
-
-          {/* Feature Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 w-full text-left">
-            <div className="bg-[#11151f] border border-slate-800/90 rounded-2xl p-5 hover:border-emerald-500/40 transition-all group">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4 group-hover:scale-110 transition-transform">
-                <Wallet className="w-5 h-5" />
-              </div>
-              <h3 className="text-slate-100 font-bold text-sm mb-1.5">Multi-Currency ARS/USD</h3>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                Live MEP, Blue &amp; Official rates automatically convert balances across accounts like Deel, DollarApp, and local banks.
-              </p>
-            </div>
-
-            <div className="bg-[#11151f] border border-slate-800/90 rounded-2xl p-5 hover:border-rose-500/40 transition-all group">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-4 group-hover:scale-110 transition-transform">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <h3 className="text-slate-100 font-bold text-sm mb-1.5">Inflation Adjustment</h3>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                Historical INDEC/IPC inflation tracking reveals your real purchasing power adjusted for economic fluctuations.
-              </p>
-            </div>
-
-            <div className="bg-[#11151f] border border-slate-800/90 rounded-2xl p-5 hover:border-teal-500/40 transition-all group">
-              <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 mb-4 group-hover:scale-110 transition-transform">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <h3 className="text-slate-100 font-bold text-sm mb-1.5">Cuotas &amp; Closing Dates</h3>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                Track installment periods, credit card statement closing dates, and settled balances with zero confusion.
-              </p>
-            </div>
-
-            <div className="bg-[#11151f] border border-slate-800/90 rounded-2xl p-5 hover:border-amber-500/40 transition-all group">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4 group-hover:scale-110 transition-transform">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <h3 className="text-slate-100 font-bold text-sm mb-1.5">AI Financial Companion</h3>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                Contextual AI assistant analyzes trends, compares category spikes, and guides your monthly budget targets.
-              </p>
-            </div>
-          </div>
-        </main>
-
-        {/* Footer */}
-        <footer className="border-t border-slate-800/60 py-6 bg-[#0f131a]/60 text-center text-xs text-slate-500">
-          <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center space-x-2">
-              <LevLevIcon className="w-5 h-5" variant="white" />
-              <span className="font-bold text-slate-300">LevLev</span>
-              <span>— Personal Finance with Heart</span>
-            </div>
-            <p className="text-[11px] text-slate-600">
-              Multi-currency intelligence tracker for ARS &amp; USD
-            </p>
-          </div>
-        </footer>
-      </div>
+      <LandingPage
+        onSignInWithGoogle={async () => {
+          setAuthError(null);
+          const { error } = await signInWithGoogle();
+          if (error) setAuthError(error.message || 'Login failed');
+        }}
+        onEnterGuestMode={() => {
+          setAuthUser({
+            id: 'guest-user',
+            email: 'guest@levlev.app',
+            user_metadata: { full_name: 'Guest User' },
+          });
+          localStorage.setItem('levlev_guest_mode', 'true');
+        }}
+        authError={authError}
+        usdArsRate={usdArsRate}
+      />
     );
   }
 
