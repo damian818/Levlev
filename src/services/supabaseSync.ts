@@ -40,7 +40,9 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       toAccount: row.to_account || undefined,
       installments: row.installments ? String(row.installments) : undefined,
       statementCloseDate: row.statement_close_date || undefined,
-      receiveAmount: row.receive_amount ? Number(row.receive_amount) : undefined,
+      transferAmount: row.transfer_amount !== undefined && row.transfer_amount !== null ? Number(row.transfer_amount) : (row.type === 'TRANSFER' ? Number(row.amount) : undefined),
+      transferCurrency: row.transfer_currency || (row.type === 'TRANSFER' ? row.currency : undefined),
+      receiveAmount: row.receive_amount !== undefined && row.receive_amount !== null ? Number(row.receive_amount) : undefined,
       receiveCurrency: row.receive_currency || undefined,
       description: row.notes || undefined,
     }));

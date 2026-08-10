@@ -589,25 +589,22 @@ export default function App() {
         const uploadedTx = parseTransactions(text);
         if (uploadedTx.length > 0) {
           setTransactions(prev => {
-            // Create a set of existing transaction keys for O(1) lookup
-            // Key format: date|title|amount|account|currency
-            const existingKeys = new Set(prev.map(t => 
-              t.id && !t.id.startsWith('tx-') ? t.id : `${t.date}|${t.title}|${t.amount}|${t.account}|${t.currency}`
-            ));
+            const getSig = (t: Transaction) => {
+              const d = t.date ? t.date.substring(0, 10) : '';
+              const title = (t.title || '').trim().toLowerCase();
+              const amt = Number(t.amount || t.transferAmount || 0);
+              const acc = (t.account || '').trim().toLowerCase();
+              const toAcc = (t.toAccount || '').trim().toLowerCase();
+              const curr = (t.currency || '').trim().toUpperCase();
+              return `${d}|${title}|${amt}|${acc}|${toAcc}|${curr}`;
+            };
 
-            const newTxs = uploadedTx.filter(t => {
-              const key = t.id && !t.id.startsWith('tx-') ? t.id : `${t.date}|${t.title}|${t.amount}|${t.account}|${t.currency}`;
-              return !existingKeys.has(key);
-            });
+            const existingSigs = new Set(prev.map(getSig));
+            const newTxs = uploadedTx.filter(t => !existingSigs.has(getSig(t)));
 
-            if (newTxs.length === 0) {
-              // Even if no new transactions, we might want to check budgets
-              return prev;
-            }
-            
-            const combined = [...newTxs, ...prev];
-            // Sort by date descending
-            const sorted = combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            // If prev is empty, use uploadedTx. Otherwise add newTxs to prev if any exist
+            const combined = prev.length === 0 ? uploadedTx : (newTxs.length > 0 ? [...newTxs, ...prev] : prev);
+            const sorted = [...combined].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             
             // Derive budget goals from the updated combined list
             const derived = deriveBudgetsFromTransactions(sorted, budgets);
@@ -652,6 +649,7 @@ export default function App() {
             setCustomBalances({});
             try {
               localStorage.removeItem('finance_app_account_balances');
+              localStorage.removeItem('finance_app_is_cleared');
             } catch (e) {}
 
             setCurrentTab('overview');
@@ -659,6 +657,7 @@ export default function App() {
       }
     };
     textReader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleDeleteAllData = async () => {

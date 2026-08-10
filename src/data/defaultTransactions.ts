@@ -13,51 +13,94 @@ export function parseTransactions(csvText: string): Transaction[] {
 
   const rawRows = result.data as any[];
   return rawRows.map((row, index) => {
+    // Helper to get value from row matching any key variant case-insensitively
+    const getVal = (...keys: string[]): any => {
+      if (!row || typeof row !== 'object') return undefined;
+      for (const k of keys) {
+        if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') return row[k];
+        const lowerK = k.toLowerCase().replace(/[\s_]/g, '');
+        for (const rowKey of Object.keys(row)) {
+          if (rowKey.toLowerCase().replace(/[\s_]/g, '') === lowerK) {
+            if (row[rowKey] !== undefined && row[rowKey] !== null && String(row[rowKey]).trim() !== '') {
+              return row[rowKey];
+            }
+          }
+        }
+      }
+      return undefined;
+    };
+
     // Clean numeric values that might contain commas or currency symbols like "9,983.33"
     const cleanNum = (val: any) => {
-      if (val === undefined || val === null || val === '') return 0;
+      if (val === undefined || val === null || val === '') return undefined;
       if (typeof val === 'number') return val;
       const cleaned = val.toString().replace(/[$"'\s]/g, '').replace(/,/g, '').trim();
       const parsed = parseFloat(cleaned);
-      return isNaN(parsed) ? 0 : parsed;
+      return isNaN(parsed) ? undefined : parsed;
     };
 
-    const dateVal = (row['Date'] && row['Date'].trim()) || 
-                    (row['Due Date'] && row['Due Date'].trim()) || 
-                    (row['Description'] && row['Description'].startsWith('202') ? row['Description'].trim() : new Date().toISOString());
+    const rawDate = getVal('Date', 'date', 'Due Date', 'due_date');
+    const rawDesc = getVal('Description', 'description', 'Title', 'title', 'notes');
+    
+    let dateVal = rawDate ? String(rawDate).trim() : undefined;
+    if (!dateVal && rawDesc && String(rawDesc).startsWith('202')) {
+      dateVal = String(rawDesc).trim();
+    }
+    if (!dateVal) {
+      dateVal = new Date().toISOString().substring(0, 10);
+    }
 
-    const parsedAmount = cleanNum(row['Amount']);
-    const parsedTransferAmount = row['Transfer Amount'] ? cleanNum(row['Transfer Amount']) : undefined;
-    const finalAmount = (parsedAmount > 0) ? parsedAmount : (parsedTransferAmount || 0);
+    const parsedAmount = cleanNum(getVal('Amount', 'amount')) || 0;
+    const parsedTransferAmount = cleanNum(getVal('Transfer Amount', 'transfer_amount', 'transferamount'));
+    const parsedReceiveAmount = cleanNum(getVal('Receive Amount', 'receive_amount', 'receiveamount'));
+    const finalAmount = (parsedAmount > 0) ? parsedAmount : (parsedTransferAmount || parsedReceiveAmount || 0);
 
-    const txType = ((row['Type'] as string) || 'EXPENSE').toUpperCase() as any;
+    const rawType = getVal('Type', 'type');
+    const txType = (rawType ? String(rawType).toUpperCase() : 'EXPENSE') as any;
 
-    const transferCurrency = row['Transfer Currency'] ? row['Transfer Currency'].trim() : undefined;
-    const receiveCurrency = row['Receive Currency'] ? row['Receive Currency'].trim() : undefined;
-    const generalCurrency = row['Currency'] ? row['Currency'].trim() : undefined;
+    const transferCurrency = getVal('Transfer Currency', 'transfer_currency');
+    const receiveCurrency = getVal('Receive Currency', 'receive_currency');
+    const generalCurrency = getVal('Currency', 'currency');
 
-    // For a transfer, origin currency is transferCurrency if provided, else general currency
     const originCurrency = (txType === 'TRANSFER' && transferCurrency)
-      ? transferCurrency
-      : (generalCurrency || transferCurrency || 'ARS');
+      ? String(transferCurrency).trim()
+      : (generalCurrency ? String(generalCurrency).trim() : (transferCurrency ? String(transferCurrency).trim() : 'ARS'));
+
+    const rawTitle = getVal('Title', 'title', 'Category', 'category', 'Description', 'description');
+    const titleVal = rawTitle ? String(rawTitle).trim() : 'Untitled';
+
+    const rawCategory = getVal('Category', 'category');
+    const categoryVal = rawCategory ? String(rawCategory).trim() : 'General';
+
+    const rawAccount = getVal('Account', 'account', 'From Account', 'from_account');
+    const accountVal = rawAccount ? String(rawAccount).trim() : 'Cash';
+
+    const rawToAccount = getVal('To Account', 'to_account', 'Destination Account', 'destination_account');
+    const toAccountVal = rawToAccount ? String(rawToAccount).trim() : undefined;
+
+    const rawId = getVal('ID', 'id');
+    const idVal = rawId ? String(rawId).trim() : `tx-${index}-${Math.random().toString(36).substring(2, 9)}`;
+
+    const descriptionVal = getVal('Description', 'description', 'notes') ? String(getVal('Description', 'description', 'notes')).trim() : undefined;
+    const dueDateVal = getVal('Due Date', 'due_date') ? String(getVal('Due Date', 'due_date')).trim() : undefined;
 
     return {
-      id: row['ID'] || `tx-${index}-${Math.random().toString(36).substring(2, 9)}`,
+      id: idVal,
       date: dateVal,
-      title: row['Title'] || row['Category'] || 'Untitled',
-      category: row['Category'] || 'General',
-      account: row['Account'] ? row['Account'].trim() : 'Cash',
+      title: titleVal,
+      category: categoryVal,
+      account: accountVal,
       amount: finalAmount,
       currency: originCurrency,
       type: txType,
       transferAmount: parsedTransferAmount,
-      transferCurrency: transferCurrency,
-      toAccount: row['To Account'] ? row['To Account'].trim() : undefined,
-      receiveAmount: row['Receive Amount'] ? cleanNum(row['Receive Amount']) : undefined,
-      receiveCurrency: receiveCurrency,
-      description: row['Description'] || undefined,
-      dueDate: row['Due Date'] || undefined,
-      installments: row['ID'] ? undefined : (row['Description'] && row['Description'].includes('/') ? row['Description'] : undefined),
+      transferCurrency: transferCurrency ? String(transferCurrency).trim() : undefined,
+      toAccount: toAccountVal,
+      receiveAmount: parsedReceiveAmount,
+      receiveCurrency: receiveCurrency ? String(receiveCurrency).trim() : undefined,
+      description: descriptionVal,
+      dueDate: dueDateVal,
+      installments: rawId ? undefined : (descriptionVal && descriptionVal.includes('/') ? descriptionVal : undefined),
     };
   }).filter(t => t.date && (!isNaN(t.amount) || (t.transferAmount && !isNaN(t.transferAmount))));
 }
