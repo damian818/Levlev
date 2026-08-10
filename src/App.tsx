@@ -632,7 +632,36 @@ export default function App() {
             return sorted;
           });
           
-          setCurrentTab('overview');
+            // Register any newly encountered accounts into custom accounts list
+            setAccounts(prevAccs => {
+              const existingNames = new Set(prevAccs.map(a => a.name));
+              const newAccs: AccountItem[] = [];
+              uploadedTx.forEach(t => {
+                if (t.account && !existingNames.has(t.account)) {
+                  existingNames.add(t.account);
+                  newAccs.push({
+                    id: `acc-${Math.random().toString(36).substring(2)}`,
+                    name: t.account,
+                    type: 'CHECKING',
+                    currency: t.currency || 'ARS',
+                    initialBalance: 0,
+                  });
+                }
+                if (t.toAccount && !existingNames.has(t.toAccount)) {
+                  existingNames.add(t.toAccount);
+                  newAccs.push({
+                    id: `acc-${Math.random().toString(36).substring(2)}`,
+                    name: t.toAccount,
+                    type: 'CHECKING',
+                    currency: t.receiveCurrency || t.transferCurrency || t.currency || 'ARS',
+                    initialBalance: 0,
+                  });
+                }
+              });
+              return newAccs.length > 0 ? [...prevAccs, ...newAccs] : prevAccs;
+            });
+
+            setCurrentTab('overview');
         }
       }
     };

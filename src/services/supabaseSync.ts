@@ -42,6 +42,8 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       statementCloseDate: row.statement_close_date || undefined,
       receiveAmount: row.receive_amount ? Number(row.receive_amount) : undefined,
       receiveCurrency: row.receive_currency || undefined,
+      transferAmount: (row.transfer_amount !== undefined && row.transfer_amount !== null) ? Number(row.transfer_amount) : undefined,
+      transferCurrency: row.transfer_currency || undefined,
       description: row.notes || undefined,
     }));
 
@@ -101,6 +103,8 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           statement_close_date: t.statementCloseDate || null,
           receive_amount: t.receiveAmount || null,
           receive_currency: t.receiveCurrency || null,
+          transfer_amount: t.transferAmount || null,
+          transfer_currency: t.transferCurrency || null,
           notes: t.description || null,
         };
       });
