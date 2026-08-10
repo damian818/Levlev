@@ -78,11 +78,10 @@ export default function App() {
   // Custom accounts list state
   const [accounts, setAccounts] = useState<AccountItem[]>(() => {
     try {
-      const isCleared = localStorage.getItem('finance_app_is_cleared');
       const saved = localStorage.getItem('finance_app_custom_accounts');
       if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && (parsed.length > 0 || isCleared === 'true')) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {
       console.warn('Failed to load custom accounts from localStorage');
@@ -639,21 +638,25 @@ export default function App() {
               uploadedTx.forEach(t => {
                 if (t.account && !existingNames.has(t.account)) {
                   existingNames.add(t.account);
+                  const isUsd = t.account.toLowerCase().includes('usd') || (t.type === 'TRANSFER' && t.transferCurrency === 'USD');
+                  const isCC = t.account.toLowerCase().includes('card') || t.account.toLowerCase().includes('visa') || t.account.toLowerCase().includes('master');
                   newAccs.push({
                     id: `acc-${Math.random().toString(36).substring(2)}`,
                     name: t.account,
-                    type: 'CHECKING',
-                    currency: t.currency || 'ARS',
+                    type: isCC ? 'CREDIT_CARD' : (t.account.toLowerCase().includes('wallet') ? 'WALLET' : 'CHECKING'),
+                    currency: (t.type === 'TRANSFER' && t.transferCurrency) ? t.transferCurrency : (t.currency || (isUsd ? 'USD' : 'ARS')),
                     initialBalance: 0,
                   });
                 }
                 if (t.toAccount && !existingNames.has(t.toAccount)) {
                   existingNames.add(t.toAccount);
+                  const isUsd = t.toAccount.toLowerCase().includes('usd') || t.receiveCurrency === 'USD';
+                  const isCC = t.toAccount.toLowerCase().includes('card') || t.toAccount.toLowerCase().includes('visa') || t.toAccount.toLowerCase().includes('master');
                   newAccs.push({
                     id: `acc-${Math.random().toString(36).substring(2)}`,
                     name: t.toAccount,
-                    type: 'CHECKING',
-                    currency: t.receiveCurrency || t.transferCurrency || t.currency || 'ARS',
+                    type: isCC ? 'CREDIT_CARD' : (t.toAccount.toLowerCase().includes('wallet') ? 'WALLET' : 'CHECKING'),
+                    currency: t.receiveCurrency || (isUsd ? 'USD' : 'ARS'),
                     initialBalance: 0,
                   });
                 }
@@ -676,14 +679,11 @@ export default function App() {
     localStorage.setItem('finance_app_is_cleared', 'true');
     localStorage.setItem('finance_app_transactions', JSON.stringify([]));
     localStorage.setItem('finance_app_budgets', JSON.stringify([]));
-
-    const zeroedAccounts = accounts.map(a => ({ ...a, initialBalance: 0 }));
-    setAccounts(zeroedAccounts);
-    localStorage.setItem('finance_app_custom_accounts', JSON.stringify(zeroedAccounts));
-
-    setCustomBalances({});
+    localStorage.setItem('finance_app_custom_accounts', JSON.stringify([]));
     localStorage.setItem('finance_app_account_balances', JSON.stringify({}));
 
+    setAccounts([]);
+    setCustomBalances({});
     setTransactions([]);
     setBudgets([]);
     setActiveFilter(undefined);
@@ -693,7 +693,7 @@ export default function App() {
       await saveAllUserDataToSupabase({
         transactions: [],
         categories,
-        accounts: zeroedAccounts,
+        accounts: [],
         budgets: [],
       });
     } catch (e) {
@@ -778,6 +778,7 @@ export default function App() {
             displayCurrency={displayCurrency}
             usdArsRate={usdArsRate}
             customBalances={customBalances}
+            accounts={accounts}
             periodStatusOverrides={periodStatusOverrides}
             onUpdatePeriodStatus={handleUpdatePeriodStatus}
             onUpdateAccountBalance={handleUpdateAccountBalance}

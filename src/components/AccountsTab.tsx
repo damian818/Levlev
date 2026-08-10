@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule } from '../types';
+import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule, AccountItem } from '../types';
 import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString, getTransferOutflow, getTransferInflow } from '../utils/financeUtils';
 import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -10,6 +10,7 @@ interface AccountsTabProps {
   displayCurrency: DisplayCurrency;
   usdArsRate: number;
   customBalances: Record<string, AccountCustomBalance>;
+  accounts?: AccountItem[];
   periodStatusOverrides?: Record<string, 'PAID' | 'OPEN'>;
   onUpdatePeriodStatus?: (accountName: string, closeDate: string, status?: 'PAID' | 'OPEN') => void;
   onUpdateAccountBalance: (accountName: string, currentBalance: number, currency: string) => void;
@@ -25,6 +26,7 @@ export function AccountsTab({
   displayCurrency,
   usdArsRate,
   customBalances,
+  accounts,
   periodStatusOverrides,
   onUpdatePeriodStatus,
   onUpdateAccountBalance,
@@ -72,59 +74,17 @@ export function AccountsTab({
     } catch (e) {}
   };
 
-  // Calculate net transaction deltas per account
-  const accountDeltas: Record<string, { netDelta: number; currency: string; txCount: number }> = {};
-  const todayStr = getTodayString();
-
-  transactions.forEach(tx => {
-    const acc = tx.account || 'Unknown';
-    const curr = tx.currency || 'ARS';
-    if (!accountDeltas[acc]) {
-      accountDeltas[acc] = { netDelta: 0, currency: curr, txCount: 0 };
-    }
-    accountDeltas[acc].txCount++;
-
-    // Ignore future transactions for current balance status
-    const txDateStr = tx.date ? tx.date.substring(0, 10) : '';
-    if (txDateStr && txDateStr > todayStr) return;
-
-    const amt = tx.amount || 0;
-    if (tx.type === 'INCOME') {
-      accountDeltas[acc].netDelta += amt;
-    } else if (tx.type === 'EXPENSE') {
-      accountDeltas[acc].netDelta -= amt;
-    } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-      const outflow = getTransferOutflow(tx, usdArsRate);
-      accountDeltas[acc].netDelta -= outflow;
-
-      if (tx.toAccount) {
-        const toAcc = tx.toAccount;
-        const inflow = getTransferInflow(tx, usdArsRate);
-        if (!accountDeltas[toAcc]) {
-          accountDeltas[toAcc] = { netDelta: 0, currency: tx.receiveCurrency || tx.transferCurrency || curr, txCount: 0 };
-        }
-        accountDeltas[toAcc].netDelta += inflow;
-      }
-    }
-  });
-
-  const accountNames = Array.from(new Set([...Object.keys(accountDeltas), ...Object.keys(customBalances)])).sort();
+  // Calculate account summaries using central financeUtils helper
+  const computedSummaries = computeAccountBalances(transactions, usdArsRate, customBalances, accounts);
 
   // Reconstructed summary list with Credit Card classification
-  const reconstructedAccounts = accountNames.map(name => {
-    const deltaObj = accountDeltas[name] || { netDelta: 0, currency: 'ARS', txCount: 0 };
-    const custom = customBalances[name];
-
-    const currency = custom?.currency || deltaObj.currency || 'ARS';
+  const reconstructedAccounts = computedSummaries.map(summary => {
+    const name = summary.accountName;
+    const currency = summary.originalCurrency;
     const isUsd = currency.toUpperCase().includes('USD');
-
-    // Current live balance (user provided or calculated from sum)
-    const currentBalance = custom !== undefined ? custom.currentBalance : deltaObj.netDelta;
-    // Reconstructed initial balance backwards
-    const reconstructedInitialBalance = custom !== undefined ? custom.currentBalance - deltaObj.netDelta : 0;
-
-    const currentARS = isUsd ? currentBalance * usdArsRate : currentBalance;
-    const currentUSD = isUsd ? currentBalance : (usdArsRate > 0 ? currentBalance / usdArsRate : 0);
+    const currentBalance = summary.balanceOriginal;
+    const currentARS = summary.balanceARS;
+    const currentUSD = summary.balanceUSD;
 
     const isCC = isCreditCardAccount(name, customCCMap);
     const accountRule = ccRulesMap[name] || { ruleType: 'FIXED_DAY', fixedDay: 25 };
@@ -143,25 +103,25 @@ export function AccountsTab({
       closingRule: accountRule,
       currentBalance,
       balanceOriginal: currentBalance,
-      netDelta: deltaObj.netDelta,
-      reconstructedInitialBalance,
+      netDelta: currentBalance,
+      reconstructedInitialBalance: 0,
       currentARS,
       currentUSD,
-      txCount: deltaObj.txCount,
-      hasCustom: custom !== undefined,
+      txCount: summary.txCount,
+      hasCustom: customBalances[name] !== undefined,
       currentStatement,
       nextCloseDate,
       statements,
     };
-  }).filter(acc => acc.txCount > 0 || acc.hasCustom);
+  });
 
   // Separate Liquid Accounts vs Credit Card Accounts
   const liquidAccounts = reconstructedAccounts.filter(a => !a.isCreditCard);
   const creditCardAccounts = reconstructedAccounts.filter(a => a.isCreditCard);
 
   // Totals calculations
-  const totalLiquidARS = liquidAccounts.reduce((acc, curr) => acc + (curr.currentARS > 0 ? curr.currentARS : 0), 0);
-  const totalLiquidUSD = liquidAccounts.reduce((acc, curr) => acc + (curr.currentUSD > 0 ? curr.currentUSD : 0), 0);
+  const totalLiquidARS = liquidAccounts.reduce((acc, curr) => acc + curr.currentARS, 0);
+  const totalLiquidUSD = liquidAccounts.reduce((acc, curr) => acc + curr.currentUSD, 0);
 
   // Credit Card Outstanding Debt (Expenses minus payments)
   const totalCcDebtARS = creditCardAccounts.reduce((acc, curr) => {

@@ -116,8 +116,8 @@ export function OverviewTab({
   });
 
   const totalAssetsDisplay = displayCurrency === 'USD' 
-    ? accounts.reduce((acc, curr) => acc + (curr.balanceUSD > 0 ? curr.balanceUSD : 0), 0)
-    : accounts.reduce((acc, curr) => acc + (curr.balanceARS > 0 ? curr.balanceARS : 0), 0);
+    ? accounts.reduce((acc, curr) => acc + curr.balanceUSD, 0)
+    : accounts.reduce((acc, curr) => acc + curr.balanceARS, 0);
 
   const pieData = spending.topCategories.slice(0, 6).map(c => ({
     name: c.category,

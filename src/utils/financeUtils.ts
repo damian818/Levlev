@@ -620,10 +620,16 @@ export function getTransferOutflow(
     currency?: string;
     transferCurrency?: string;
     receiveCurrency?: string;
+    account?: string;
     toAccount?: string;
   },
-  usdArsRate: number = 1200
+  usdArsRate: number = 1200,
+  originCurrency?: string,
+  destCurrency?: string
 ): number {
+  const originCurr = (originCurrency || tx.transferCurrency || tx.currency || (tx.account?.toLowerCase().includes('usd') ? 'USD' : 'ARS')).toUpperCase();
+  const destCurr = (destCurrency || tx.receiveCurrency || (tx.toAccount?.toLowerCase().includes('usd') ? 'USD' : 'ARS')).toUpperCase();
+
   if (tx.transferAmount !== undefined && tx.transferAmount !== null && Number(tx.transferAmount) > 0) {
     return Number(tx.transferAmount);
   }
@@ -632,9 +638,6 @@ export function getTransferOutflow(
   }
   if (tx.receiveAmount !== undefined && tx.receiveAmount !== null && Number(tx.receiveAmount) > 0) {
     const recAmt = Number(tx.receiveAmount);
-    const originCurr = (tx.transferCurrency || tx.currency || 'ARS').toUpperCase();
-    const destCurr = (tx.receiveCurrency || 'ARS').toUpperCase();
-
     if (originCurr.includes('USD') && destCurr.includes('ARS') && usdArsRate > 0) {
       return recAmt / usdArsRate;
     } else if (originCurr.includes('ARS') && destCurr.includes('USD') && usdArsRate > 0) {
@@ -653,18 +656,21 @@ export function getTransferInflow(
     currency?: string;
     transferCurrency?: string;
     receiveCurrency?: string;
+    account?: string;
     toAccount?: string;
   },
-  usdArsRate: number = 1200
+  usdArsRate: number = 1200,
+  originCurrency?: string,
+  destCurrency?: string
 ): number {
+  const originCurr = (originCurrency || tx.transferCurrency || tx.currency || (tx.account?.toLowerCase().includes('usd') ? 'USD' : 'ARS')).toUpperCase();
+  const destCurr = (destCurrency || tx.receiveCurrency || (tx.toAccount?.toLowerCase().includes('usd') ? 'USD' : 'ARS')).toUpperCase();
+
   if (tx.receiveAmount !== undefined && tx.receiveAmount !== null && Number(tx.receiveAmount) > 0) {
     return Number(tx.receiveAmount);
   }
   if (tx.transferAmount !== undefined && tx.transferAmount !== null && Number(tx.transferAmount) > 0) {
     const transAmt = Number(tx.transferAmount);
-    const originCurr = (tx.transferCurrency || tx.currency || 'ARS').toUpperCase();
-    const destCurr = (tx.receiveCurrency || 'ARS').toUpperCase();
-
     if (originCurr.includes('USD') && destCurr.includes('ARS') && usdArsRate > 0) {
       return transAmt * usdArsRate;
     } else if (originCurr.includes('ARS') && destCurr.includes('USD') && usdArsRate > 0) {
@@ -674,9 +680,6 @@ export function getTransferInflow(
   }
   if (tx.amount !== undefined && tx.amount !== null && Number(tx.amount) > 0) {
     const amt = Number(tx.amount);
-    const originCurr = (tx.transferCurrency || tx.currency || 'ARS').toUpperCase();
-    const destCurr = (tx.receiveCurrency || 'ARS').toUpperCase();
-
     if (originCurr.includes('USD') && destCurr.includes('ARS') && usdArsRate > 0) {
       return amt * usdArsRate;
     } else if (originCurr.includes('ARS') && destCurr.includes('USD') && usdArsRate > 0) {
@@ -690,16 +693,31 @@ export function getTransferInflow(
 export function computeAccountBalances(
   transactions: Transaction[],
   usdArsRate: number,
-  customBalances?: Record<string, { currentBalance: number; currency: string }>
+  customBalances?: Record<string, { currentBalance: number; currency: string }>,
+  accountsList?: AccountItem[]
 ): AccountSummary[] {
   const accountDeltas: { [name: string]: { netDelta: number; currency: string; count: number } } = {};
   const todayStr = getTodayString();
 
+  const getAccountCurrency = (accName: string, fallbackCurrency?: string): string => {
+    if (customBalances?.[accName]?.currency) {
+      return customBalances[accName].currency;
+    }
+    if (accountsList) {
+      const match = accountsList.find(a => a.name === accName);
+      if (match?.currency) return match.currency;
+    }
+    if (fallbackCurrency) return fallbackCurrency;
+    if (accName.toLowerCase().includes('usd')) return 'USD';
+    return 'ARS';
+  };
+
   transactions.forEach(tx => {
     const acc = tx.account || 'Unknown';
-    const curr = tx.currency || 'ARS';
+    const originCurr = getAccountCurrency(acc, (tx.type === 'TRANSFER' && tx.transferCurrency) ? tx.transferCurrency : tx.currency);
+
     if (!accountDeltas[acc]) {
-      accountDeltas[acc] = { netDelta: 0, currency: curr, count: 0 };
+      accountDeltas[acc] = { netDelta: 0, currency: originCurr, count: 0 };
     }
     accountDeltas[acc].count++;
 
@@ -714,32 +732,36 @@ export function computeAccountBalances(
     } else if (tx.type === 'EXPENSE') {
       accountDeltas[acc].netDelta -= amt;
     } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-      const outflow = getTransferOutflow(tx, usdArsRate);
+      const destAcc = tx.toAccount;
+      const destCurr = destAcc ? getAccountCurrency(destAcc, tx.receiveCurrency) : originCurr;
+
+      const outflow = getTransferOutflow(tx, usdArsRate, originCurr, destCurr);
       accountDeltas[acc].netDelta -= outflow;
 
-      if (tx.toAccount) {
-        const toAcc = tx.toAccount;
-        const inflow = getTransferInflow(tx, usdArsRate);
+      if (destAcc) {
+        const inflow = getTransferInflow(tx, usdArsRate, originCurr, destCurr);
 
-        if (!accountDeltas[toAcc]) {
-          accountDeltas[toAcc] = { netDelta: 0, currency: tx.receiveCurrency || tx.transferCurrency || curr, count: 0 };
+        if (!accountDeltas[destAcc]) {
+          accountDeltas[destAcc] = { netDelta: 0, currency: destCurr, count: 0 };
         }
-        accountDeltas[toAcc].netDelta += inflow;
+        accountDeltas[destAcc].netDelta += inflow;
       }
     }
   });
 
   const allNames = Array.from(new Set([
     ...Object.keys(accountDeltas),
-    ...(customBalances ? Object.keys(customBalances) : [])
+    ...(customBalances ? Object.keys(customBalances) : []),
+    ...(accountsList ? accountsList.map(a => a.name) : [])
   ])).sort();
 
   return allNames
     .map(accName => {
       const deltaObj = accountDeltas[accName] || { netDelta: 0, currency: 'ARS', count: 0 };
       const custom = customBalances?.[accName];
+      const accItem = accountsList?.find(a => a.name === accName);
 
-      const currency = custom?.currency || deltaObj.currency || 'ARS';
+      const currency = custom?.currency || accItem?.currency || deltaObj.currency || getAccountCurrency(accName);
       const balance = custom !== undefined ? custom.currentBalance : deltaObj.netDelta;
 
       const isUsd = currency.toUpperCase().includes('USD');
@@ -755,7 +777,7 @@ export function computeAccountBalances(
         txCount: deltaObj.count,
       };
     })
-    .filter(acc => acc.txCount > 0 || (customBalances && customBalances[acc.accountName] !== undefined));
+    .filter(acc => acc.txCount > 0 || (customBalances && customBalances[acc.accountName] !== undefined) || (accountsList && accountsList.some(a => a.name === acc.accountName)));
 }
 
 
@@ -933,8 +955,8 @@ export function computePredictiveTrend(
   // 1. Calculate current liquid assets
   const accounts = computeAccountBalances(transactions, usdArsRate, customBalances);
   const currentLiquidBalance = displayCurrency === 'USD'
-    ? accounts.reduce((sum, a) => sum + (a.balanceUSD > 0 ? a.balanceUSD : 0), 0)
-    : accounts.reduce((sum, a) => sum + (a.balanceARS > 0 ? a.balanceARS : 0), 0);
+    ? accounts.reduce((sum, a) => sum + a.balanceUSD, 0)
+    : accounts.reduce((sum, a) => sum + a.balanceARS, 0);
 
   // 2. Map monthly transactions
   const monthlyMap: Record<string, { income: number; expense: number }> = {};
@@ -1600,6 +1622,14 @@ export function recalculateAccountBalancesFromTransactions(
   const recalculated: Record<string, AccountCustomBalance> = {};
   const todayStr = getTodayString();
 
+  // Helper to infer currency for an account
+  const getAccCurrency = (accName: string): string => {
+    const accItem = accounts.find(a => a.name === accName);
+    if (accItem?.currency) return accItem.currency;
+    if (accName.toLowerCase().includes('usd')) return 'USD';
+    return 'ARS';
+  };
+
   // Track all unique account names from both registered accounts and transactions
   const nameSet = new Set<string>();
   accounts.forEach(a => { if (a.name) nameSet.add(a.name); });
@@ -1609,11 +1639,8 @@ export function recalculateAccountBalancesFromTransactions(
   });
 
   nameSet.forEach(accName => {
-    const accItem = accounts.find(a => a.name === accName);
-    const initialBalance = accItem?.initialBalance ?? 0;
-    const currency = accItem?.currency || 'ARS';
-
-    let netBalance = initialBalance;
+    const currency = getAccCurrency(accName);
+    let netBalance = 0;
 
     transactions.forEach(tx => {
       // Exclude future transactions from current status balance
@@ -1627,13 +1654,17 @@ export function recalculateAccountBalancesFromTransactions(
         } else if (tx.type === 'EXPENSE') {
           netBalance -= amt;
         } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-          const outflow = getTransferOutflow(tx, usdArsRate);
+          const originCurr = currency;
+          const destCurr = tx.toAccount ? getAccCurrency(tx.toAccount) : originCurr;
+          const outflow = getTransferOutflow(tx, usdArsRate, originCurr, destCurr);
           netBalance -= outflow;
         }
       }
 
       if (tx.toAccount === accName && (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT')) {
-        const inflow = getTransferInflow(tx, usdArsRate);
+        const destCurr = currency;
+        const originCurr = tx.account ? getAccCurrency(tx.account) : destCurr;
+        const inflow = getTransferInflow(tx, usdArsRate, originCurr, destCurr);
         netBalance += inflow;
       }
     });
