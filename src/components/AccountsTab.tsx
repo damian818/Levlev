@@ -94,12 +94,12 @@ export function AccountsTab({
     } else if (tx.type === 'EXPENSE') {
       accountDeltas[acc].netDelta -= amt;
     } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-      const outflow = getTransferOutflow(tx);
+      const outflow = getTransferOutflow(tx, usdArsRate);
       accountDeltas[acc].netDelta -= outflow;
 
       if (tx.toAccount) {
         const toAcc = tx.toAccount;
-        const inflow = getTransferInflow(tx);
+        const inflow = getTransferInflow(tx, usdArsRate);
         if (!accountDeltas[toAcc]) {
           accountDeltas[toAcc] = { netDelta: 0, currency: tx.receiveCurrency || tx.transferCurrency || curr, txCount: 0 };
         }

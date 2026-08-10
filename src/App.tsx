@@ -580,7 +580,7 @@ export default function App() {
   };
 
   const handleRecalculateAllBalances = () => {
-    const recalculated = recalculateAccountBalancesFromTransactions(accounts, transactions);
+    const recalculated = recalculateAccountBalancesFromTransactions(accounts, transactions, usdArsRate);
     setCustomBalances(recalculated);
     try {
       localStorage.setItem('finance_app_account_balances', JSON.stringify(recalculated));
@@ -660,6 +660,10 @@ export default function App() {
               });
               return newAccs.length > 0 ? [...prevAccs, ...newAccs] : prevAccs;
             });
+
+            setTimeout(() => {
+              handleRecalculateAllBalances();
+            }, 0);
 
             setCurrentTab('overview');
         }
@@ -750,6 +754,7 @@ export default function App() {
             usdArsRate={usdArsRate}
             historyData={historyData}
             recurringRules={[]}
+            customBalances={customBalances}
             onNavigateTab={setCurrentTab}
             onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
           />

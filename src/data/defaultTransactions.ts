@@ -108,7 +108,7 @@ export function parseTransactions(csvText: string): Transaction[] {
       category: row['Category'] || 'General',
       account: row['Account'] || 'Cash',
       amount: finalAmount,
-      currency: row['Currency'] || 'ARS',
+      currency: row['Currency'] || row['Transfer Currency'] || 'ARS',
       type: (row['Type'] as any) || 'EXPENSE',
       transferAmount: parsedTransferAmount,
       transferCurrency: row['Transfer Currency'] || undefined,

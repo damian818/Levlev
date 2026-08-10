@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule } from '../types';
+import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
 import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon } from 'lucide-react';
@@ -14,6 +14,7 @@ interface OverviewTabProps {
   usdArsRate: number;
   historyData?: InflationPoint[];
   recurringRules?: RecurringRule[];
+  customBalances?: Record<string, AccountCustomBalance>;
   onNavigateTab: (tab: ViewTab) => void;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
 }
@@ -26,6 +27,7 @@ export function OverviewTab({
   usdArsRate,
   historyData,
   recurringRules,
+  customBalances,
   onNavigateTab,
   onNavigateToTransactionsWithFilter,
 }: OverviewTabProps) {
@@ -71,8 +73,8 @@ export function OverviewTab({
   }, [availableMonths]);
 
   const spending = analyzeSpending(transactions, displayCurrency, usdArsRate, selectedMonth);
-  const accounts = computeAccountBalances(transactions, usdArsRate);
-  const { trendData, metrics } = computePredictiveTrend(transactions, displayCurrency, usdArsRate, recurringRules, undefined, historyData);
+  const accounts = computeAccountBalances(transactions, usdArsRate, customBalances);
+  const { trendData, metrics } = computePredictiveTrend(transactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData);
 
   // Filter trend data based on date filters
   const filteredTrendData = useMemo(() => {
