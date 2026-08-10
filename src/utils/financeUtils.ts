@@ -612,6 +612,32 @@ export interface AccountSummary {
   txCount: number;
 }
 
+export function getTransferOutflow(tx: { amount?: number; transferAmount?: number; receiveAmount?: number }): number {
+  if (tx.transferAmount !== undefined && tx.transferAmount !== null && Number(tx.transferAmount) > 0) {
+    return Number(tx.transferAmount);
+  }
+  if (tx.amount !== undefined && tx.amount !== null && Number(tx.amount) > 0) {
+    return Number(tx.amount);
+  }
+  if (tx.receiveAmount !== undefined && tx.receiveAmount !== null && Number(tx.receiveAmount) > 0) {
+    return Number(tx.receiveAmount);
+  }
+  return 0;
+}
+
+export function getTransferInflow(tx: { amount?: number; transferAmount?: number; receiveAmount?: number }): number {
+  if (tx.receiveAmount !== undefined && tx.receiveAmount !== null && Number(tx.receiveAmount) > 0) {
+    return Number(tx.receiveAmount);
+  }
+  if (tx.transferAmount !== undefined && tx.transferAmount !== null && Number(tx.transferAmount) > 0) {
+    return Number(tx.transferAmount);
+  }
+  if (tx.amount !== undefined && tx.amount !== null && Number(tx.amount) > 0) {
+    return Number(tx.amount);
+  }
+  return 0;
+}
+
 export function computeAccountBalances(
   transactions: Transaction[],
   usdArsRate: number,
@@ -651,16 +677,14 @@ export function computeAccountBalances(
     } else if (tx.type === 'EXPENSE') {
       map[acc].balance -= amt;
     } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-      // For transfers / cc payments, the outflow from origin account is tx.transferAmount if provided, or tx.amount
-      const outflow = (tx.transferAmount && tx.transferAmount > 0) ? tx.transferAmount : amt;
+      // For transfers / cc payments, outflow from origin account falls back to receiveAmount if amount/transferAmount is 0
+      const outflow = getTransferOutflow(tx);
       map[acc].balance -= outflow;
 
       // Inflow to destination account
       if (tx.toAccount) {
         const toAcc = tx.toAccount;
-        const inflow = (tx.receiveAmount && tx.receiveAmount > 0)
-          ? tx.receiveAmount
-          : (tx.transferAmount && tx.transferAmount > 0 ? tx.transferAmount : outflow);
+        const inflow = getTransferInflow(tx);
 
         if (!map[toAcc]) {
           map[toAcc] = { balance: 0, currency: tx.receiveCurrency || tx.transferCurrency || curr, count: 0 };
@@ -1488,15 +1512,13 @@ export function verifyAccountBalances(
         } else if (tx.type === 'EXPENSE') {
           sumTransactions -= amt;
         } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-          const outflow = (tx.transferAmount && tx.transferAmount > 0) ? tx.transferAmount : amt;
+          const outflow = getTransferOutflow(tx);
           sumTransactions -= outflow;
         }
       }
 
       if (tx.toAccount === accName && (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT')) {
-        const inflow = (tx.receiveAmount && tx.receiveAmount > 0)
-          ? tx.receiveAmount
-          : ((tx.transferAmount && tx.transferAmount > 0) ? tx.transferAmount : amt);
+        const inflow = getTransferInflow(tx);
         sumTransactions += inflow;
       }
     });
@@ -1558,15 +1580,13 @@ export function recalculateAccountBalancesFromTransactions(
         } else if (tx.type === 'EXPENSE') {
           netBalance -= amt;
         } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-          const outflow = (tx.transferAmount && tx.transferAmount > 0) ? tx.transferAmount : amt;
+          const outflow = getTransferOutflow(tx);
           netBalance -= outflow;
         }
       }
 
       if (tx.toAccount === accName && (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT')) {
-        const inflow = (tx.receiveAmount && tx.receiveAmount > 0)
-          ? tx.receiveAmount
-          : ((tx.transferAmount && tx.transferAmount > 0) ? tx.transferAmount : amt);
+        const inflow = getTransferInflow(tx);
         netBalance += inflow;
       }
     });

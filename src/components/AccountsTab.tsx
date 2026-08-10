@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule } from '../types';
-import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString } from '../utils/financeUtils';
+import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString, getTransferOutflow, getTransferInflow } from '../utils/financeUtils';
 import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { CreditCardDetailModal } from './CreditCardDetailModal';
@@ -94,14 +94,12 @@ export function AccountsTab({
     } else if (tx.type === 'EXPENSE') {
       accountDeltas[acc].netDelta -= amt;
     } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-      const outflow = (tx.transferAmount && tx.transferAmount > 0) ? tx.transferAmount : amt;
+      const outflow = getTransferOutflow(tx);
       accountDeltas[acc].netDelta -= outflow;
 
       if (tx.toAccount) {
         const toAcc = tx.toAccount;
-        const inflow = (tx.receiveAmount && tx.receiveAmount > 0)
-          ? tx.receiveAmount
-          : (tx.transferAmount && tx.transferAmount > 0 ? tx.transferAmount : outflow);
+        const inflow = getTransferInflow(tx);
         if (!accountDeltas[toAcc]) {
           accountDeltas[toAcc] = { netDelta: 0, currency: tx.receiveCurrency || tx.transferCurrency || curr, txCount: 0 };
         }
