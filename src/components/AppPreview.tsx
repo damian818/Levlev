@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, LineChart, CreditCard, Sparkles } from 'lucide-react';
 
+import dashboardImg from '../assets/images/dashboard_preview_1786150416027.jpg';
+import analyticsImg from '../assets/images/analytics_preview_1786150432307.jpg';
+import accountsImg from '../assets/images/accounts_preview_1786150446819.jpg';
+
 interface PreviewTab {
   id: string;
   title: string;
   subtitle: string;
   icon: React.ReactNode;
   image: string;
+  fallbackImage: string;
   features: string[];
 }
 
@@ -17,7 +22,8 @@ export const AppPreview: React.FC = () => {
       title: 'Net Worth & Multi-Currency',
       subtitle: 'Real-time overview of ARS and USD balances converted at live Dólar MEP rates.',
       icon: <LayoutDashboard className="w-4 h-4" />,
-      image: '/assets/images/dashboard_preview_1786150416027.jpg',
+      image: dashboardImg,
+      fallbackImage: '/assets/images/dashboard_preview_1786150416027.jpg',
       features: [
         'Instant ARS/USD toggle',
         'Bank, Deel, DollarApp & cash sync',
@@ -29,7 +35,8 @@ export const AppPreview: React.FC = () => {
       title: 'Inflation & IPC Purchasing Power',
       subtitle: 'Evaluate nominal income against INDEC IPC inflation to protect real wealth.',
       icon: <LineChart className="w-4 h-4" />,
-      image: '/assets/images/analytics_preview_1786150432307.jpg',
+      image: analyticsImg,
+      fallbackImage: '/assets/images/analytics_preview_1786150432307.jpg',
       features: [
         'Historical INDEC IPC charts',
         'ARS purchasing power loss tracker',
@@ -41,7 +48,8 @@ export const AppPreview: React.FC = () => {
       title: 'Accounts, Cards & Cuotas',
       subtitle: 'Manage credit card closing dates, installment payments (cuotas), and shared budgets.',
       icon: <CreditCard className="w-4 h-4" />,
-      image: '/assets/images/accounts_preview_1786150446819.jpg',
+      image: accountsImg,
+      fallbackImage: '/assets/images/accounts_preview_1786150446819.jpg',
       features: [
         'Installment statement dates',
         'Account-level custom balances',
@@ -52,6 +60,13 @@ export const AppPreview: React.FC = () => {
 
   const [activeTabId, setActiveTabId] = useState<string>('dashboard');
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, fallbackSrc: string) => {
+    const target = e.currentTarget;
+    if (target.src !== window.location.origin + fallbackSrc && target.src !== fallbackSrc) {
+      target.src = fallbackSrc;
+    }
+  };
 
   return (
     <section className="py-12 px-4 max-w-6xl mx-auto w-full">
@@ -109,10 +124,11 @@ export const AppPreview: React.FC = () => {
         </div>
 
         {/* Featured Image */}
-        <div className="relative rounded-2xl overflow-hidden border border-slate-800/80 bg-slate-950 group shadow-inner">
+        <div className="relative rounded-2xl overflow-hidden border border-slate-800/80 bg-slate-950 group shadow-inner min-h-[250px] flex items-center justify-center">
           <img
             src={activeTab.image}
             alt={activeTab.title}
+            onError={(e) => handleImageError(e, activeTab.fallbackImage)}
             className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.01]"
           />
           <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl pointer-events-none" />
