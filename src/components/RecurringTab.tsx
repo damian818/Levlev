@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Transaction, RecurringRule, DisplayCurrency, IdentifiedRecurringItem, InflationPoint } from '../types';
+import { Transaction, RecurringRule, DisplayCurrency, IdentifiedRecurringItem, InflationPoint, RecurringOccurrence } from '../types';
 import { formatCurrency, formatCurrencyCompact, convertCurrency, detectRecurringItems, detectInstallmentPlans } from '../utils/financeUtils';
 import { RecurringTrendModal } from './RecurringTrendModal';
 import { RecurringCategoryTrendModal } from './RecurringCategoryTrendModal';
@@ -50,7 +50,113 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
 
   // Auto-detect strict recurring items (6+ occurrences, no installments, consolidated across accounts)
   const regularRecurring = useMemo(() => {
-    return detectRecurringItems(transactions, displayCurrency, usdArsRate);
+    const rawItems = detectRecurringItems(transactions, displayCurrency, usdArsRate);
+    
+    const consolidatedMap = new Map<string, IdentifiedRecurringItem[]>();
+    
+    rawItems.forEach(item => {
+      const nameKey = item.cleanTitle.toLowerCase().trim();
+      if (!consolidatedMap.has(nameKey)) {
+        consolidatedMap.set(nameKey, []);
+      }
+      consolidatedMap.get(nameKey)!.push(item);
+    });
+    
+    const result: IdentifiedRecurringItem[] = [];
+    
+    consolidatedMap.forEach((items, nameKey) => {
+      if (items.length === 1) {
+        result.push(items[0]);
+      } else {
+        const hasIncome = items.some(i => i.type === 'INCOME');
+        const hasExpense = items.some(i => i.type === 'EXPENSE');
+
+        if (!hasIncome || !hasExpense) {
+          result.push(...items);
+          return;
+        }
+
+        let allHistory: (RecurringOccurrence & { originalType: 'INCOME' | 'EXPENSE' })[] = [];
+        items.forEach(it => {
+          allHistory = allHistory.concat(it.history.map(h => ({ ...h, originalType: it.type })));
+        });
+        
+        allHistory.sort((a, b) => a.date.localeCompare(b.date));
+        
+        const monthMap = new Map<string, { amountDisplay: number, count: number, maxAccount: string }>();
+        const accountCounts = new Map<string, number>();
+        
+        allHistory.forEach(h => {
+           const amt = convertCurrency(h.amount, h.currency as DisplayCurrency, displayCurrency, usdArsRate, h.date, transactions);
+           const m = h.month;
+           if (!monthMap.has(m)) monthMap.set(m, { amountDisplay: 0, count: 0, maxAccount: h.account });
+           
+           const data = monthMap.get(m)!;
+           if (h.originalType === 'INCOME') {
+              data.amountDisplay -= amt; 
+           } else {
+              data.amountDisplay += amt;
+           }
+           data.count++;
+           
+           accountCounts.set(h.account, (accountCounts.get(h.account) || 0) + 1);
+        });
+        
+        const totalNetDisplay = Array.from(monthMap.values()).reduce((sum, data) => sum + data.amountDisplay, 0);
+        const finalType = totalNetDisplay > 0 ? 'EXPENSE' : 'INCOME';
+        
+        let maxAccCount = 0;
+        let mainAcc = items[0].account;
+        accountCounts.forEach((c, a) => {
+          if (c > maxAccCount) {
+             maxAccCount = c;
+             mainAcc = a;
+          }
+        });
+        
+        const monthlyTrend = Array.from(monthMap.entries()).map(([month, data]) => ({
+          month,
+          amount: Math.abs(data.amountDisplay),
+          amountDisplay: Math.abs(data.amountDisplay),
+          currency: displayCurrency,
+          account: data.maxAccount
+        })).sort((a, b) => a.month.localeCompare(b.month));
+        
+        const distinctMonthsCount = monthMap.size;
+        const latestMonthData = monthlyTrend[monthlyTrend.length - 1];
+        const avgAmount = monthlyTrend.reduce((s, m) => s + m.amountDisplay, 0) / (monthlyTrend.length || 1);
+        
+        result.push({
+          id: items[0].id + '-consolidated',
+          title: items[0].title,
+          cleanTitle: items[0].cleanTitle,
+          category: items[0].category,
+          type: finalType,
+          account: mainAcc,
+          currency: displayCurrency,
+          latestAmount: latestMonthData ? latestMonthData.amountDisplay : 0,
+          avgAmount: avgAmount,
+          minAmount: Math.min(...monthlyTrend.map(m => m.amountDisplay)),
+          maxAmount: Math.max(...monthlyTrend.map(m => m.amountDisplay)),
+          dayOfMonth: items[0].dayOfMonth,
+          occurrencesCount: allHistory.length,
+          distinctMonthsCount,
+          isInstallment: false,
+          history: allHistory.map(h => ({
+             ...h,
+             amount: convertCurrency(h.amount, h.currency as DisplayCurrency, displayCurrency, usdArsRate, h.date, transactions),
+             currency: displayCurrency
+          })),
+          monthlyTrend
+        });
+      }
+    });
+
+    return result.sort((a, b) => {
+      const bConv = convertCurrency(b.latestAmount, b.currency as DisplayCurrency, displayCurrency, usdArsRate);
+      const aConv = convertCurrency(a.latestAmount, a.currency as DisplayCurrency, displayCurrency, usdArsRate);
+      return bConv - aConv || a.title.localeCompare(b.title);
+    });
   }, [transactions, displayCurrency, usdArsRate]);
 
   // Separate credit card installment plans (cuotas)
