@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { IdentifiedRecurringItem, DisplayCurrency, Transaction, InflationPoint } from '../types';
 import { formatCurrency, convertCurrency, getHistoricalFxRate } from '../utils/financeUtils';
-import { X, Calendar, TrendingUp, TrendingDown, DollarSign, Repeat, ArrowUpRight, ArrowDownRight, Clock, Award, ShieldCheck } from 'lucide-react';
+import { X, Calendar, TrendingUp, TrendingDown, DollarSign, Repeat, ArrowUpRight, ArrowDownRight, Clock, Award, ShieldCheck, Ban } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, LabelList, BarChart } from 'recharts';
 
 interface RecurringTrendModalProps {
@@ -12,6 +12,7 @@ interface RecurringTrendModalProps {
   usdArsRate: number;
   transactions: Transaction[];
   historyData?: InflationPoint[];
+  onMarkNonRecurring?: (item: IdentifiedRecurringItem) => void;
 }
 
 export function RecurringTrendModal({
@@ -22,6 +23,7 @@ export function RecurringTrendModal({
   usdArsRate,
   transactions,
   historyData,
+  onMarkNonRecurring,
 }: RecurringTrendModalProps) {
   if (!isOpen || !item) return null;
 
@@ -90,12 +92,27 @@ export function RecurringTrendModal({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-800"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onMarkNonRecurring && (
+              <button
+                onClick={() => {
+                  onMarkNonRecurring(item);
+                  onClose();
+                }}
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold transition-colors"
+                title="Exclude this item from future recurring lists"
+              >
+                <Ban className="w-3.5 h-3.5" />
+                <span>Mark Non-Recurring</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Key Metrics Row */}

@@ -54,19 +54,46 @@ export function ReportsTab({
     return Array.from(set).sort();
   }, [transactions]);
 
-  // Aggregate monthly data
+  // Aggregate monthly data (including future scheduled periods)
   const monthlyReportData = useMemo(() => {
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const currentMonthKey = todayStr.substring(0, 7);
+
     const monthlyMap: Record<string, {
       month: string;
+      isFuture: boolean;
       incomeARS: number;
       incomeUSD: number;
       expenseARS: number;
       expenseUSD: number;
       incomeConverted: number;
       expenseConverted: number;
+      scheduledIncomeConverted: number;
+      scheduledExpenseConverted: number;
       netConverted: number;
       txCount: number;
     }> = {};
+
+    // Helper to ensure month exists
+    const ensureMonth = (m: string) => {
+      if (!monthlyMap[m]) {
+        monthlyMap[m] = {
+          month: m,
+          isFuture: m > currentMonthKey,
+          incomeARS: 0,
+          incomeUSD: 0,
+          expenseARS: 0,
+          expenseUSD: 0,
+          incomeConverted: 0,
+          expenseConverted: 0,
+          scheduledIncomeConverted: 0,
+          scheduledExpenseConverted: 0,
+          netConverted: 0,
+          txCount: 0,
+        };
+      }
+      return monthlyMap[m];
+    };
 
     transactions.forEach(tx => {
       if (tx.type === 'TRANSFER') return; // Exclude internal transfers from income/expense metrics
@@ -75,37 +102,42 @@ export function ReportsTab({
       const monthKey = tx.date ? tx.date.substring(0, 7) : 'Unknown';
       if (monthKey === 'Unknown') return;
 
-      if (!monthlyMap[monthKey]) {
-        monthlyMap[monthKey] = {
-          month: monthKey,
-          incomeARS: 0,
-          incomeUSD: 0,
-          expenseARS: 0,
-          expenseUSD: 0,
-          incomeConverted: 0,
-          expenseConverted: 0,
-          netConverted: 0,
-          txCount: 0,
-        };
-      }
-
-      const item = monthlyMap[monthKey];
+      const item = ensureMonth(monthKey);
       item.txCount++;
 
       const isUsd = tx.currency?.toUpperCase().includes('USD');
       const amt = tx.amount || 0;
       const converted = convertCurrency(amt, tx.currency, displayCurrency, usdArsRate, tx.date, transactions);
+      const isTxFuture = Boolean(tx.date && tx.date.substring(0, 10) > todayStr);
 
       if (tx.type === 'INCOME') {
         if (isUsd) item.incomeUSD += amt;
         else item.incomeARS += amt;
-        item.incomeConverted += converted;
+
+        if (isTxFuture) {
+          item.scheduledIncomeConverted += converted;
+        } else {
+          item.incomeConverted += converted;
+        }
       } else if (tx.type === 'EXPENSE') {
         if (isUsd) item.expenseUSD += amt;
         else item.expenseARS += amt;
-        item.expenseConverted += converted;
+
+        if (isTxFuture) {
+          item.scheduledExpenseConverted += converted;
+        } else {
+          item.expenseConverted += converted;
+        }
       }
     });
+
+    // Ensure future 3 months exist for forecasting visibility
+    const currDt = new Date();
+    for (let i = 1; i <= 3; i++) {
+      const futureDt = new Date(currDt.getFullYear(), currDt.getMonth() + i, 1);
+      const fKey = futureDt.toISOString().substring(0, 7);
+      ensureMonth(fKey);
+    }
 
     let allMonths = Object.keys(monthlyMap).sort();
 
@@ -118,7 +150,7 @@ export function ReportsTab({
 
     return allMonths.map(m => {
       const data = monthlyMap[m];
-      data.netConverted = data.incomeConverted - data.expenseConverted;
+      data.netConverted = (data.incomeConverted + data.scheduledIncomeConverted) - (data.expenseConverted + data.scheduledExpenseConverted);
       return data;
     });
   }, [transactions, timeRange, selectedCategoryFilter, displayCurrency, usdArsRate]);
@@ -196,59 +228,189 @@ export function ReportsTab({
   // PDF Report Exporter
   const handleExportPDF = () => {
     const doc = new jsPDF();
-    const nowStr = new Date().toLocaleDateString();
+    const nowStr = new Date().toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' });
 
-    // Header
+    // Page 1 Header Banner
     doc.setFillColor(15, 19, 26);
-    doc.rect(0, 0, 210, 35, 'F');
+    doc.rect(0, 0, 210, 36, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.text('Finlev - Executive Financial Report', 14, 20);
-    doc.setFontSize(10);
-    doc.text(`Generated on ${nowStr} | Currency Mode: ${displayCurrency} (USD/ARS: $${usdArsRate})`, 14, 28);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('LevLev', 14, 18);
 
-    // Summary Section
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(148, 163, 184);
+    doc.text('Personal Finance & Inflation Executive Report', 14, 26);
+    doc.text(`Generated: ${nowStr} | Mode: ${displayCurrency} (USD/ARS: $${usdArsRate})`, 14, 32);
+
+    // Section 1: Key Performance Indicators Card
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, 42, 182, 38, 3, 3, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
     doc.setTextColor(30, 41, 59);
-    doc.setFontSize(14);
-    doc.text('Key Performance Summary', 14, 48);
+    doc.text('Executive Summary Indicators', 18, 50);
 
-    doc.setFontSize(10);
-    doc.text(`Selected Period Range: ${timeRange === '6M' ? 'Last 6 Months' : timeRange === '12M' ? 'Last 12 Months' : 'All History'}`, 14, 56);
-    doc.text(`Total Income: ${formatCurrency(summaryMetrics.totalIncomeConverted, displayCurrency)} (ARS: $${summaryMetrics.totalIncomeARS.toLocaleString()} | USD: $${summaryMetrics.totalIncomeUSD.toLocaleString()})`, 14, 63);
-    doc.text(`Total Expenses: ${formatCurrency(summaryMetrics.totalExpenseConverted, displayCurrency)} (ARS: $${summaryMetrics.totalExpenseARS.toLocaleString()} | USD: $${summaryMetrics.totalExpenseUSD.toLocaleString()})`, 14, 70);
-    doc.text(`Net Cash Flow: ${formatCurrency(summaryMetrics.netSavingsConverted, displayCurrency)}`, 14, 77);
-    doc.text(`Average Savings Rate: ${summaryMetrics.savingsRate.toFixed(1)}%`, 14, 84);
-
-    // Table Header
-    doc.setFontSize(12);
-    doc.text('Monthly Breakdown', 14, 98);
-
-    doc.setFillColor(241, 245, 249);
-    doc.rect(14, 102, 182, 8, 'F');
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text('Month', 18, 107);
-    doc.text('Income (ARS)', 55, 107);
-    doc.text('Income (USD)', 90, 107);
-    doc.text('Expense (ARS)', 125, 107);
-    doc.text('Expense (USD)', 160, 107);
 
-    let y = 116;
-    doc.setTextColor(15, 23, 42);
-    monthlyReportData.forEach(m => {
-      if (y > 270) {
+    // Left Column
+    doc.text(`Total Period Income:`, 18, 58);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(16, 185, 129);
+    doc.text(`${formatCurrency(summaryMetrics.totalIncomeConverted, displayCurrency)}`, 62, 58);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Total Period Expense:`, 18, 65);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(244, 63, 94);
+    doc.text(`${formatCurrency(summaryMetrics.totalExpenseConverted, displayCurrency)}`, 62, 65);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Net Cash Flow:`, 18, 72);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(summaryMetrics.netSavingsConverted >= 0 ? 16 : 239, summaryMetrics.netSavingsConverted >= 0 ? 185 : 68, summaryMetrics.netSavingsConverted >= 0 ? 129 : 68);
+    doc.text(`${formatCurrency(summaryMetrics.netSavingsConverted, displayCurrency)}`, 62, 72);
+
+    // Right Column
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Savings Rate:`, 110, 58);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text(`${summaryMetrics.savingsRate.toFixed(1)}%`, 150, 58);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Avg Monthly Expense:`, 110, 65);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${formatCurrency(summaryMetrics.avgMonthlyExpense, displayCurrency)}`, 150, 65);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Selected Period Range:`, 110, 72);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${timeRange === '6M' ? 'Last 6 Months' : timeRange === '12M' ? 'Last 12 Months' : 'All History'}`, 150, 72);
+
+    // Section 2: Top Expense Categories
+    let currentY = 88;
+    if (categoryBreakdownData.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(30, 41, 59);
+      doc.text('Expense Category Breakdown', 14, currentY);
+      currentY += 5;
+
+      // Table Header
+      doc.setFillColor(241, 245, 249);
+      doc.rect(14, currentY, 182, 7, 'F');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Category', 18, currentY + 5);
+      doc.text(`Amount (${displayCurrency})`, 110, currentY + 5);
+      doc.text('% Share', 165, currentY + 5);
+      currentY += 8;
+
+      const totalCatExp = categoryBreakdownData.reduce((acc, c) => acc + c.value, 0);
+      categoryBreakdownData.slice(0, 6).forEach((cat, idx) => {
+        if (idx % 2 === 1) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(14, currentY - 1, 182, 6, 'F');
+        }
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(51, 65, 85);
+        doc.text(cat.name, 18, currentY + 3);
+        doc.text(formatCurrency(cat.value, displayCurrency), 110, currentY + 3);
+        const pct = totalCatExp > 0 ? ((cat.value / totalCatExp) * 100).toFixed(1) : '0';
+        doc.text(`${pct}%`, 165, currentY + 3);
+        currentY += 6;
+      });
+      currentY += 6;
+    }
+
+    // Section 3: Monthly Breakdown Table
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(30, 41, 59);
+    doc.text('Monthly Historical & Scheduled Performance Breakdown', 14, currentY);
+    currentY += 5;
+
+    // Table Header
+    doc.setFillColor(15, 23, 42);
+    doc.rect(14, currentY, 182, 8, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Month', 18, currentY + 5);
+    doc.text('Status', 42, currentY + 5);
+    doc.text('Income (ARS)', 68, currentY + 5);
+    doc.text('Income (USD)', 100, currentY + 5);
+    doc.text('Expense (ARS)', 132, currentY + 5);
+    doc.text('Expense (USD)', 164, currentY + 5);
+    currentY += 9;
+
+    let pageNum = 1;
+    doc.setFont('helvetica', 'normal');
+
+    monthlyReportData.forEach((m, idx) => {
+      if (currentY > 270) {
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`LevLev Executive Financial Report • Page ${pageNum}`, 14, 288);
         doc.addPage();
-        y = 20;
+        pageNum++;
+        currentY = 20;
+
+        // Repeat header
+        doc.setFillColor(15, 23, 42);
+        doc.rect(14, currentY, 182, 8, 'F');
+        doc.setFontSize(8);
+        doc.setTextColor(255, 255, 255);
+        doc.text('Month', 18, currentY + 5);
+        doc.text('Status', 42, currentY + 5);
+        doc.text('Income (ARS)', 68, currentY + 5);
+        doc.text('Income (USD)', 100, currentY + 5);
+        doc.text('Expense (ARS)', 132, currentY + 5);
+        doc.text('Expense (USD)', 164, currentY + 5);
+        currentY += 9;
       }
-      doc.text(m.month, 18, y);
-      doc.text(`$${Math.round(m.incomeARS).toLocaleString()}`, 55, y);
-      doc.text(`$${Math.round(m.incomeUSD).toLocaleString()}`, 90, y);
-      doc.text(`$${Math.round(m.expenseARS).toLocaleString()}`, 125, y);
-      doc.text(`$${Math.round(m.expenseUSD).toLocaleString()}`, 160, y);
-      y += 7;
+
+      if (idx % 2 === 1) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(14, currentY - 1, 182, 6, 'F');
+      }
+
+      doc.setTextColor(51, 65, 85);
+      doc.text(m.month, 18, currentY + 3);
+
+      if (m.isFuture) {
+        doc.setTextColor(217, 119, 6);
+        doc.text('Scheduled', 42, currentY + 3);
+      } else {
+        doc.setTextColor(16, 185, 129);
+        doc.text('Actual', 42, currentY + 3);
+      }
+
+      doc.setTextColor(51, 65, 85);
+      doc.text(`$${Math.round(m.incomeARS).toLocaleString()}`, 68, currentY + 3);
+      doc.text(`$${Math.round(m.incomeUSD).toLocaleString()}`, 100, currentY + 3);
+      doc.text(`$${Math.round(m.expenseARS).toLocaleString()}`, 132, currentY + 3);
+      doc.text(`$${Math.round(m.expenseUSD).toLocaleString()}`, 164, currentY + 3);
+
+      currentY += 6;
     });
 
-    doc.save(`Finlev_Financial_Report_${displayCurrency}_${timeRange}.pdf`);
+    // Page number footer
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`LevLev Executive Financial Report • Page ${pageNum}`, 14, 288);
+
+    doc.save(`LevLev_Financial_Report_${displayCurrency}_${timeRange}.pdf`);
   };
 
   // Custom Recharts Tooltip
@@ -449,7 +611,7 @@ export function ReportsTab({
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Compare income and spending per month separated by ARS and USD
+              Compare actual vs future scheduled income and expenses per month
             </p>
           </div>
 
@@ -605,14 +767,26 @@ export function ReportsTab({
                 
                 <Bar 
                   dataKey="incomeConverted" 
-                  name={`Total Income (${displayCurrency})`} 
+                  name={`Actual Income (${displayCurrency})`} 
                   fill={COLORS.incomeTotal} 
                   radius={[4, 4, 0, 0]} 
                 />
                 <Bar 
+                  dataKey="scheduledIncomeConverted" 
+                  name={`Scheduled Income (${displayCurrency})`} 
+                  fill="#6366f1" 
+                  radius={[4, 4, 0, 0]} 
+                />
+                <Bar 
                   dataKey="expenseConverted" 
-                  name={`Total Expense (${displayCurrency})`} 
+                  name={`Actual Expense (${displayCurrency})`} 
                   fill={COLORS.expenseTotal} 
+                  radius={[4, 4, 0, 0]} 
+                />
+                <Bar 
+                  dataKey="scheduledExpenseConverted" 
+                  name={`Scheduled Expense (${displayCurrency})`} 
+                  fill="#f59e0b" 
                   radius={[4, 4, 0, 0]} 
                 />
               </BarChart>

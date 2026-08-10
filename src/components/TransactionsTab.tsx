@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint } from '../types';
 import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString } from '../utils/financeUtils';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -14,6 +14,9 @@ interface TransactionsTabProps {
   activeFilter?: TransactionFilter;
   onClearFilter?: () => void;
 }
+
+type SortField = 'date' | 'title' | 'category' | 'account' | 'type' | 'amount' | 'converted';
+type SortOrder = 'asc' | 'desc';
 
 export function TransactionsTab({
   transactions,
@@ -33,6 +36,20 @@ export function TransactionsTab({
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  // Sorting state
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortOrder(field === 'title' || field === 'category' || field === 'account' || field === 'type' ? 'asc' : 'desc');
+    }
+    setCurrentPage(1);
+  };
 
   // React to activeFilter changes
   useEffect(() => {
@@ -68,10 +85,7 @@ export function TransactionsTab({
   }, [transactions]);
 
   const filtered = useMemo(() => {
-    return transactions.filter(t => {
-      // Exclude standard transfers from the main list as requested, but keep CC_PAYMENT
-      if (t.type === 'TRANSFER') return false;
-
+    const list = transactions.filter(t => {
       const matchSearch = !searchTerm || 
                           (t.title && t.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
                           (t.category && t.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -84,8 +98,40 @@ export function TransactionsTab({
       const txMonth = t.date ? t.date.substring(0, 7) : '';
       const matchMonth = selectedMonth === 'ALL' || txMonth === selectedMonth;
       return matchSearch && matchType && matchCat && matchAcc && matchMonth;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, searchTerm, selectedType, selectedCategory, selectedAccount, selectedMonth]);
+    });
+
+    return list.sort((a, b) => {
+      let valA: any;
+      let valB: any;
+
+      if (sortField === 'date') {
+        valA = new Date(a.date || 0).getTime();
+        valB = new Date(b.date || 0).getTime();
+      } else if (sortField === 'title') {
+        valA = (a.title || '').toLowerCase();
+        valB = (b.title || '').toLowerCase();
+      } else if (sortField === 'category') {
+        valA = (a.category || '').toLowerCase();
+        valB = (b.category || '').toLowerCase();
+      } else if (sortField === 'account') {
+        valA = (a.account || '').toLowerCase();
+        valB = (b.account || '').toLowerCase();
+      } else if (sortField === 'type') {
+        valA = (a.type || '').toLowerCase();
+        valB = (b.type || '').toLowerCase();
+      } else if (sortField === 'amount') {
+        valA = Number(a.amount || 0);
+        valB = Number(b.amount || 0);
+      } else if (sortField === 'converted') {
+        valA = convertCurrency(a.amount, a.currency as DisplayCurrency, displayCurrency, usdArsRate, a.date, transactions, historyData);
+        valB = convertCurrency(b.amount, b.currency as DisplayCurrency, displayCurrency, usdArsRate, b.date, transactions, historyData);
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [transactions, searchTerm, selectedType, selectedCategory, selectedAccount, selectedMonth, sortField, sortOrder, displayCurrency, usdArsRate, historyData]);
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -158,6 +204,7 @@ export function TransactionsTab({
             <option value="ALL">All Types</option>
             <option value="EXPENSE">Expense</option>
             <option value="INCOME">Income</option>
+            <option value="TRANSFER">Transfer</option>
             <option value="CC_PAYMENT">Credit Card Payment</option>
           </select>
 
@@ -206,13 +253,83 @@ export function TransactionsTab({
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-[#121620] border-b border-slate-800 text-slate-400 uppercase font-semibold">
-                <th className="p-3">Date</th>
-                <th className="p-3">Title / Merchant</th>
-                <th className="p-3">Category</th>
-                <th className="p-3">Account</th>
-                <th className="p-3">Type</th>
-                <th className="p-3 text-right">Original Amount</th>
-                <th className="p-3 text-right">Converted ({displayCurrency})</th>
+                <th 
+                  onClick={() => handleSort('date')}
+                  className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Date</span>
+                    {sortField === 'date' ? (
+                      sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('title')}
+                  className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Title / Merchant</span>
+                    {sortField === 'title' ? (
+                      sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('category')}
+                  className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Category</span>
+                    {sortField === 'category' ? (
+                      sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('account')}
+                  className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Account</span>
+                    {sortField === 'account' ? (
+                      sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('type')}
+                  className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Type</span>
+                    {sortField === 'type' ? (
+                      sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('amount')}
+                  className="p-3 text-right cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>Original Amount</span>
+                    {sortField === 'amount' ? (
+                      sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('converted')}
+                  className="p-3 text-right cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>Converted ({displayCurrency})</span>
+                    {sortField === 'converted' ? (
+                      sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
+                  </div>
+                </th>
                 <th className="p-3 text-center">Actions</th>
               </tr>
             </thead>

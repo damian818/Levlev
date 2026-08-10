@@ -24,7 +24,7 @@ import { AddTransactionModal } from './components/AddTransactionModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { AiChatWidget } from './components/AiChatWidget';
 import { AppPreview } from './components/AppPreview';
-import { LevLevIcon } from './components/LevLevLogo';
+import { LevLevIcon, LevLevLogo } from './components/LevLevLogo';
 
 export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -395,8 +395,8 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#0a0b0d] flex flex-col items-center justify-center text-slate-400 p-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-rose-500/20 to-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-lg shadow-emerald-950/40">
-          <LevLevIcon className="w-6 h-6" variant="emerald" />
+        <div className="w-14 h-14 rounded-2xl bg-[#0f131a] border border-slate-800 flex items-center justify-center mb-4 shadow-xl shadow-emerald-950/20">
+          <LevLevIcon className="w-8 h-8" variant="white" />
         </div>
         <Loader2 className="w-6 h-6 animate-spin text-emerald-500 mb-2" />
         <p className="font-bold text-slate-200 text-sm">Loading LevLev...</p>
@@ -411,20 +411,7 @@ export default function App() {
         {/* Navigation Header */}
         <header className="border-b border-slate-800/80 bg-[#0f131a]/80 backdrop-blur-md sticky top-0 z-50">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 via-rose-500/20 to-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/40">
-                <Heart className="w-5 h-5 text-rose-500 fill-rose-500/20" />
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-white tracking-tight leading-none flex items-center gap-1.5">
-                  LevLev
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                    GLOBAL
-                  </span>
-                </h1>
-                <p className="text-[10px] text-slate-400 font-medium">Personal Finance with Heart</p>
-              </div>
-            </div>
+            <LevLevLogo badgeText="GLOBAL" size="md" />
 
             <div className="flex items-center gap-3">
               <button
@@ -444,8 +431,8 @@ export default function App() {
         {/* Hero & Features Body */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 flex-1 flex flex-col items-center justify-center text-center">
           {/* Top Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-semibold mb-6 shadow-inner">
-            <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400" />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/80 text-rose-300 text-xs font-semibold mb-6 shadow-inner">
+            <LevLevIcon className="w-4 h-4 shrink-0" variant="white" />
             <span>Multi-Currency &amp; Inflation Intelligence Engine</span>
           </div>
 
@@ -538,7 +525,7 @@ export default function App() {
         <footer className="border-t border-slate-800/60 py-6 bg-[#0f131a]/60 text-center text-xs text-slate-500">
           <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center space-x-2">
-              <Heart className="w-4 h-4 text-rose-500 fill-rose-500/20" />
+              <LevLevIcon className="w-5 h-5" variant="white" />
               <span className="font-bold text-slate-300">LevLev</span>
               <span>— Personal Finance with Heart</span>
             </div>
