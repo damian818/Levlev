@@ -300,26 +300,12 @@ export default function App() {
   // User-configured actual live account balances (persisted in localStorage)
   const [customBalances, setCustomBalances] = useState<Record<string, AccountCustomBalance>>(() => {
     try {
-      const isCleared = localStorage.getItem('finance_app_is_cleared');
-      if (isCleared === 'true') {
-        const saved = localStorage.getItem('finance_app_account_balances');
-        if (saved !== null) return JSON.parse(saved);
-        return {};
-      }
       const saved = localStorage.getItem('finance_app_account_balances');
       if (saved !== null) return JSON.parse(saved);
     } catch (e) {
       console.warn('Failed to load custom balances from localStorage');
     }
-    // Default initial live balances
-    return {
-      'Deel': { accountName: 'Deel', currentBalance: 12450, currency: 'USD' },
-      'DollarApp': { accountName: 'DollarApp', currentBalance: 3200, currency: 'USD' },
-      'Santander (ARS)': { accountName: 'Santander (ARS)', currentBalance: 450000, currency: 'ARS' },
-      'BBVA (ARS)': { accountName: 'BBVA (ARS)', currentBalance: 280000, currency: 'ARS' },
-      'ICBC (ARS)': { accountName: 'ICBC (ARS)', currentBalance: 150000, currency: 'ARS' },
-      'Cocos Capital (ARS)': { accountName: 'Cocos Capital (ARS)', currentBalance: 1850000, currency: 'ARS' },
-    };
+    return {};
   });
 
   // Credit card manual period status overrides
@@ -579,12 +565,11 @@ export default function App() {
   };
 
   const handleRecalculateAllBalances = () => {
-    const recalculated = recalculateAccountBalancesFromTransactions(accounts, transactions, usdArsRate);
-    setCustomBalances(recalculated);
+    setCustomBalances({});
     try {
-      localStorage.setItem('finance_app_account_balances', JSON.stringify(recalculated));
+      localStorage.removeItem('finance_app_account_balances');
     } catch (e) {
-      console.warn('Failed to save recalculated balances to localStorage');
+      console.warn('Failed to clear custom balances in localStorage');
     }
   };
 
@@ -664,9 +649,10 @@ export default function App() {
               return newAccs.length > 0 ? [...prevAccs, ...newAccs] : prevAccs;
             });
 
-            setTimeout(() => {
-              handleRecalculateAllBalances();
-            }, 0);
+            setCustomBalances({});
+            try {
+              localStorage.removeItem('finance_app_account_balances');
+            } catch (e) {}
 
             setCurrentTab('overview');
         }
