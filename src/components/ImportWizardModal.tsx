@@ -25,10 +25,13 @@ interface ValidationError {
 }
 
 export default function ImportWizardModal({ isOpen, onClose, onImport, existingAccounts, existingCategories }: ImportWizardModalProps) {
-  const [step, setStep] = useState<'upload' | 'preview'>('upload');
+  const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+  const [rawData, setRawData] = useState<any[]>([]);
 
   if (!isOpen) return null;
 
@@ -108,73 +111,9 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const errors: ValidationError[] = [];
-        const txs: Transaction[] = [];
-
-        results.data.forEach((row: any, index: number) => {
-          const rowNum = index + 1;
-          
-          if (!row.date || !row.title || !row.amount || !row.account) {
-            errors.push({ row: rowNum, message: 'Missing required fields (date, title, amount, account).', type: 'error' });
-            return;
-          }
-
-          let amount = parseFloat(row.amount);
-          if (isNaN(amount)) {
-            errors.push({ row: rowNum, message: `Invalid amount format: ${row.amount}`, type: 'error' });
-            return;
-          }
-
-          let type = row.type?.toUpperCase();
-          if (type !== 'EXPENSE' && type !== 'INCOME' && type !== 'TRANSFER' && type !== 'CC_PAYMENT') { 
-             type = amount < 0 ? 'EXPENSE' : 'INCOME';
-             amount = Math.abs(amount);
-             errors.push({ row: rowNum, message: `Invalid type '${row.type}'. Auto-inferred as ${type} based on amount.`, type: 'warning' });
-          }
-
-          const currency = row.currency?.toUpperCase() || 'ARS';
-          if (currency !== 'ARS' && currency !== 'USD') {
-             errors.push({ row: rowNum, message: `Currency ${currency} not officially supported. Defaulting to ARS.`, type: 'warning' });
-          }
-
-          // Check if account exists
-          if (!existingAccounts.find(a => a.name.toLowerCase() === row.account.toLowerCase())) {
-             errors.push({ row: rowNum, message: `Account '${row.account}' does not exist. It will be created.`, type: 'warning' });
-          }
-
-          let toAccount = row.toAccount;
-          let receiveAmount = row.receiveAmount ? parseFloat(row.receiveAmount) : undefined;
-          let receiveCurrency = row.receiveCurrency?.toUpperCase();
-
-          if (type === 'TRANSFER' && !toAccount) {
-            errors.push({ row: rowNum, message: `Type is TRANSFER but toAccount is missing.`, type: 'error' });
-            return;
-          }
-
-          if (toAccount && !existingAccounts.find(a => a.name.toLowerCase() === toAccount.toLowerCase())) {
-             errors.push({ row: rowNum, message: `Target account '${toAccount}' does not exist. It will be created.`, type: 'warning' });
-          }
-
-          txs.push({
-            id: row.id || `tx-${Date.now()}-${Math.random().toString(36).substring(2)}`,
-            date: row.date,
-            title: row.title,
-            category: row.category || 'Uncategorized',
-            account: row.account,
-            amount: amount,
-            currency: currency === 'USD' ? 'USD' : 'ARS',
-            type: type as 'EXPENSE'|'INCOME'|'TRANSFER'|'CC_PAYMENT',
-            description: row.description || '',
-            installments: row.installments || '',
-            toAccount: toAccount,
-            receiveAmount: receiveAmount,
-            receiveCurrency: receiveCurrency === 'USD' ? 'USD' : (receiveCurrency === 'ARS' ? 'ARS' : undefined),
-          });
-        });
-
-        setParsedData({ transactions: txs, categories: [], accounts: [], budgets: [] });
-        setValidationErrors(errors);
-        setStep('preview');
+        setCsvHeaders(results.meta.fields || []);
+        setRawData(results.data);
+        setStep('mapping');
         setIsLoading(false);
       },
       error: (error) => {
@@ -196,6 +135,97 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
     setStep('upload');
     setParsedData(null);
     setValidationErrors([]);
+    setColumnMapping({});
+    setCsvHeaders([]);
+    setRawData([]);
+  };
+
+  const fields = [
+    { id: 'date', label: 'Date', required: true },
+    { id: 'title', label: 'Title', required: true },
+    { id: 'category', label: 'Category' },
+    { id: 'account', label: 'Account', required: true },
+    { id: 'amount', label: 'Amount', required: true },
+    { id: 'currency', label: 'Currency' },
+    { id: 'type', label: 'Type' },
+    { id: 'description', label: 'Description' },
+    { id: 'installments', label: 'Installments' },
+    { id: 'toAccount', label: 'To Account' },
+    { id: 'receiveAmount', label: 'Receive Amount' },
+    { id: 'receiveCurrency', label: 'Receive Currency' },
+  ];
+
+  const handleMappingConfirm = () => {
+    const errors: ValidationError[] = [];
+    const txs: Transaction[] = [];
+
+    rawData.forEach((row: any, index: number) => {
+      const rowNum = index + 1;
+      
+      const mappedRow: any = {};
+      fields.forEach(field => {
+        const csvCol = columnMapping[field.id];
+        if (csvCol) mappedRow[field.id] = row[csvCol];
+      });
+
+      if (!mappedRow.date || !mappedRow.title || !mappedRow.amount || !mappedRow.account) {
+        errors.push({ row: rowNum, message: 'Missing required fields (date, title, amount, account) based on mapping.', type: 'error' });
+        return;
+      }
+
+      let amount = parseFloat(mappedRow.amount);
+      if (isNaN(amount)) {
+        errors.push({ row: rowNum, message: `Invalid amount format: ${mappedRow.amount}`, type: 'error' });
+        return;
+      }
+
+      let type = mappedRow.type?.toUpperCase();
+      if (type !== 'EXPENSE' && type !== 'INCOME' && type !== 'TRANSFER' && type !== 'CC_PAYMENT') { 
+         type = amount < 0 ? 'EXPENSE' : 'INCOME';
+         amount = Math.abs(amount);
+         errors.push({ row: rowNum, message: `Invalid type '${mappedRow.type}'. Auto-inferred as ${type} based on amount.`, type: 'warning' });
+      }
+
+      const currency = mappedRow.currency?.toUpperCase() || 'ARS';
+      
+      // Check if account exists
+      if (!existingAccounts.find(a => a.name.toLowerCase() === mappedRow.account.toLowerCase())) {
+         errors.push({ row: rowNum, message: `Account '${mappedRow.account}' does not exist. It will be created.`, type: 'warning' });
+      }
+
+      let toAccount = mappedRow.toAccount;
+      let receiveAmount = mappedRow.receiveAmount ? parseFloat(mappedRow.receiveAmount) : undefined;
+      let receiveCurrency = mappedRow.receiveCurrency?.toUpperCase();
+
+      if (type === 'TRANSFER' && !toAccount) {
+        errors.push({ row: rowNum, message: `Type is TRANSFER but toAccount is missing.`, type: 'error' });
+        return;
+      }
+
+      if (toAccount && !existingAccounts.find(a => a.name.toLowerCase() === toAccount.toLowerCase())) {
+         errors.push({ row: rowNum, message: `Target account '${toAccount}' does not exist. It will be created.`, type: 'warning' });
+      }
+
+      txs.push({
+        id: mappedRow.id || `tx-${Date.now()}-${Math.random().toString(36).substring(2)}`,
+        date: mappedRow.date,
+        title: mappedRow.title,
+        category: mappedRow.category || 'Uncategorized',
+        account: mappedRow.account,
+        amount: amount,
+        currency: currency === 'USD' ? 'USD' : 'ARS',
+        type: type as 'EXPENSE'|'INCOME'|'TRANSFER'|'CC_PAYMENT',
+        description: mappedRow.description || '',
+        installments: mappedRow.installments || '',
+        toAccount: toAccount,
+        receiveAmount: receiveAmount,
+        receiveCurrency: receiveCurrency === 'USD' ? 'USD' : (receiveCurrency === 'ARS' ? 'ARS' : undefined),
+      });
+    });
+
+    setParsedData({ transactions: txs, categories: [], accounts: [], budgets: [] });
+    setValidationErrors(errors);
+    setStep('preview');
   };
 
   const hasErrors = validationErrors.some(e => e.type === 'error');
@@ -263,6 +293,32 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
                   {isLoading ? 'Processing...' : 'Select File'}
                   <input type="file" accept=".csv,.json" onChange={handleFileChange} className="hidden" disabled={isLoading} />
                 </label>
+              </div>
+            </div>
+          )}
+
+          {step === 'mapping' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-slate-200">Map Columns</h3>
+              <p className="text-xs text-slate-400">Map your CSV columns to the required LevLev fields.</p>
+              <div className="grid grid-cols-2 gap-4">
+                {fields.map(field => (
+                  <div key={field.id} className="flex flex-col gap-1">
+                    <label className="text-xs text-slate-300">
+                      {field.label} {field.required && <span className="text-rose-500">*</span>}
+                    </label>
+                    <select
+                      value={columnMapping[field.id] || ''}
+                      onChange={(e) => setColumnMapping({ ...columnMapping, [field.id]: e.target.value })}
+                      className="bg-[#121620] border border-slate-800 rounded-lg p-2 text-xs text-slate-200"
+                    >
+                      <option value="">Select column...</option>
+                      {csvHeaders.map(header => (
+                        <option key={header} value={header}>{header}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -374,6 +430,16 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
               >
                 Confirm Import
                 <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          ) : step === 'mapping' ? (
+            <>
+              <button onClick={handleReset} className="px-4 py-2 text-slate-300 hover:text-slate-100 hover:bg-slate-800 rounded-lg text-sm font-medium transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleMappingConfirm} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold transition-all shadow-sm active:scale-95">
+                Next
+                <ChevronRight className="w-4 h-4 ml-2" />
               </button>
             </>
           ) : (
