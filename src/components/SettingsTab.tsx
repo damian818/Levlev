@@ -58,6 +58,7 @@ import {
   signInWithGoogle, 
   signOutFromSupabase 
 } from '../lib/supabase';
+import ImportWizardModal from './ImportWizardModal';
 
 interface SettingsTabProps {
   authUser: any;
@@ -196,6 +197,7 @@ export function SettingsTab({
   const [accNthInput, setAccNthInput] = useState<number>(4); // 4th
   const [accDueDaysInput, setAccDueDaysInput] = useState<number>(10);
   const [accUpdateTxs, setAccUpdateTxs] = useState(true);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const [deletingAccName, setDeletingAccName] = useState<string | null>(null);
 
@@ -398,31 +400,6 @@ export function SettingsTab({
   };
 
   // --- Import JSON Backup ---
-  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !onImportBackup) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        if (json && (json.transactions || json.accounts || json.categories)) {
-          onImportBackup({
-            transactions: json.transactions || [],
-            categories: json.categories || [],
-            accounts: json.accounts || [],
-            budgets: json.budgets || [],
-          });
-          alert('Backup data imported successfully!');
-        } else {
-          alert('Invalid backup file format.');
-        }
-      } catch (err) {
-        alert('Failed to parse backup JSON file.');
-      }
-    };
-    reader.readAsText(file);
-  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -843,11 +820,13 @@ export function SettingsTab({
               </button>
 
               {onImportBackup && (
-                <label className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
+                <button
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
                   <Upload className="w-4 h-4 text-slate-400" />
-                  <span>Import JSON Backup</span>
-                  <input type="file" accept=".json" onChange={handleFileImport} className="hidden" />
-                </label>
+                  <span>Import Data</span>
+                </button>
               )}
             </div>
           </div>
@@ -1553,6 +1532,17 @@ export function SettingsTab({
           </div>
         </div>
       )}
+
+      <ImportWizardModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={(data) => {
+          if (onImportBackup) onImportBackup(data);
+          alert('Data imported successfully!');
+        }}
+        existingAccounts={accounts}
+        existingCategories={categories}
+      />
     </div>
   );
 }
