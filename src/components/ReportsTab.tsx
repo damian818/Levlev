@@ -66,6 +66,10 @@ export function ReportsTab({
       incomeUSD: number;
       expenseARS: number;
       expenseUSD: number;
+      scheduledIncomeARS: number;
+      scheduledIncomeUSD: number;
+      scheduledExpenseARS: number;
+      scheduledExpenseUSD: number;
       incomeConverted: number;
       expenseConverted: number;
       scheduledIncomeConverted: number;
@@ -84,6 +88,10 @@ export function ReportsTab({
           incomeUSD: 0,
           expenseARS: 0,
           expenseUSD: 0,
+          scheduledIncomeARS: 0,
+          scheduledIncomeUSD: 0,
+          scheduledExpenseARS: 0,
+          scheduledExpenseUSD: 0,
           incomeConverted: 0,
           expenseConverted: 0,
           scheduledIncomeConverted: 0,
@@ -111,21 +119,23 @@ export function ReportsTab({
       const isTxFuture = Boolean(tx.date && tx.date.substring(0, 10) > todayStr);
 
       if (tx.type === 'INCOME') {
-        if (isUsd) item.incomeUSD += amt;
-        else item.incomeARS += amt;
-
         if (isTxFuture) {
+          if (isUsd) item.scheduledIncomeUSD += amt;
+          else item.scheduledIncomeARS += amt;
           item.scheduledIncomeConverted += converted;
         } else {
+          if (isUsd) item.incomeUSD += amt;
+          else item.incomeARS += amt;
           item.incomeConverted += converted;
         }
       } else if (tx.type === 'EXPENSE') {
-        if (isUsd) item.expenseUSD += amt;
-        else item.expenseARS += amt;
-
         if (isTxFuture) {
+          if (isUsd) item.scheduledExpenseUSD += amt;
+          else item.scheduledExpenseARS += amt;
           item.scheduledExpenseConverted += converted;
         } else {
+          if (isUsd) item.expenseUSD += amt;
+          else item.expenseARS += amt;
           item.expenseConverted += converted;
         }
       }
@@ -165,12 +175,12 @@ export function ReportsTab({
     let totalExpenseConverted = 0;
 
     monthlyReportData.forEach(m => {
-      totalIncomeARS += m.incomeARS;
-      totalIncomeUSD += m.incomeUSD;
-      totalExpenseARS += m.expenseARS;
-      totalExpenseUSD += m.expenseUSD;
-      totalIncomeConverted += m.incomeConverted;
-      totalExpenseConverted += m.expenseConverted;
+      totalIncomeARS += m.incomeARS + m.scheduledIncomeARS;
+      totalIncomeUSD += m.incomeUSD + m.scheduledIncomeUSD;
+      totalExpenseARS += m.expenseARS + m.scheduledExpenseARS;
+      totalExpenseUSD += m.expenseUSD + m.scheduledExpenseUSD;
+      totalIncomeConverted += m.incomeConverted + m.scheduledIncomeConverted;
+      totalExpenseConverted += m.expenseConverted + m.scheduledExpenseConverted;
     });
 
     const netSavingsConverted = totalIncomeConverted - totalExpenseConverted;
@@ -181,10 +191,15 @@ export function ReportsTab({
     let highestExpenseMonth = monthlyReportData[0];
 
     monthlyReportData.forEach(m => {
-      if (!highestIncomeMonth || m.incomeConverted > highestIncomeMonth.incomeConverted) {
+      const mIncome = m.incomeConverted + m.scheduledIncomeConverted;
+      const hIncome = highestIncomeMonth ? highestIncomeMonth.incomeConverted + highestIncomeMonth.scheduledIncomeConverted : 0;
+      if (!highestIncomeMonth || mIncome > hIncome) {
         highestIncomeMonth = m;
       }
-      if (!highestExpenseMonth || m.expenseConverted > highestExpenseMonth.expenseConverted) {
+      
+      const mExpense = m.expenseConverted + m.scheduledExpenseConverted;
+      const hExpense = highestExpenseMonth ? highestExpenseMonth.expenseConverted + highestExpenseMonth.scheduledExpenseConverted : 0;
+      if (!highestExpenseMonth || mExpense > hExpense) {
         highestExpenseMonth = m;
       }
     });
@@ -397,10 +412,10 @@ export function ReportsTab({
       }
 
       doc.setTextColor(51, 65, 85);
-      doc.text(`$${Math.round(m.incomeARS).toLocaleString()}`, 68, currentY + 3);
-      doc.text(`$${Math.round(m.incomeUSD).toLocaleString()}`, 100, currentY + 3);
-      doc.text(`$${Math.round(m.expenseARS).toLocaleString()}`, 132, currentY + 3);
-      doc.text(`$${Math.round(m.expenseUSD).toLocaleString()}`, 164, currentY + 3);
+      doc.text(`$${Math.round(m.incomeARS + m.scheduledIncomeARS).toLocaleString()}`, 68, currentY + 3);
+      doc.text(`$${Math.round(m.incomeUSD + m.scheduledIncomeUSD).toLocaleString()}`, 100, currentY + 3);
+      doc.text(`$${Math.round(m.expenseARS + m.scheduledExpenseARS).toLocaleString()}`, 132, currentY + 3);
+      doc.text(`$${Math.round(m.expenseUSD + m.scheduledExpenseUSD).toLocaleString()}`, 164, currentY + 3);
 
       currentY += 6;
     });
@@ -422,7 +437,7 @@ export function ReportsTab({
             <span>Period: {label}</span>
           </p>
           <div className="space-y-1.5">
-            {payload.map((entry: any, index: number) => (
+            {payload.filter((e: any) => e.value > 0).map((entry: any, index: number) => (
               <div key={`item-${index}`} className="flex justify-between items-center gap-4">
                 <span className="flex items-center gap-1.5 font-medium" style={{ color: entry.color }}>
                   <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: entry.color }}></span>
@@ -709,6 +724,28 @@ export function ReportsTab({
                 />
                 <Tooltip content={<CustomTooltip />} />
                 
+                {/* Scheduled Income ARS */}
+                <Bar 
+                  dataKey="scheduledIncomeARS" 
+                  name="Scheduled Income ARS" 
+                  fill={COLORS.incomeARS}
+                  fillOpacity={0.4}
+                  stroke={COLORS.incomeARS}
+                  strokeDasharray="4 4"
+                  stackId={barStyle === 'STACKED' ? 'income' : undefined} 
+                  radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
+                />
+                {/* Scheduled Income USD */}
+                <Bar 
+                  dataKey="scheduledIncomeUSD" 
+                  name="Scheduled Income USD" 
+                  fill={COLORS.incomeUSD} 
+                  fillOpacity={0.4}
+                  stroke={COLORS.incomeUSD}
+                  strokeDasharray="4 4"
+                  stackId={barStyle === 'STACKED' ? 'income' : undefined} 
+                  radius={[4, 4, 0, 0]} 
+                />
                 {/* Income ARS */}
                 <Bar 
                   dataKey="incomeARS" 
@@ -723,6 +760,28 @@ export function ReportsTab({
                   name="Income USD" 
                   fill={COLORS.incomeUSD} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
+                  radius={[4, 4, 0, 0]} 
+                />
+                {/* Scheduled Expense ARS */}
+                <Bar 
+                  dataKey="scheduledExpenseARS" 
+                  name="Scheduled Expense ARS" 
+                  fill={COLORS.expenseARS} 
+                  fillOpacity={0.4}
+                  stroke={COLORS.expenseARS}
+                  strokeDasharray="4 4"
+                  stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
+                  radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
+                />
+                {/* Scheduled Expense USD */}
+                <Bar 
+                  dataKey="scheduledExpenseUSD" 
+                  name="Scheduled Expense USD" 
+                  fill={COLORS.expenseUSD} 
+                  fillOpacity={0.4}
+                  stroke={COLORS.expenseUSD}
+                  strokeDasharray="4 4"
+                  stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={[4, 4, 0, 0]} 
                 />
                 {/* Expense ARS */}
@@ -766,27 +825,37 @@ export function ReportsTab({
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
                 
                 <Bar 
-                  dataKey="incomeConverted" 
-                  name={`Actual Income (${displayCurrency})`} 
+                  dataKey="scheduledIncomeConverted" 
+                  name={`Scheduled Income (${displayCurrency})`} 
                   fill={COLORS.incomeTotal} 
+                  fillOpacity={0.4}
+                  stroke={COLORS.incomeTotal}
+                  strokeDasharray="4 4"
+                  stackId="income"
                   radius={[4, 4, 0, 0]} 
                 />
                 <Bar 
-                  dataKey="scheduledIncomeConverted" 
-                  name={`Scheduled Income (${displayCurrency})`} 
-                  fill="#6366f1" 
+                  dataKey="incomeConverted" 
+                  name={`Actual Income (${displayCurrency})`} 
+                  fill={COLORS.incomeTotal} 
+                  stackId="income"
+                  radius={[4, 4, 0, 0]} 
+                />
+                <Bar 
+                  dataKey="scheduledExpenseConverted" 
+                  name={`Scheduled Expense (${displayCurrency})`} 
+                  fill={COLORS.expenseTotal} 
+                  fillOpacity={0.4}
+                  stroke={COLORS.expenseTotal}
+                  strokeDasharray="4 4"
+                  stackId="expense"
                   radius={[4, 4, 0, 0]} 
                 />
                 <Bar 
                   dataKey="expenseConverted" 
                   name={`Actual Expense (${displayCurrency})`} 
                   fill={COLORS.expenseTotal} 
-                  radius={[4, 4, 0, 0]} 
-                />
-                <Bar 
-                  dataKey="scheduledExpenseConverted" 
-                  name={`Scheduled Expense (${displayCurrency})`} 
-                  fill="#f59e0b" 
+                  stackId="expense"
                   radius={[4, 4, 0, 0]} 
                 />
               </BarChart>
