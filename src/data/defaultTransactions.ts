@@ -97,16 +97,20 @@ export function parseTransactions(csvText: string): Transaction[] {
                     (row['Due Date'] && row['Due Date'].trim()) || 
                     (row['Description'] && row['Description'].startsWith('202') ? row['Description'].trim() : new Date().toISOString());
 
+    const parsedAmount = cleanNum(row['Amount']);
+    const parsedTransferAmount = row['Transfer Amount'] ? cleanNum(row['Transfer Amount']) : undefined;
+    const finalAmount = (parsedAmount > 0) ? parsedAmount : (parsedTransferAmount || 0);
+
     return {
       id: row['ID'] || `tx-${index}-${Math.random().toString(36).substring(2, 9)}`,
       date: dateVal,
       title: row['Title'] || row['Category'] || 'Untitled',
       category: row['Category'] || 'General',
       account: row['Account'] || 'Cash',
-      amount: cleanNum(row['Amount']),
+      amount: finalAmount,
       currency: row['Currency'] || 'ARS',
       type: (row['Type'] as any) || 'EXPENSE',
-      transferAmount: row['Transfer Amount'] ? cleanNum(row['Transfer Amount']) : undefined,
+      transferAmount: parsedTransferAmount,
       transferCurrency: row['Transfer Currency'] || undefined,
       toAccount: row['To Account'] || undefined,
       receiveAmount: row['Receive Amount'] ? cleanNum(row['Receive Amount']) : undefined,
