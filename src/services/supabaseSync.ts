@@ -90,6 +90,8 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       type: row.type || 'CHECKING',
       currency: row.currency || 'ARS',
       initialBalance: (row.initial_balance !== undefined && row.initial_balance !== null) ? Number(row.initial_balance) : 0,
+      isShared: row.is_shared || false,
+      sharedMembers: Array.isArray(row.shared_members) ? row.shared_members : [],
     }));
 
     const budgets: BudgetGoal[] = (budRes.data || []).map((row: any) => ({
@@ -178,6 +180,8 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           type: a.type || 'CHECKING',
           currency: a.currency || 'ARS',
           initial_balance: a.initialBalance || 0,
+          is_shared: a.isShared || false,
+          shared_members: a.sharedMembers || [],
         };
       });
 

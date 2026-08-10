@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem } from './types';
+import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
 import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions } from './utils/financeUtils';
@@ -159,6 +159,21 @@ export default function App() {
   const handleDeleteAccount = (accName: string) => {
     setAccounts(prev => prev.filter(a => a.name !== accName));
     deleteAccountFromSupabase(accName);
+  };
+
+  const handleUpdateAccountSharing = (accName: string, isShared: boolean, sharedMembers: SharedMember[]) => {
+    setAccounts(prev => {
+      return prev.map(a => {
+        if (a.name === accName) {
+          return {
+            ...a,
+            isShared,
+            sharedMembers,
+          };
+        }
+        return a;
+      });
+    });
   };
 
   const handleImportBackup = (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[] }) => {
@@ -761,6 +776,7 @@ export default function App() {
             onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
             onAddTransaction={handleAddTransaction}
             onReassignTransactionPeriod={handleReassignTransactionPeriod}
+            onUpdateAccountSharing={handleUpdateAccountSharing}
           />
         )}
         {currentTab === 'reports' && (

@@ -43,7 +43,9 @@ import {
   Shield,
   Activity,
   CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  Users,
+  Share2
 } from 'lucide-react';
 import { 
   verifyAccountBalances 
@@ -510,7 +512,14 @@ export function SettingsTab({
                           {isCC ? <CreditCard className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
                         </div>
                         <div>
-                          <h4 className="text-sm font-bold text-slate-100">{acc.name}</h4>
+                          <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                            <span>{acc.name}</span>
+                            {(acc.isShared || (acc.sharedMembers && acc.sharedMembers.length > 0)) && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
+                                <Users className="w-2.5 h-2.5" /> Shared ({acc.sharedMembers?.length || 0})
+                              </span>
+                            )}
+                          </h4>
                           <span className="text-[10px] text-slate-400 font-medium">
                             {acc.type.replace('_', ' ')} • {acc.currency}
                           </span>

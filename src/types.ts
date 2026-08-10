@@ -86,6 +86,15 @@ export interface CategoryItem {
   description?: string;
 }
 
+export interface SharedMember {
+  id: string;
+  email: string;
+  name?: string;
+  role: 'EDITOR' | 'VIEWER' | 'ADMIN';
+  addedAt: string;
+  status: 'ACTIVE' | 'PENDING';
+}
+
 export interface AccountItem {
   id: string;
   name: string;
@@ -94,6 +103,8 @@ export interface AccountItem {
   initialBalance?: number;
   closingRule?: CreditCardClosingRule;
   description?: string;
+  isShared?: boolean;
+  sharedMembers?: SharedMember[];
 }
 
 export type ViewTab = 'overview' | 'transactions' | 'accounts' | 'budgets' | 'recurring' | 'inflation' | 'ai-advisor' | 'settings' | 'reports';

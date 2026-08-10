@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule, AccountItem } from '../types';
+import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule, AccountItem, SharedMember } from '../types';
 import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString, getTransferOutflow, getTransferInflow } from '../utils/financeUtils';
-import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings } from 'lucide-react';
+import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { CreditCardDetailModal } from './CreditCardDetailModal';
+import { ShareAccountModal } from './ShareAccountModal';
 
 interface AccountsTabProps {
   transactions: Transaction[];
@@ -17,6 +18,7 @@ interface AccountsTabProps {
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
   onAddTransaction: (tx: Transaction) => void;
   onReassignTransactionPeriod?: (txId: string, statementCloseDate: string | undefined) => void;
+  onUpdateAccountSharing?: (accName: string, isShared: boolean, sharedMembers: SharedMember[]) => void;
 }
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
@@ -33,12 +35,16 @@ export function AccountsTab({
   onNavigateToTransactionsWithFilter,
   onAddTransaction,
   onReassignTransactionPeriod,
+  onUpdateAccountSharing,
 }: AccountsTabProps) {
   const [editingAccount, setEditingAccount] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
   // Selected credit card for detail modal
   const [selectedCardAccount, setSelectedCardAccount] = useState<string | null>(null);
+
+  // Selected account for sharing modal
+  const [sharingAccountName, setSharingAccountName] = useState<string | null>(null);
 
   // Custom user overrides for account classification (persisted in local state/storage)
   const [customCCMap, setCustomCCMap] = useState<Record<string, boolean>>(() => {
@@ -158,6 +164,20 @@ export function AccountsTab({
     setEditingAccount(null);
   };
 
+  const selectedAccountToShare = useMemo(() => {
+    if (!sharingAccountName) return null;
+    const found = accounts?.find(a => a.name === sharingAccountName);
+    if (found) return found;
+    return {
+      id: `acc_${sharingAccountName}`,
+      name: sharingAccountName,
+      type: isCreditCardAccount(sharingAccountName, customCCMap) ? ('CREDIT_CARD' as const) : ('CHECKING' as const),
+      currency: liquidAccounts.find(a => a.accountName === sharingAccountName)?.currency || creditCardAccounts.find(a => a.accountName === sharingAccountName)?.currency || 'ARS',
+      isShared: false,
+      sharedMembers: [],
+    };
+  }, [sharingAccountName, accounts, liquidAccounts, creditCardAccounts, customCCMap]);
+
   return (
     <div className="space-y-6">
       {/* Guidance Banner */}
@@ -247,6 +267,10 @@ export function AccountsTab({
               const netDue = stmt ? stmt.netDue : 0;
               const nextClose = acc.nextCloseDate || stmt?.closeDate;
 
+              const matchedAccount = accounts?.find(a => a.name === acc.accountName);
+              const isShared = matchedAccount?.isShared || (matchedAccount?.sharedMembers && matchedAccount.sharedMembers.length > 0);
+              const memberCount = matchedAccount?.sharedMembers?.length || 0;
+
               return (
                 <div
                   key={acc.accountName}
@@ -258,6 +282,11 @@ export function AccountsTab({
                         <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-md flex items-center gap-1">
                           <CreditCard className="w-3 h-3" /> Credit Card ({acc.currency})
                         </span>
+                        {isShared && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
+                            <Users className="w-2.5 h-2.5" /> Shared ({memberCount})
+                          </span>
+                        )}
                         <button
                           onClick={() => toggleAccountClassification(acc.accountName, true)}
                           className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700"
@@ -269,13 +298,24 @@ export function AccountsTab({
                       <h4 className="text-sm font-bold text-slate-100 mt-1.5">{acc.accountName}</h4>
                     </div>
 
-                    <button
-                      onClick={() => setSelectedCardAccount(acc.accountName)}
-                      className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-600 border border-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shadow-sm"
-                    >
-                      <span>Details & Statement</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        onClick={() => setSharingAccountName(acc.accountName)}
+                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                        title="Share account with another person"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Share</span>
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedCardAccount(acc.accountName)}
+                        className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-600 border border-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shadow-sm"
+                      >
+                        <span>Details</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Statement metrics box */}
@@ -333,6 +373,10 @@ export function AccountsTab({
             {liquidAccounts.map((acc) => {
               const isEditing = editingAccount === acc.accountName;
 
+              const matchedAccount = accounts?.find(a => a.name === acc.accountName);
+              const isShared = matchedAccount?.isShared || (matchedAccount?.sharedMembers && matchedAccount.sharedMembers.length > 0);
+              const memberCount = matchedAccount?.sharedMembers?.length || 0;
+
               return (
                 <div 
                   key={acc.accountName} 
@@ -348,6 +392,11 @@ export function AccountsTab({
                         <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 bg-slate-800 text-slate-300 border border-slate-700 rounded-md">
                           {acc.currency}
                         </span>
+                        {isShared && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
+                            <Users className="w-2.5 h-2.5" /> Shared ({memberCount})
+                          </span>
+                        )}
                         {acc.hasCustom && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
                             Calibrated
@@ -370,7 +419,18 @@ export function AccountsTab({
                       </h4>
                     </div>
                     
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSharingAccountName(acc.accountName);
+                        }}
+                        className="p-1.5 text-purple-300 hover:text-white bg-[#161b22] hover:bg-purple-900/40 border border-purple-500/30 rounded-lg transition-colors text-xs flex items-center"
+                        title="Share account with another person"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
+
                       {!isEditing ? (
                         <button
                           onClick={() => handleStartEdit(acc.accountName, acc.currentBalance)}
@@ -556,6 +616,20 @@ export function AccountsTab({
           onAddTransaction={onAddTransaction}
           onNavigateToTransactionsWithFilter={onNavigateToTransactionsWithFilter}
           onReassignTransactionPeriod={onReassignTransactionPeriod}
+        />
+      )}
+
+      {/* Share Account Modal */}
+      {sharingAccountName && selectedAccountToShare && (
+        <ShareAccountModal
+          isOpen={!!sharingAccountName}
+          onClose={() => setSharingAccountName(null)}
+          account={selectedAccountToShare}
+          onUpdateAccountSharing={(accName, isShared, sharedMembers) => {
+            if (onUpdateAccountSharing) {
+              onUpdateAccountSharing(accName, isShared, sharedMembers);
+            }
+          }}
         />
       )}
     </div>
