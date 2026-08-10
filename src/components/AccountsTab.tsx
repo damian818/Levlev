@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule } from '../types';
-import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel } from '../utils/financeUtils';
+import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString } from '../utils/financeUtils';
 import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { CreditCardDetailModal } from './CreditCardDetailModal';
@@ -74,6 +74,8 @@ export function AccountsTab({
 
   // Calculate net transaction deltas per account
   const accountDeltas: Record<string, { netDelta: number; currency: string; txCount: number }> = {};
+  const todayStr = getTodayString();
+
   transactions.forEach(tx => {
     const acc = tx.account || 'Unknown';
     const curr = tx.currency || 'ARS';
@@ -81,6 +83,10 @@ export function AccountsTab({
       accountDeltas[acc] = { netDelta: 0, currency: curr, txCount: 0 };
     }
     accountDeltas[acc].txCount++;
+
+    // Ignore future transactions for current balance status
+    const txDateStr = tx.date ? tx.date.substring(0, 10) : '';
+    if (txDateStr && txDateStr > todayStr) return;
 
     const amt = tx.amount || 0;
     if (tx.type === 'INCOME') {

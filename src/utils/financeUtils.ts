@@ -618,6 +618,7 @@ export function computeAccountBalances(
   customBalances?: Record<string, { currentBalance: number; currency: string }>
 ): AccountSummary[] {
   const map: { [name: string]: { balance: number; currency: string; count: number } } = {};
+  const todayStr = getTodayString();
 
   // Seed with custom current balances if provided
   if (customBalances) {
@@ -638,6 +639,10 @@ export function computeAccountBalances(
       map[acc] = { balance: 0, currency: curr, count: 0 };
     }
     map[acc].count++;
+
+    // Ignore future transactions for current balance calculation
+    const txDateStr = tx.date ? tx.date.substring(0, 10) : '';
+    if (txDateStr && txDateStr > todayStr) return;
 
     const amt = tx.amount || 0;
 
@@ -684,6 +689,14 @@ export function computeAccountBalances(
     .filter(acc => acc.txCount > 0);
 }
 
+
+export function getTodayString(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export function getCurrentMonthKey(): string {
   const now = new Date();
@@ -1442,6 +1455,7 @@ export function verifyAccountBalances(
   customBalances?: Record<string, { currentBalance: number; currency: string }>,
   targetAccountName?: string
 ): DiagnosticAccountResult[] {
+  const todayStr = getTodayString();
   const nameSet = new Set<string>();
   accounts.forEach(a => { if (a.name) nameSet.add(a.name); });
   transactions.forEach(t => {
@@ -1463,6 +1477,10 @@ export function verifyAccountBalances(
 
     let sumTransactions = 0;
     transactions.forEach(tx => {
+      // Exclude future transactions from current status balance calculations
+      const txDateStr = tx.date ? tx.date.substring(0, 10) : '';
+      if (txDateStr && txDateStr > todayStr) return;
+
       const amt = tx.amount || 0;
       if (tx.account === accName) {
         if (tx.type === 'INCOME') {
@@ -1504,13 +1522,14 @@ export function verifyAccountBalances(
 
 /**
   * Re-synchronizes account balances by recalculating them from the ground up:
-  * starting with each account's initial balance and applying every associated transaction cumulatively.
+  * starting with each account's initial balance and applying every associated past/present transaction cumulatively.
   */
 export function recalculateAccountBalancesFromTransactions(
   accounts: AccountItem[] = [],
   transactions: Transaction[] = []
 ): Record<string, AccountCustomBalance> {
   const recalculated: Record<string, AccountCustomBalance> = {};
+  const todayStr = getTodayString();
 
   // Track all unique account names from both registered accounts and transactions
   const nameSet = new Set<string>();
@@ -1528,6 +1547,10 @@ export function recalculateAccountBalancesFromTransactions(
     let netBalance = initialBalance;
 
     transactions.forEach(tx => {
+      // Exclude future transactions from current status balance
+      const txDateStr = tx.date ? tx.date.substring(0, 10) : '';
+      if (txDateStr && txDateStr > todayStr) return;
+
       const amt = tx.amount || 0;
       if (tx.account === accName) {
         if (tx.type === 'INCOME') {
