@@ -164,6 +164,7 @@ export interface RecurringOccurrence {
   title: string;
   description?: string;
   installments?: string;
+  originalType?: 'INCOME' | 'EXPENSE';
 }
 
 export interface IdentifiedRecurringItem {
@@ -188,6 +189,8 @@ export interface IdentifiedRecurringItem {
     month: string;
     amount: number;
     amountDisplay: number;
+    incomeAmountDisplay?: number;
+    expenseAmountDisplay?: number;
     currency: string;
     account: string;
   }[];

@@ -83,19 +83,21 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
         
         allHistory.sort((a, b) => a.date.localeCompare(b.date));
         
-        const monthMap = new Map<string, { amountDisplay: number, count: number, maxAccount: string }>();
+        const monthMap = new Map<string, { amountDisplay: number, count: number, maxAccount: string, incomeAmountDisplay: number, expenseAmountDisplay: number }>();
         const accountCounts = new Map<string, number>();
         
         allHistory.forEach(h => {
            const amt = convertCurrency(h.amount, h.currency as DisplayCurrency, displayCurrency, usdArsRate, h.date, transactions);
            const m = h.month;
-           if (!monthMap.has(m)) monthMap.set(m, { amountDisplay: 0, count: 0, maxAccount: h.account });
+           if (!monthMap.has(m)) monthMap.set(m, { amountDisplay: 0, count: 0, maxAccount: h.account, incomeAmountDisplay: 0, expenseAmountDisplay: 0 });
            
            const data = monthMap.get(m)!;
            if (h.originalType === 'INCOME') {
               data.amountDisplay -= amt; 
+              data.incomeAmountDisplay += amt;
            } else {
               data.amountDisplay += amt;
+              data.expenseAmountDisplay += amt;
            }
            data.count++;
            
@@ -118,6 +120,8 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
           month,
           amount: Math.abs(data.amountDisplay),
           amountDisplay: Math.abs(data.amountDisplay),
+          incomeAmountDisplay: data.incomeAmountDisplay,
+          expenseAmountDisplay: data.expenseAmountDisplay,
           currency: displayCurrency,
           account: data.maxAccount
         })).sort((a, b) => a.month.localeCompare(b.month));

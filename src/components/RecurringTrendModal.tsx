@@ -40,6 +40,8 @@ export function RecurringTrendModal({
       month: pt.month,
       amountNative: pt.amount,
       amountDisplay: pt.amountDisplay,
+      incomeAmountDisplay: pt.incomeAmountDisplay,
+      expenseAmountDisplay: pt.expenseAmountDisplay,
       currency: pt.currency,
       fxRate: historicalFx,
     };
@@ -201,12 +203,23 @@ export function RecurringTrendModal({
                       const data = payload[0].payload;
                       const val = useOriginalCurrency ? data.amountNative : data.amountDisplay;
                       const curr = useOriginalCurrency ? data.currency : displayCurrency;
+                      const isConsolidated = data.incomeAmountDisplay !== undefined && data.expenseAmountDisplay !== undefined;
                       return (
                         <div className="bg-[#0f131a] border border-slate-700 p-3 rounded-lg shadow-xl text-xs space-y-1">
                           <p className="font-bold text-slate-200">{label}</p>
                           <p className={`font-semibold ${isIncome ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {item.title}: {formatCurrency(val, curr)}
+                            {item.title} Net: {formatCurrency(val, curr)}
                           </p>
+                          {isConsolidated && !useOriginalCurrency && (
+                            <div className="pt-1 mt-1 border-t border-slate-800 space-y-0.5">
+                              {data.incomeAmountDisplay > 0 && (
+                                <p className="text-emerald-400 font-mono text-[10px]">Income: {formatCurrency(data.incomeAmountDisplay, curr)}</p>
+                              )}
+                              {data.expenseAmountDisplay > 0 && (
+                                <p className="text-rose-400 font-mono text-[10px]">Expense: {formatCurrency(data.expenseAmountDisplay, curr)}</p>
+                              )}
+                            </div>
+                          )}
                           {data.currency !== displayCurrency && (
                             <p className="text-[10px] text-slate-400 font-mono">
                               Conversion Rate: 1 {data.currency} = {data.fxRate.toLocaleString()} {displayCurrency}
@@ -278,6 +291,7 @@ export function RecurringTrendModal({
               <thead className="bg-[#161b22] text-slate-400 sticky top-0 uppercase text-[10px] font-semibold border-b border-slate-800">
                 <tr>
                   <th className="p-2.5">Date</th>
+                  <th className="p-2.5">Type</th>
                   <th className="p-2.5">Account</th>
                   <th className="p-2.5">Notes / Cuota</th>
                   <th className="p-2.5 text-right">Original Amt</th>
@@ -285,11 +299,19 @@ export function RecurringTrendModal({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                {item.history.map((h) => {
+                {[...item.history].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((h) => {
                   const converted = convertCurrency(h.amount, h.currency as DisplayCurrency, displayCurrency, usdArsRate, h.date, transactions, historyData);
+                  const typeLabel = h.originalType || item.type;
                   return (
                     <tr key={h.id} className="hover:bg-slate-800/40 transition-colors">
                       <td className="p-2.5 font-mono text-slate-400">{h.date ? h.date.substring(0, 10) : 'N/A'}</td>
+                      <td className="p-2.5">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          typeLabel === 'INCOME' ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50' : 'bg-rose-950/80 text-rose-400 border border-rose-800/50'
+                        }`}>
+                          {typeLabel}
+                        </span>
+                      </td>
                       <td className="p-2.5 text-slate-300">{h.account}</td>
                       <td className="p-2.5">
                         {h.installments ? (
@@ -300,11 +322,11 @@ export function RecurringTrendModal({
                           <span className="text-slate-500">{h.description || '-'}</span>
                         )}
                       </td>
-                      <td className="p-2.5 text-right font-mono text-slate-400">
-                        {h.currency} {h.amount.toLocaleString()}
+                      <td className={`p-2.5 text-right font-mono ${typeLabel === 'INCOME' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                        {typeLabel === 'INCOME' ? '+' : ''}{h.currency} {h.amount.toLocaleString()}
                       </td>
-                      <td className="p-2.5 text-right font-bold text-slate-100 font-mono">
-                        {formatCurrency(converted, displayCurrency)}
+                      <td className={`p-2.5 text-right font-bold font-mono ${typeLabel === 'INCOME' ? 'text-emerald-400' : 'text-slate-100'}`}>
+                        {typeLabel === 'INCOME' ? '+' : ''}{formatCurrency(converted, displayCurrency)}
                       </td>
                     </tr>
                   );
