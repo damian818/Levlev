@@ -294,6 +294,13 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
     };
   }, [activeInstallmentPlans, completedInstallmentPlans, installmentsSort, displayCurrency, usdArsRate]);
 
+  const getCurrentInstallmentDisplay = (plan: IdentifiedRecurringItem) => {
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    const tx = plan.history.find(h => h.month === currentMonth);
+    if (tx && tx.installments) return tx.installments;
+    return plan.installmentInfo || 'Cuotas';
+  };
+
   return (
     <div className="space-y-6">
       {/* Overview Banner */}
@@ -565,7 +572,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                         <td className="p-3 text-slate-300 font-medium">{plan.account}</td>
                         <td className="p-3">
                           <span className="px-2 py-0.5 bg-amber-950/80 border border-amber-800/50 text-amber-300 font-mono font-bold rounded text-[10px]">
-                            {plan.installmentInfo || 'Cuotas'}
+                            {getCurrentInstallmentDisplay(plan)}
                           </span>
                         </td>
                         <td className="p-3 text-slate-400 font-mono text-[11px]">
@@ -598,7 +605,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                         <td className="p-3 text-slate-300 font-medium">{plan.account}</td>
                         <td className="p-3">
                           <span className="px-2 py-0.5 bg-slate-800 border border-slate-700 text-slate-300 font-mono font-bold rounded text-[10px]">
-                            {plan.installmentInfo || 'Cuotas'}
+                            {getCurrentInstallmentDisplay(plan)}
                           </span>
                         </td>
                         <td className="p-3 text-slate-400 font-mono text-[11px]">
