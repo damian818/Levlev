@@ -1402,6 +1402,21 @@ export function detectInstallmentPlans(
     const cleanTitle = normalizeCleanTitle(latest.title || latest.category || 'Installment Plan');
 
     const installmentInfo = latest.installments || latest.description || 'Cuotas';
+    let installmentCurrent: number | undefined;
+    let installmentTotal: number | undefined;
+    
+    const match = installmentInfo.match(/(\d+)\s*\/\s*(\d+)/);
+    if (match) {
+      installmentCurrent = parseInt(match[1], 10);
+      installmentTotal = parseInt(match[2], 10);
+    } else {
+       const cuotaMatch = installmentInfo.match(/cuota\s+(\d+)\s+de\s+(\d+)/i);
+       if (cuotaMatch) {
+         installmentCurrent = parseInt(cuotaMatch[1], 10);
+         installmentTotal = parseInt(cuotaMatch[2], 10);
+       }
+    }
+
     const distinctMonths = new Set<string>();
     const accountsSet = new Set<string>();
 
@@ -1464,6 +1479,8 @@ export function detectInstallmentPlans(
       distinctMonthsCount: distinctMonths.size,
       isInstallment: true,
       installmentInfo,
+      installmentCurrent,
+      installmentTotal,
       history,
       monthlyTrend,
     });

@@ -19,6 +19,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
   const [selectedItem, setSelectedItem] = useState<IdentifiedRecurringItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [showCompletedInstallments, setShowCompletedInstallments] = useState(false);
 
   // Non-recurring exclusions state
   const [nonRecurringKeys, setNonRecurringKeys] = useState<string[]>(() => {
@@ -164,8 +165,11 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
   }, [transactions, displayCurrency, usdArsRate]);
 
   // Separate credit card installment plans (cuotas)
-  const installmentPlans = useMemo(() => {
-    return detectInstallmentPlans(transactions, displayCurrency, usdArsRate);
+  const { activeInstallmentPlans, completedInstallmentPlans, installmentPlans } = useMemo(() => {
+    const plans = detectInstallmentPlans(transactions, displayCurrency, usdArsRate);
+    const active = plans.filter(p => p.installmentCurrent === undefined || p.installmentTotal === undefined || p.installmentCurrent < p.installmentTotal);
+    const completed = plans.filter(p => p.installmentCurrent !== undefined && p.installmentTotal !== undefined && p.installmentCurrent >= p.installmentTotal);
+    return { activeInstallmentPlans: active, completedInstallmentPlans: completed, installmentPlans: plans };
   }, [transactions, displayCurrency, usdArsRate]);
 
   // Active (non-excluded) regular recurring items
@@ -452,16 +456,24 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
 
       {/* Credit Card Installments Detailed Section */}
       <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg">
-            <Clock className="w-5 h-5" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-100">Credit Card Installment Plans (Cuotas)</h3>
+              <p className="text-xs text-slate-400">
+                Purchases split across multiple monthly card billing cycles.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-100">Active Credit Card Installment Plans (Cuotas)</h3>
-            <p className="text-xs text-slate-400">
-              Purchases split across multiple monthly card billing cycles. Click any row to view full payment history.
-            </p>
-          </div>
+          <button
+            onClick={() => setShowCompletedInstallments(!showCompletedInstallments)}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg transition-colors border border-slate-700"
+          >
+            {showCompletedInstallments ? 'Hide Completed' : 'Show Completed'}
+          </button>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-[#121620]">
@@ -472,46 +484,98 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                 <th className="p-3">Category</th>
                 <th className="p-3">Card Account</th>
                 <th className="p-3">Current Installment</th>
+                <th className="p-3">Period (Start - End)</th>
                 <th className="p-3 text-right">Latest Amount ({displayCurrency})</th>
                 <th className="p-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {installmentPlans.length === 0 ? (
+              {activeInstallmentPlans.length === 0 && (!showCompletedInstallments || completedInstallmentPlans.length === 0) ? (
                 <tr>
-                  <td colSpan={6} className="p-4 text-center text-slate-500">No active credit card installment plans detected.</td>
+                  <td colSpan={7} className="p-4 text-center text-slate-500">No installment plans detected.</td>
                 </tr>
               ) : (
-                installmentPlans.map((plan) => {
-                  const converted = convertCurrency(plan.latestAmount, plan.currency, displayCurrency, usdArsRate);
-                  return (
-                    <tr
-                      key={plan.id}
-                      onClick={() => handleCardClick(plan)}
-                      className="hover:bg-slate-800/50 transition-colors cursor-pointer group"
-                    >
-                      <td className="p-3 font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                        {plan.title}
-                      </td>
-                      <td className="p-3 text-slate-400">{plan.category}</td>
-                      <td className="p-3 text-slate-300 font-medium">{plan.account}</td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 bg-amber-950/80 border border-amber-800/50 text-amber-300 font-mono font-bold rounded text-[10px]">
-                          {plan.installmentInfo || 'Cuotas'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right font-bold text-slate-100 font-mono">
-                        {formatCurrency(converted, displayCurrency)}
-                      </td>
-                      <td className="p-3 text-center">
-                        <span className="inline-flex items-center space-x-1 text-[11px] font-semibold text-emerald-400 group-hover:underline">
-                          <span>Trend</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
+                <>
+                  {activeInstallmentPlans.map((plan) => {
+                    const converted = convertCurrency(plan.latestAmount, plan.currency, displayCurrency, usdArsRate);
+                    const firstTx = plan.history[0];
+                    const lastTx = plan.history[plan.history.length - 1];
+                    let endDate = lastTx?.date?.substring(0, 7) || '';
+                    if (plan.installmentCurrent && plan.installmentTotal && lastTx?.date) {
+                      const remaining = plan.installmentTotal - plan.installmentCurrent;
+                      if (remaining > 0) {
+                        const d = new Date(lastTx.date);
+                        d.setMonth(d.getMonth() + remaining);
+                        endDate = d.toISOString().substring(0, 7);
+                      }
+                    }
+                    return (
+                      <tr
+                        key={plan.id}
+                        onClick={() => handleCardClick(plan)}
+                        className="hover:bg-slate-800/50 transition-colors cursor-pointer group"
+                      >
+                        <td className="p-3 font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">
+                          {plan.title}
+                        </td>
+                        <td className="p-3 text-slate-400">{plan.category}</td>
+                        <td className="p-3 text-slate-300 font-medium">{plan.account}</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-amber-950/80 border border-amber-800/50 text-amber-300 font-mono font-bold rounded text-[10px]">
+                            {plan.installmentInfo || 'Cuotas'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-400 font-mono text-[11px]">
+                          {firstTx?.date?.substring(0, 7)} to {endDate}
+                        </td>
+                        <td className="p-3 text-right font-bold text-slate-100 font-mono">
+                          {formatCurrency(converted, displayCurrency)}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className="inline-flex items-center space-x-1 text-[11px] font-semibold text-emerald-400 group-hover:underline">
+                            <span>Trend</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {showCompletedInstallments && completedInstallmentPlans.map((plan) => {
+                    const converted = convertCurrency(plan.latestAmount, plan.currency, displayCurrency, usdArsRate);
+                    const firstTx = plan.history[0];
+                    const lastTx = plan.history[plan.history.length - 1];
+                    return (
+                      <tr
+                        key={plan.id}
+                        onClick={() => handleCardClick(plan)}
+                        className="hover:bg-slate-800/50 transition-colors cursor-pointer group opacity-60"
+                      >
+                        <td className="p-3 font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">
+                          {plan.title} <span className="ml-1 text-[10px] text-emerald-400 font-normal px-1.5 py-0.5 bg-emerald-950 rounded">Completed</span>
+                        </td>
+                        <td className="p-3 text-slate-400">{plan.category}</td>
+                        <td className="p-3 text-slate-300 font-medium">{plan.account}</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-slate-800 border border-slate-700 text-slate-300 font-mono font-bold rounded text-[10px]">
+                            {plan.installmentInfo || 'Cuotas'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-400 font-mono text-[11px]">
+                          {firstTx?.date?.substring(0, 7)} to {lastTx?.date?.substring(0, 7)}
+                        </td>
+                        <td className="p-3 text-right font-bold text-slate-100 font-mono">
+                          {formatCurrency(converted, displayCurrency)}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className="inline-flex items-center space-x-1 text-[11px] font-semibold text-slate-400 group-hover:underline">
+                            <span>Trend</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </>
               )}
             </tbody>
           </table>

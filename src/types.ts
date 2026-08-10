@@ -184,6 +184,8 @@ export interface IdentifiedRecurringItem {
   distinctMonthsCount: number;
   isInstallment: boolean;
   installmentInfo?: string;
+  installmentCurrent?: number;
+  installmentTotal?: number;
   history: RecurringOccurrence[];
   monthlyTrend: {
     month: string;
