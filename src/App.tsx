@@ -22,11 +22,34 @@ import { AiAdvisorTab } from './components/AiAdvisorTab';
 import { SettingsTab } from './components/SettingsTab';
 import { AddTransactionModal } from './components/AddTransactionModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
+import { ShareWorkspaceModal } from './components/ShareWorkspaceModal';
 import { AiChatWidget } from './components/AiChatWidget';
 import { AppPreview } from './components/AppPreview';
 import { LevLevIcon, LevLevLogo } from './components/LevLevLogo';
 
 export default function App() {
+  const [isWorkspaceShared, setIsWorkspaceShared] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('finance_app_workspace_is_shared') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const [workspaceMembers, setWorkspaceMembers] = useState<SharedMember[]>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_workspace_members');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load workspace members from localStorage');
+    }
+    return [];
+  });
+
+  const [isShareWorkspaceModalOpen, setIsShareWorkspaceModalOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
       const isCleared = localStorage.getItem('finance_app_is_cleared');
@@ -106,6 +129,21 @@ export default function App() {
       console.warn('Failed to save custom accounts to localStorage');
     }
   }, [accounts]);
+
+  // Sync general workspace sharing to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('finance_app_workspace_is_shared', String(isWorkspaceShared));
+      localStorage.setItem('finance_app_workspace_members', JSON.stringify(workspaceMembers));
+    } catch (e) {
+      console.warn('Failed to save workspace sharing state to localStorage');
+    }
+  }, [isWorkspaceShared, workspaceMembers]);
+
+  const handleUpdateWorkspaceSharing = (isShared: boolean, members: SharedMember[]) => {
+    setIsWorkspaceShared(isShared);
+    setWorkspaceMembers(members);
+  };
 
   // Category Handlers
   const handleAddCategory = (newCat: CategoryItem) => {
@@ -731,6 +769,9 @@ export default function App() {
         setUsdArsRate={setUsdArsRate}
         privacyMode={privacyMode}
         onTogglePrivacyMode={handleTogglePrivacyMode}
+        isWorkspaceShared={isWorkspaceShared}
+        workspaceMembersCount={workspaceMembers.length}
+        onOpenShareWorkspaceModal={() => setIsShareWorkspaceModalOpen(true)}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onFileUpload={handleFileUpload}
         onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
@@ -771,6 +812,9 @@ export default function App() {
             customBalances={customBalances}
             accounts={accounts}
             periodStatusOverrides={periodStatusOverrides}
+            isWorkspaceShared={isWorkspaceShared}
+            workspaceMembersCount={workspaceMembers.length}
+            onOpenShareWorkspaceModal={() => setIsShareWorkspaceModalOpen(true)}
             onUpdatePeriodStatus={handleUpdatePeriodStatus}
             onUpdateAccountBalance={handleUpdateAccountBalance}
             onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
@@ -818,6 +862,9 @@ export default function App() {
             budgets={budgets}
             usdArsRate={usdArsRate}
             privacyMode={privacyMode}
+            isWorkspaceShared={isWorkspaceShared}
+            workspaceMembersCount={workspaceMembers.length}
+            onOpenShareWorkspaceModal={() => setIsShareWorkspaceModalOpen(true)}
             customBalances={customBalances}
             onTogglePrivacyMode={handleTogglePrivacyMode}
             onUpdateRate={setUsdArsRate}
@@ -846,6 +893,14 @@ export default function App() {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirmDeleteAll={handleDeleteAllData}
+      />
+
+      <ShareWorkspaceModal
+        isOpen={isShareWorkspaceModalOpen}
+        onClose={() => setIsShareWorkspaceModalOpen(false)}
+        isWorkspaceShared={isWorkspaceShared}
+        workspaceMembers={workspaceMembers}
+        onUpdateWorkspaceSharing={handleUpdateWorkspaceSharing}
       />
 
       <AiChatWidget

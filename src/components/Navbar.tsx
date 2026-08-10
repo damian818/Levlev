@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ViewTab, DisplayCurrency } from '../types';
-import { LayoutDashboard, Receipt, Wallet, Target, Repeat, TrendingUp, Sparkles, Upload, PlusCircle, RefreshCw, Trash2, Sliders, BarChart3, UserCheck, LogIn, LogOut, Eye, EyeOff, Shield } from 'lucide-react';
+import { LayoutDashboard, Receipt, Wallet, Target, Repeat, TrendingUp, Sparkles, Upload, PlusCircle, RefreshCw, Trash2, Sliders, BarChart3, UserCheck, LogIn, LogOut, Eye, EyeOff, Shield, Users, Share2 } from 'lucide-react';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from '../lib/supabase';
 import { LevLevLogo } from './LevLevLogo';
 
@@ -13,6 +13,9 @@ interface NavbarProps {
   setUsdArsRate: (rate: number) => void;
   privacyMode?: boolean;
   onTogglePrivacyMode?: () => void;
+  isWorkspaceShared?: boolean;
+  workspaceMembersCount?: number;
+  onOpenShareWorkspaceModal?: () => void;
   onOpenAddModal: () => void;
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onOpenDeleteModal: () => void;
@@ -28,6 +31,9 @@ export function Navbar({
   setUsdArsRate,
   privacyMode = false,
   onTogglePrivacyMode,
+  isWorkspaceShared = false,
+  workspaceMembersCount = 0,
+  onOpenShareWorkspaceModal,
   onOpenAddModal,
   onFileUpload,
   onOpenDeleteModal,
@@ -142,6 +148,22 @@ export function Navbar({
                   <span className="hidden sm:inline font-normal">Privacy</span>
                 </>
               )}
+            </button>
+
+            {/* General Workspace Share Button */}
+            <button
+              onClick={onOpenShareWorkspaceModal}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold border transition-all shrink-0 active:scale-95 ${
+                isWorkspaceShared
+                  ? 'bg-purple-500/20 border-purple-500/40 text-purple-300 shadow-xs shadow-purple-950/50'
+                  : 'bg-[#161b22] border-slate-700 text-purple-300 hover:text-white hover:bg-slate-800'
+              }`}
+              title="General Workspace Share (Share all accounts & data with family or partner)"
+            >
+              <Users className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline font-semibold">
+                {isWorkspaceShared ? `Household (${workspaceMembersCount})` : 'Share Household'}
+              </span>
             </button>
 
             <label className="cursor-pointer inline-flex items-center px-2 sm:px-3 py-1.5 border border-slate-800 rounded-lg text-[10px] sm:text-xs font-medium text-slate-300 bg-[#161b22] hover:bg-slate-800 transition-colors shrink-0">

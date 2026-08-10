@@ -68,6 +68,9 @@ interface SettingsTabProps {
   budgets: BudgetGoal[];
   usdArsRate: number;
   privacyMode?: boolean;
+  isWorkspaceShared?: boolean;
+  workspaceMembersCount?: number;
+  onOpenShareWorkspaceModal?: () => void;
   customBalances?: Record<string, AccountCustomBalance>;
   onTogglePrivacyMode?: () => void;
   onUpdateRate: (rate: number) => void;
@@ -91,6 +94,9 @@ export function SettingsTab({
   budgets,
   usdArsRate,
   privacyMode = false,
+  isWorkspaceShared = false,
+  workspaceMembersCount = 0,
+  onOpenShareWorkspaceModal,
   customBalances,
   onTogglePrivacyMode,
   onUpdateRate,
@@ -104,7 +110,7 @@ export function SettingsTab({
   onRecalculateBalances,
   onLogout,
 }: SettingsTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'categories' | 'preferences'>('accounts');
+  const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'categories' | 'preferences' | 'sharing'>('accounts');
 
   // Diagnostic State for Balance Verification
   const [diagnosticStatus, setDiagnosticStatus] = useState<{
@@ -466,6 +472,17 @@ export function SettingsTab({
           >
             <Sliders className="w-4 h-4 text-amber-400" />
             <span>Preferences & Data</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('sharing')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeSubTab === 'sharing'
+                ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Users className="w-4 h-4 text-purple-400" />
+            <span>Household Sharing</span>
           </button>
         </div>
       </div>
@@ -891,6 +908,104 @@ export function SettingsTab({
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* -------------------- HOUSEHOLD SHARING SUB-TAB -------------------- */}
+      {activeSubTab === 'sharing' && (
+        <div className="space-y-6">
+          <div className="bg-[#121620] p-6 rounded-2xl border border-slate-800 space-y-4 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shrink-0">
+                  <Globe className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <span>General Household Workspace Sharing</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                      isWorkspaceShared 
+                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    }`}>
+                      {isWorkspaceShared ? 'Active' : 'Private'}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Allow partner, spouse, or family members to access and operate over the same full dataset (transactions, bank accounts, budgets, and AI insights).
+                  </p>
+                </div>
+              </div>
+
+              {onOpenShareWorkspaceModal && (
+                <button
+                  type="button"
+                  onClick={onOpenShareWorkspaceModal}
+                  className="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-sm shrink-0"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>{isWorkspaceShared ? `Manage Workspace Access (${workspaceMembersCount})` : 'Setup General Share'}</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className="p-4 rounded-xl bg-[#161b22] border border-slate-800 space-y-2">
+                <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs">
+                  <Globe className="w-4 h-4" />
+                  <span>General Share (Full Workspace)</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Shares all accounts, transactions, budgets, recurring rules, and reports together. Ideal for married couples, partners, or households operating out of a unified financial pool.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#161b22] border border-slate-800 space-y-2">
+                <div className="flex items-center space-x-2 text-indigo-400 font-bold text-xs">
+                  <Wallet className="w-4 h-4" />
+                  <span>Per-Account Share</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Allows sharing specific individual accounts (e.g., a single shared credit card or joint checking account) while keeping other personal accounts private. Configured under the Accounts tab.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* List of Accounts with Share Status */}
+          <div className="bg-[#121620] p-6 rounded-2xl border border-slate-800 space-y-4 shadow-sm">
+            <h4 className="text-sm font-bold text-slate-100 flex items-center justify-between">
+              <span>Account Sharing Overview ({accounts.length} Total Accounts)</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {accounts.map(acc => {
+                const accShared = acc.isShared || isWorkspaceShared;
+                return (
+                  <div key={acc.id} className="p-3.5 rounded-xl bg-[#161b22] border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                        <span>{acc.name}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">({acc.currency})</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {acc.type.replace('_', ' ')}
+                      </p>
+                    </div>
+
+                    <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1 border ${
+                      accShared
+                        ? 'bg-purple-500/15 border-purple-500/30 text-purple-300'
+                        : 'bg-slate-800/80 border-slate-700 text-slate-400'
+                    }`}>
+                      <Users className="w-3 h-3" />
+                      {accShared ? (isWorkspaceShared ? 'Shared (General)' : `Shared (${acc.sharedMembers?.length || 0})`) : 'Private'}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

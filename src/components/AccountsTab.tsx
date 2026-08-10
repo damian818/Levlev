@@ -13,6 +13,9 @@ interface AccountsTabProps {
   customBalances: Record<string, AccountCustomBalance>;
   accounts?: AccountItem[];
   periodStatusOverrides?: Record<string, 'PAID' | 'OPEN'>;
+  isWorkspaceShared?: boolean;
+  workspaceMembersCount?: number;
+  onOpenShareWorkspaceModal?: () => void;
   onUpdatePeriodStatus?: (accountName: string, closeDate: string, status?: 'PAID' | 'OPEN') => void;
   onUpdateAccountBalance: (accountName: string, currentBalance: number, currency: string) => void;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
@@ -30,6 +33,9 @@ export function AccountsTab({
   customBalances,
   accounts,
   periodStatusOverrides,
+  isWorkspaceShared = false,
+  workspaceMembersCount = 0,
+  onOpenShareWorkspaceModal,
   onUpdatePeriodStatus,
   onUpdateAccountBalance,
   onNavigateToTransactionsWithFilter,
@@ -198,6 +204,21 @@ export function AccountsTab({
             </p>
           </div>
         </div>
+
+        {onOpenShareWorkspaceModal && (
+          <button
+            type="button"
+            onClick={onOpenShareWorkspaceModal}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 shrink-0 ${
+              isWorkspaceShared
+                ? 'bg-purple-500/20 border-purple-500/40 text-purple-300 hover:bg-purple-500/30'
+                : 'bg-purple-600 hover:bg-purple-500 text-white border-purple-500'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>{isWorkspaceShared ? `Shared Household (${workspaceMembersCount})` : 'Share Full Household Workspace'}</span>
+          </button>
+        )}
       </div>
 
       {/* Financial Overview Metrics Cards */}
