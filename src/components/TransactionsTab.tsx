@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint } from '../types';
 import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString } from '../utils/financeUtils';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft } from 'lucide-react';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -256,8 +256,23 @@ export function TransactionsTab({
                         </span>
                       </td>
                       <td className="p-3 text-slate-300 font-medium">
-                        {tx.account}
-                        {tx.toAccount && <span className="text-slate-500 text-[10px] block">→ {tx.toAccount}</span>}
+                        {tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT' ? (
+                          <div className="flex flex-col text-xs space-y-0.5">
+                            <div className="inline-flex items-center space-x-1.5 px-2 py-0.5 bg-blue-950/50 border border-blue-800/50 rounded-md w-fit">
+                              <span className="font-semibold text-slate-200">{tx.account}</span>
+                              <ArrowRight className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                              <span className="font-semibold text-blue-300">{tx.toAccount || <span className="italic text-rose-400">Unspecified</span>}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-normal">
+                              From: <span className="text-slate-300">{tx.account}</span> → To: <span className="text-blue-300">{tx.toAccount || 'Unspecified'}</span>
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span>{tx.account}</span>
+                            {tx.toAccount && <span className="text-slate-500 text-[10px] block">→ {tx.toAccount}</span>}
+                          </div>
+                        )}
                       </td>
                       <td className="p-3">
                         <div className="flex items-center space-x-1 flex-wrap gap-y-1">
@@ -267,6 +282,7 @@ export function TransactionsTab({
                             tx.type === 'CC_PAYMENT' ? 'bg-purple-950/80 text-purple-300 border border-purple-800/50' :
                             'bg-blue-950/80 text-blue-300 border border-blue-800/50'
                           }`}>
+                            {tx.type === 'TRANSFER' && <ArrowRightLeft className="w-2.5 h-2.5 mr-1 text-blue-300 shrink-0" />}
                             {tx.type === 'CC_PAYMENT' ? 'CC PAYMENT' : tx.type}
                           </span>
                           {tx.installments && (
