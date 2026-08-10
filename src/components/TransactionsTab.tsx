@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint } from '../types';
-import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey } from '../utils/financeUtils';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X } from 'lucide-react';
+import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString } from '../utils/financeUtils';
+import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock } from 'lucide-react';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -225,14 +225,26 @@ export function TransactionsTab({
                 </tr>
               ) : (
                 paginated.map((tx) => {
+                  const todayStr = getTodayString();
+                  const txDateStr = tx.date ? tx.date.substring(0, 10) : '';
+                  const isFuture = Boolean(txDateStr && txDateStr > todayStr);
+
                   const converted = convertCurrency(tx.amount, tx.currency as DisplayCurrency, displayCurrency, usdArsRate, tx.date, transactions, historyData);
                   const effectiveRate = getHistoricalFxRate(tx.date, usdArsRate, transactions, historyData);
                   const isCrossCurrency = (tx.currency?.toUpperCase().includes('USD') && displayCurrency === 'ARS') || (!tx.currency?.toUpperCase().includes('USD') && displayCurrency === 'USD');
 
                   return (
-                    <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
+                    <tr key={tx.id} className={`hover:bg-slate-800/40 transition-colors ${isFuture ? 'bg-amber-950/15 border-l-2 border-l-amber-500/70' : ''}`}>
                       <td className="p-3 text-slate-400 whitespace-nowrap">
-                        {tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                          <span>{tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}</span>
+                          {isFuture && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold inline-flex items-center w-fit" title="Future date - transaction is pending and excluded from current live balances">
+                              <Clock className="w-2.5 h-2.5 mr-0.5 shrink-0" />
+                              Pending/Future
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3 font-medium text-slate-200">
                         <div>{tx.title}</div>
@@ -248,19 +260,21 @@ export function TransactionsTab({
                         {tx.toAccount && <span className="text-slate-500 text-[10px] block">→ {tx.toAccount}</span>}
                       </td>
                       <td className="p-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                          tx.type === 'INCOME' ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/50' :
-                          tx.type === 'EXPENSE' ? 'bg-rose-950/80 text-rose-300 border border-rose-800/50' :
-                          tx.type === 'CC_PAYMENT' ? 'bg-purple-950/80 text-purple-300 border border-purple-800/50' :
-                          'bg-blue-950/80 text-blue-300 border border-blue-800/50'
-                        }`}>
-                          {tx.type === 'CC_PAYMENT' ? 'CC PAYMENT' : tx.type}
-                        </span>
-                        {tx.installments && (
-                          <span className="ml-1 text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">
-                            {tx.installments}
+                        <div className="flex items-center space-x-1 flex-wrap gap-y-1">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            tx.type === 'INCOME' ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/50' :
+                            tx.type === 'EXPENSE' ? 'bg-rose-950/80 text-rose-300 border border-rose-800/50' :
+                            tx.type === 'CC_PAYMENT' ? 'bg-purple-950/80 text-purple-300 border border-purple-800/50' :
+                            'bg-blue-950/80 text-blue-300 border border-blue-800/50'
+                          }`}>
+                            {tx.type === 'CC_PAYMENT' ? 'CC PAYMENT' : tx.type}
                           </span>
-                        )}
+                          {tx.installments && (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">
+                              {tx.installments}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3 text-right font-semibold text-slate-200">
                         {formatCurrency(tx.amount, tx.currency as DisplayCurrency)}
