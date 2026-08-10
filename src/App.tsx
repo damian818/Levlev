@@ -78,10 +78,11 @@ export default function App() {
   // Custom accounts list state
   const [accounts, setAccounts] = useState<AccountItem[]>(() => {
     try {
+      const isCleared = localStorage.getItem('finance_app_is_cleared');
       const saved = localStorage.getItem('finance_app_custom_accounts');
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && (parsed.length > 0 || isCleared === 'true')) return parsed;
       }
     } catch (e) {
       console.warn('Failed to load custom accounts from localStorage');
@@ -300,8 +301,14 @@ export default function App() {
   // User-configured actual live account balances (persisted in localStorage)
   const [customBalances, setCustomBalances] = useState<Record<string, AccountCustomBalance>>(() => {
     try {
+      const isCleared = localStorage.getItem('finance_app_is_cleared');
+      if (isCleared === 'true') {
+        const saved = localStorage.getItem('finance_app_account_balances');
+        if (saved !== null) return JSON.parse(saved);
+        return {};
+      }
       const saved = localStorage.getItem('finance_app_account_balances');
-      if (saved) return JSON.parse(saved);
+      if (saved !== null) return JSON.parse(saved);
     } catch (e) {
       console.warn('Failed to load custom balances from localStorage');
     }
@@ -642,7 +649,7 @@ export default function App() {
     localStorage.setItem('finance_app_custom_accounts', JSON.stringify(zeroedAccounts));
 
     setCustomBalances({});
-    localStorage.removeItem('finance_app_account_balances');
+    localStorage.setItem('finance_app_account_balances', JSON.stringify({}));
 
     setTransactions([]);
     setBudgets([]);
