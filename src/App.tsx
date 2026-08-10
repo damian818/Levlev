@@ -206,6 +206,8 @@ export default function App() {
 
   const [authError, setAuthError] = useState<string | null>(null);
 
+  const [hasInitialSynced, setHasInitialSynced] = useState(false);
+
   // Sync Supabase user data
   const syncFromSupabase = React.useCallback(async () => {
     try {
@@ -218,6 +220,8 @@ export default function App() {
       }
     } catch (err) {
       console.warn('Failed to fetch user data from Supabase:', err);
+    } finally {
+      setHasInitialSynced(true);
     }
   }, []);
 
@@ -381,12 +385,12 @@ export default function App() {
 
   // Save changes to Supabase when user is authenticated
   useEffect(() => {
-    if (!authUser) return;
+    if (!authUser || !hasInitialSynced) return;
     const timer = setTimeout(() => {
       saveAllUserDataToSupabase({ transactions, categories, accounts, budgets });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [transactions, categories, accounts, budgets, authUser]);
+  }, [transactions, categories, accounts, budgets, authUser, hasInitialSynced]);
 
   if (authLoading) {
     return (

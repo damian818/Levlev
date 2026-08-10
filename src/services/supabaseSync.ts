@@ -16,19 +16,49 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
   if (!session?.user) return null;
 
   try {
-    const [txRes, catRes, accRes, budRes] = await Promise.all([
-      client.from('transactions').select('*').order('date', { ascending: false }),
+    const [catRes, accRes, budRes] = await Promise.all([
       client.from('categories').select('*'),
       client.from('accounts').select('*'),
       client.from('budgets').select('*'),
     ]);
 
-    if (txRes.error) console.warn('Supabase fetch transactions error:', txRes.error);
     if (catRes.error) console.warn('Supabase fetch categories error:', catRes.error);
     if (accRes.error) console.warn('Supabase fetch accounts error:', accRes.error);
     if (budRes.error) console.warn('Supabase fetch budgets error:', budRes.error);
 
-    const transactions: Transaction[] = (txRes.data || []).map((row: any) => ({
+    // Fetch transactions in paginated chunks of 1000 to bypass PostgREST max row limit
+    let rawTxRows: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let keepGoing = true;
+
+    while (keepGoing) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+      const txRes = await client
+        .from('transactions')
+        .select('*')
+        .order('date', { ascending: false })
+        .range(from, to);
+
+      if (txRes.error) {
+        console.warn('Supabase fetch transactions range error:', txRes.error);
+        break;
+      }
+
+      if (txRes.data && txRes.data.length > 0) {
+        rawTxRows = rawTxRows.concat(txRes.data);
+        if (txRes.data.length < pageSize) {
+          keepGoing = false;
+        } else {
+          page++;
+        }
+      } else {
+        keepGoing = false;
+      }
+    }
+
+    const transactions: Transaction[] = rawTxRows.map((row: any) => ({
       id: row.id || `tx-${Math.random().toString(36).substring(2)}`,
       date: row.date || new Date().toISOString().substring(0, 10),
       title: row.title || 'Untitled',
@@ -84,7 +114,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
   const userId = session.user.id;
 
   try {
-    // 1. Transactions upsert or clear
+    // 1. Transactions upsert or clear in batches of 500
     if (data.transactions && data.transactions.length > 0) {
       const txRows = data.transactions.map(t => {
         const rowId = (t.id && t.id.startsWith(userId)) ? t.id : `${userId}_${t.id || Math.random().toString(36).substring(2)}`;
@@ -101,14 +131,20 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           to_account: t.toAccount || null,
           installments: t.installments || null,
           statement_close_date: t.statementCloseDate || null,
-          receive_amount: t.receiveAmount || null,
+          transfer_amount: t.transferAmount !== undefined && t.transferAmount !== null ? t.transferAmount : null,
+          transfer_currency: t.transferCurrency || null,
+          receive_amount: t.receiveAmount !== undefined && t.receiveAmount !== null ? t.receiveAmount : null,
           receive_currency: t.receiveCurrency || null,
           notes: t.description || null,
         };
       });
 
-      const { error: txErr } = await client.from('transactions').upsert(txRows, { onConflict: 'id' });
-      if (txErr) console.error('Error upserting transactions to Supabase:', txErr);
+      const batchSize = 500;
+      for (let i = 0; i < txRows.length; i += batchSize) {
+        const batch = txRows.slice(i, i + batchSize);
+        const { error: txErr } = await client.from('transactions').upsert(batch, { onConflict: 'id' });
+        if (txErr) console.error(`Error upserting transactions batch ${i} to Supabase:`, txErr);
+      }
     } else if (data.transactions && data.transactions.length === 0) {
       const { error: delTxErr } = await client.from('transactions').delete().eq('user_id', userId);
       if (delTxErr) console.error('Error clearing transactions in Supabase:', delTxErr);
