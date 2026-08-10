@@ -1424,6 +1424,19 @@ export function detectInstallmentPlans(
       if (t.date) distinctMonths.add(t.date.substring(0, 7));
       if (t.account) accountsSet.add(t.account);
     });
+    
+    let installmentStartDate: string | undefined;
+    let installmentEndDate: string | undefined;
+    if (sorted.length > 0) {
+      installmentStartDate = sorted[0].date?.substring(0, 7);
+      const lastTx = sorted[sorted.length - 1];
+      if (installmentCurrent && installmentTotal && lastTx.date) {
+        const remaining = installmentTotal - installmentCurrent;
+        const d = new Date(lastTx.date);
+        d.setMonth(d.getMonth() + remaining);
+        installmentEndDate = d.toISOString().substring(0, 7);
+      }
+    }
 
     const monthMap = new Map<string, { amountNativeSum: number; amountDisplaySum: number; account: string; date: string }>();
     sorted.forEach(t => {
@@ -1481,6 +1494,8 @@ export function detectInstallmentPlans(
       installmentInfo,
       installmentCurrent,
       installmentTotal,
+      installmentStartDate,
+      installmentEndDate,
       history,
       monthlyTrend,
     });

@@ -186,6 +186,8 @@ export interface IdentifiedRecurringItem {
   installmentInfo?: string;
   installmentCurrent?: number;
   installmentTotal?: number;
+  installmentStartDate?: string;
+  installmentEndDate?: string;
   history: RecurringOccurrence[];
   monthlyTrend: {
     month: string;

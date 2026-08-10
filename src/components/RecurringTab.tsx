@@ -20,6 +20,15 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [showCompletedInstallments, setShowCompletedInstallments] = useState(false);
+  const [installmentsSort, setInstallmentsSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  const handleInstallmentsSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (installmentsSort && installmentsSort.key === key && installmentsSort.direction === 'asc') {
+      direction = 'desc';
+    }
+    setInstallmentsSort({ key, direction });
+  };
 
   // Non-recurring exclusions state
   const [nonRecurringKeys, setNonRecurringKeys] = useState<string[]>(() => {
@@ -167,8 +176,15 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
   // Separate credit card installment plans (cuotas)
   const { activeInstallmentPlans, completedInstallmentPlans, installmentPlans } = useMemo(() => {
     const plans = detectInstallmentPlans(transactions, displayCurrency, usdArsRate);
-    const active = plans.filter(p => p.installmentCurrent === undefined || p.installmentTotal === undefined || p.installmentCurrent < p.installmentTotal);
-    const completed = plans.filter(p => p.installmentCurrent !== undefined && p.installmentTotal !== undefined && p.installmentCurrent >= p.installmentTotal);
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    const active = plans.filter(p => {
+       if (!p.installmentEndDate) return p.installmentCurrent === undefined || p.installmentTotal === undefined || p.installmentCurrent < p.installmentTotal;
+       return p.installmentEndDate >= currentMonth;
+    });
+    const completed = plans.filter(p => {
+       if (!p.installmentEndDate) return p.installmentCurrent !== undefined && p.installmentTotal !== undefined && p.installmentCurrent >= p.installmentTotal;
+       return p.installmentEndDate < currentMonth;
+    });
     return { activeInstallmentPlans: active, completedInstallmentPlans: completed, installmentPlans: plans };
   }, [transactions, displayCurrency, usdArsRate]);
 
@@ -251,6 +267,32 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
         return sum + latestMonthAmount;
       }, 0);
   }, [regularRecurring, displayCurrency, usdArsRate, transactions]);
+
+  const { sortedActiveInstallmentPlans, sortedCompletedInstallmentPlans } = useMemo(() => {
+    const sortFn = (a: IdentifiedRecurringItem, b: IdentifiedRecurringItem) => {
+      if (!installmentsSort) return 0;
+      const { key, direction } = installmentsSort;
+      let aVal: any = a[key as keyof IdentifiedRecurringItem];
+      let bVal: any = b[key as keyof IdentifiedRecurringItem];
+
+      if (key === 'amount') {
+        aVal = convertCurrency(a.latestAmount, a.currency, displayCurrency, usdArsRate);
+        bVal = convertCurrency(b.latestAmount, b.currency, displayCurrency, usdArsRate);
+      } else if (key === 'period') {
+        aVal = a.installmentEndDate || '';
+        bVal = b.installmentEndDate || '';
+      }
+
+      if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+      return 0;
+    };
+
+    return {
+      sortedActiveInstallmentPlans: [...activeInstallmentPlans].sort(sortFn),
+      sortedCompletedInstallmentPlans: [...completedInstallmentPlans].sort(sortFn),
+    };
+  }, [activeInstallmentPlans, completedInstallmentPlans, installmentsSort, displayCurrency, usdArsRate]);
 
   return (
     <div className="space-y-6">
@@ -480,35 +522,36 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
           <table className="w-full text-left text-xs">
             <thead className="bg-[#161b22] text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
               <tr>
-                <th className="p-3">Merchant / Item</th>
-                <th className="p-3">Category</th>
-                <th className="p-3">Card Account</th>
-                <th className="p-3">Current Installment</th>
-                <th className="p-3">Period (Start - End)</th>
-                <th className="p-3 text-right">Latest Amount ({displayCurrency})</th>
+                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('title')}>
+                  Merchant / Item {installmentsSort?.key === 'title' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('category')}>
+                  Category {installmentsSort?.key === 'category' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('account')}>
+                  Card Account {installmentsSort?.key === 'account' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('installmentCurrent')}>
+                  Current Installment {installmentsSort?.key === 'installmentCurrent' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('period')}>
+                  Period (Start - End) {installmentsSort?.key === 'period' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th className="p-3 text-right cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('amount')}>
+                  Latest Amount ({displayCurrency}) {installmentsSort?.key === 'amount' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="p-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {activeInstallmentPlans.length === 0 && (!showCompletedInstallments || completedInstallmentPlans.length === 0) ? (
+              {sortedActiveInstallmentPlans.length === 0 && (!showCompletedInstallments || sortedCompletedInstallmentPlans.length === 0) ? (
                 <tr>
                   <td colSpan={7} className="p-4 text-center text-slate-500">No installment plans detected.</td>
                 </tr>
               ) : (
                 <>
-                  {activeInstallmentPlans.map((plan) => {
+                  {sortedActiveInstallmentPlans.map((plan) => {
                     const converted = convertCurrency(plan.latestAmount, plan.currency, displayCurrency, usdArsRate);
-                    const firstTx = plan.history[0];
-                    const lastTx = plan.history[plan.history.length - 1];
-                    let endDate = lastTx?.date?.substring(0, 7) || '';
-                    if (plan.installmentCurrent && plan.installmentTotal && lastTx?.date) {
-                      const remaining = plan.installmentTotal - plan.installmentCurrent;
-                      if (remaining > 0) {
-                        const d = new Date(lastTx.date);
-                        d.setMonth(d.getMonth() + remaining);
-                        endDate = d.toISOString().substring(0, 7);
-                      }
-                    }
                     return (
                       <tr
                         key={plan.id}
@@ -526,7 +569,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                           </span>
                         </td>
                         <td className="p-3 text-slate-400 font-mono text-[11px]">
-                          {firstTx?.date?.substring(0, 7)} to {endDate}
+                          {plan.installmentStartDate || ''} to {plan.installmentEndDate || ''}
                         </td>
                         <td className="p-3 text-right font-bold text-slate-100 font-mono">
                           {formatCurrency(converted, displayCurrency)}
@@ -540,10 +583,8 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                       </tr>
                     );
                   })}
-                  {showCompletedInstallments && completedInstallmentPlans.map((plan) => {
+                  {showCompletedInstallments && sortedCompletedInstallmentPlans.map((plan) => {
                     const converted = convertCurrency(plan.latestAmount, plan.currency, displayCurrency, usdArsRate);
-                    const firstTx = plan.history[0];
-                    const lastTx = plan.history[plan.history.length - 1];
                     return (
                       <tr
                         key={plan.id}
@@ -561,7 +602,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                           </span>
                         </td>
                         <td className="p-3 text-slate-400 font-mono text-[11px]">
-                          {firstTx?.date?.substring(0, 7)} to {lastTx?.date?.substring(0, 7)}
+                          {plan.installmentStartDate || ''} to {plan.installmentEndDate || ''}
                         </td>
                         <td className="p-3 text-right font-bold text-slate-100 font-mono">
                           {formatCurrency(converted, displayCurrency)}
