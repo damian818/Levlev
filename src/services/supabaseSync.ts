@@ -84,23 +84,26 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
   try {
     // 1. Transactions upsert or clear
     if (data.transactions && data.transactions.length > 0) {
-      const txRows = data.transactions.map(t => ({
-        id: t.id,
-        user_id: userId,
-        date: t.date,
-        title: t.title,
-        amount: t.amount,
-        currency: t.currency || 'ARS',
-        category: t.category || 'General',
-        account: t.account || 'Main',
-        type: t.type,
-        to_account: t.toAccount || null,
-        installments: t.installments || null,
-        statement_close_date: t.statementCloseDate || null,
-        receive_amount: t.receiveAmount || null,
-        receive_currency: t.receiveCurrency || null,
-        notes: t.description || null,
-      }));
+      const txRows = data.transactions.map(t => {
+        const rowId = (t.id && t.id.startsWith(userId)) ? t.id : `${userId}_${t.id || Math.random().toString(36).substring(2)}`;
+        return {
+          id: rowId,
+          user_id: userId,
+          date: t.date,
+          title: t.title,
+          amount: t.amount,
+          currency: t.currency || 'ARS',
+          category: t.category || 'General',
+          account: t.account || 'Main',
+          type: t.type,
+          to_account: t.toAccount || null,
+          installments: t.installments || null,
+          statement_close_date: t.statementCloseDate || null,
+          receive_amount: t.receiveAmount || null,
+          receive_currency: t.receiveCurrency || null,
+          notes: t.description || null,
+        };
+      });
 
       const { error: txErr } = await client.from('transactions').upsert(txRows, { onConflict: 'id' });
       if (txErr) console.error('Error upserting transactions to Supabase:', txErr);
@@ -111,13 +114,16 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
 
     // 2. Categories upsert
     if (data.categories && data.categories.length > 0) {
-      const catRows = data.categories.map(c => ({
-        id: c.id,
-        user_id: userId,
-        name: c.name,
-        type: c.type || 'BOTH',
-        color: c.description || '#64748b',
-      }));
+      const catRows = data.categories.map(c => {
+        const rowId = (c.id && c.id.startsWith(userId)) ? c.id : `${userId}_${c.id || Math.random().toString(36).substring(2)}`;
+        return {
+          id: rowId,
+          user_id: userId,
+          name: c.name,
+          type: c.type || 'BOTH',
+          color: c.description || '#64748b',
+        };
+      });
 
       const { error: catErr } = await client.from('categories').upsert(catRows, { onConflict: 'id' });
       if (catErr) console.error('Error upserting categories to Supabase:', catErr);
@@ -125,14 +131,17 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
 
     // 3. Accounts upsert
     if (data.accounts && data.accounts.length > 0) {
-      const accRows = data.accounts.map(a => ({
-        id: a.id,
-        user_id: userId,
-        name: a.name,
-        type: a.type || 'CHECKING',
-        currency: a.currency || 'ARS',
-        initial_balance: a.initialBalance || 0,
-      }));
+      const accRows = data.accounts.map(a => {
+        const rowId = (a.id && a.id.startsWith(userId)) ? a.id : `${userId}_${a.id || Math.random().toString(36).substring(2)}`;
+        return {
+          id: rowId,
+          user_id: userId,
+          name: a.name,
+          type: a.type || 'CHECKING',
+          currency: a.currency || 'ARS',
+          initial_balance: a.initialBalance || 0,
+        };
+      });
 
       const { error: accErr } = await client.from('accounts').upsert(accRows, { onConflict: 'id' });
       if (accErr) console.error('Error upserting accounts to Supabase:', accErr);
@@ -141,7 +150,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
     // 4. Budgets upsert or clear
     if (data.budgets && data.budgets.length > 0) {
       const budRows = data.budgets.map(b => ({
-        id: b.category, // using category name as ID for budget rows
+        id: `${userId}_${b.category}`,
         user_id: userId,
         category: b.category,
         monthly_limit: b.monthlyLimitARS,
@@ -170,11 +179,14 @@ export async function deleteTransactionFromSupabase(txId: string): Promise<boole
     const { data: { session } } = await client.auth.getSession();
     if (!session?.user) return false;
 
+    const userId = session.user.id;
+    const scopedId = (txId && txId.startsWith(userId)) ? txId : `${userId}_${txId}`;
+
     const { error } = await client
       .from('transactions')
       .delete()
-      .eq('id', txId)
-      .eq('user_id', session.user.id);
+      .or(`id.eq.${txId},id.eq.${scopedId}`)
+      .eq('user_id', userId);
     if (error) {
       console.error('Error deleting transaction from Supabase:', error);
       return false;
