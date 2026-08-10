@@ -17,7 +17,7 @@ interface NavbarProps {
   workspaceMembersCount?: number;
   onOpenShareWorkspaceModal?: () => void;
   onOpenAddModal: () => void;
-  onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onOpenImportModal: () => void;
   onOpenDeleteModal: () => void;
   onLogout?: () => void;
 }
@@ -35,7 +35,7 @@ export function Navbar({
   workspaceMembersCount = 0,
   onOpenShareWorkspaceModal,
   onOpenAddModal,
-  onFileUpload,
+  onOpenImportModal,
   onOpenDeleteModal,
   onLogout,
 }: NavbarProps) {
@@ -166,11 +166,13 @@ export function Navbar({
               </span>
             </button>
 
-            <label className="cursor-pointer inline-flex items-center px-2 sm:px-3 py-1.5 border border-slate-800 rounded-lg text-[10px] sm:text-xs font-medium text-slate-300 bg-[#161b22] hover:bg-slate-800 transition-colors shrink-0">
+            <button
+              onClick={onOpenImportModal}
+              className="cursor-pointer inline-flex items-center px-2 sm:px-3 py-1.5 border border-slate-800 rounded-lg text-[10px] sm:text-xs font-medium text-slate-300 bg-[#161b22] hover:bg-slate-800 transition-colors shrink-0"
+            >
               <Upload className="w-3 h-3 sm:w-3.5 sm:h-3.5 sm:mr-1.5 text-slate-400" />
               <span className="hidden sm:inline">Import</span>
-              <input type="file" accept=".csv" onChange={onFileUpload} className="hidden" />
-            </label>
+            </button>
 
             <button
               onClick={onOpenAddModal}

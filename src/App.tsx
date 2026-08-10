@@ -25,6 +25,7 @@ import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { ShareWorkspaceModal } from './components/ShareWorkspaceModal';
 import { AiChatWidget } from './components/AiChatWidget';
 import { AppPreview } from './components/AppPreview';
+import ImportWizardModal from './components/ImportWizardModal';
 import { LevLevIcon, LevLevLogo } from './components/LevLevLogo';
 
 export default function App() {
@@ -226,6 +227,7 @@ export default function App() {
   const [usdArsRate, setUsdArsRate] = useState<number>(1521);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [historyData, setHistoryData] = useState<InflationPoint[]>(historicalInflationAndFX);
 
   // Sync transactions to localStorage on update
@@ -615,93 +617,9 @@ export default function App() {
     } catch (e) {
       console.warn('Failed to clear custom balances in localStorage');
     }
-  };
-
-  const handleNavigateToTransactionsWithFilter = (filter: TransactionFilter) => {
+  };  const handleNavigateToTransactionsWithFilter = (filter: TransactionFilter) => {
     setActiveFilter(filter);
     setCurrentTab('transactions');
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const textReader = new FileReader();
-    textReader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (text) {
-        const uploadedTx = parseTransactions(text);
-        if (uploadedTx.length > 0) {
-          setTransactions(prev => {
-            const getSig = (t: Transaction) => {
-              const d = t.date ? t.date.substring(0, 10) : '';
-              const title = (t.title || '').trim().toLowerCase();
-              const amt = Number(t.amount || t.transferAmount || 0);
-              const acc = (t.account || '').trim().toLowerCase();
-              const toAcc = (t.toAccount || '').trim().toLowerCase();
-              const curr = (t.currency || '').trim().toUpperCase();
-              return `${d}|${title}|${amt}|${acc}|${toAcc}|${curr}`;
-            };
-
-            const existingSigs = new Set(prev.map(getSig));
-            const newTxs = uploadedTx.filter(t => !existingSigs.has(getSig(t)));
-
-            // If prev is empty, use uploadedTx. Otherwise add newTxs to prev if any exist
-            const combined = prev.length === 0 ? uploadedTx : (newTxs.length > 0 ? [...newTxs, ...prev] : prev);
-            const sorted = [...combined].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            
-            // Derive budget goals from the updated combined list
-            const derived = deriveBudgetsFromTransactions(sorted, budgets);
-            setBudgets(derived);
-            
-            return sorted;
-          });
-          
-            // Register any newly encountered accounts into custom accounts list
-            setAccounts(prevAccs => {
-              const existingNames = new Set(prevAccs.map(a => a.name));
-              const newAccs: AccountItem[] = [];
-              uploadedTx.forEach(t => {
-                if (t.account && !existingNames.has(t.account)) {
-                  existingNames.add(t.account);
-                  const isUsd = t.account.toLowerCase().includes('usd') || (t.type === 'TRANSFER' && t.transferCurrency === 'USD');
-                  const isCC = t.account.toLowerCase().includes('card') || t.account.toLowerCase().includes('visa') || t.account.toLowerCase().includes('master');
-                  newAccs.push({
-                    id: `acc-${Math.random().toString(36).substring(2)}`,
-                    name: t.account,
-                    type: isCC ? 'CREDIT_CARD' : (t.account.toLowerCase().includes('wallet') ? 'WALLET' : 'CHECKING'),
-                    currency: (t.type === 'TRANSFER' && t.transferCurrency) ? t.transferCurrency : (t.currency || (isUsd ? 'USD' : 'ARS')),
-                    initialBalance: 0,
-                  });
-                }
-                if (t.toAccount && !existingNames.has(t.toAccount)) {
-                  existingNames.add(t.toAccount);
-                  const isUsd = t.toAccount.toLowerCase().includes('usd') || t.receiveCurrency === 'USD';
-                  const isCC = t.toAccount.toLowerCase().includes('card') || t.toAccount.toLowerCase().includes('visa') || t.toAccount.toLowerCase().includes('master');
-                  newAccs.push({
-                    id: `acc-${Math.random().toString(36).substring(2)}`,
-                    name: t.toAccount,
-                    type: isCC ? 'CREDIT_CARD' : (t.toAccount.toLowerCase().includes('wallet') ? 'WALLET' : 'CHECKING'),
-                    currency: t.receiveCurrency || (isUsd ? 'USD' : 'ARS'),
-                    initialBalance: 0,
-                  });
-                }
-              });
-              return newAccs.length > 0 ? [...prevAccs, ...newAccs] : prevAccs;
-            });
-
-            setCustomBalances({});
-            try {
-              localStorage.removeItem('finance_app_account_balances');
-              localStorage.removeItem('finance_app_is_cleared');
-            } catch (e) {}
-
-            setCurrentTab('overview');
-        }
-      }
-    };
-    textReader.readAsText(file);
-    e.target.value = '';
   };
 
   const handleDeleteAllData = async () => {
@@ -773,7 +691,7 @@ export default function App() {
         workspaceMembersCount={workspaceMembers.length}
         onOpenShareWorkspaceModal={() => setIsShareWorkspaceModalOpen(true)}
         onOpenAddModal={() => setIsAddModalOpen(true)}
-        onFileUpload={handleFileUpload}
+        onOpenImportModal={() => setIsImportModalOpen(true)}
         onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
         onLogout={handleLogout}
       />
@@ -875,6 +793,7 @@ export default function App() {
             onEditAccount={handleEditAccount}
             onDeleteAccount={handleDeleteAccount}
             onImportBackup={handleImportBackup}
+            onOpenImportModal={() => setIsImportModalOpen(true)}
             onRecalculateBalances={handleRecalculateAllBalances}
             onLogout={handleLogout}
           />
@@ -887,6 +806,17 @@ export default function App() {
         onAddTransaction={handleAddTransaction}
         existingAccounts={accounts.map(a => a.name)}
         existingCategories={categories.map(c => c.name)}
+      />
+
+      <ImportWizardModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={(data) => {
+          handleImportBackup(data);
+          alert('Data imported successfully!');
+        }}
+        existingAccounts={accounts}
+        existingCategories={categories}
       />
 
       <ConfirmDeleteModal

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
 import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
-import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon } from 'lucide-react';
+import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon, Upload } from 'lucide-react';
 import { MonthlyCategoryDonut } from './MonthlyCategoryDonut';
 import { generateMonthlyPdfReport } from '../utils/pdfReport';
 import { MonthlyHeatmap } from './MonthlyHeatmap';
@@ -17,6 +17,7 @@ interface OverviewTabProps {
   customBalances?: Record<string, AccountCustomBalance>;
   onNavigateTab: (tab: ViewTab) => void;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
+  onOpenImportModal?: () => void;
 }
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
@@ -30,6 +31,7 @@ export function OverviewTab({
   customBalances,
   onNavigateTab,
   onNavigateToTransactionsWithFilter,
+  onOpenImportModal
 }: OverviewTabProps) {
   const [velocityMultiplier, setVelocityMultiplier] = useState<number>(1.0);
   const [showCategoryTrend, setShowCategoryTrend] = useState<boolean>(false);
@@ -162,6 +164,17 @@ export function OverviewTab({
               ))}
             </select>
           </div>
+
+          {onOpenImportModal && (
+            <button
+              onClick={onOpenImportModal}
+              className="flex items-center justify-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[10px] sm:text-xs font-semibold px-2.5 py-2 rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer flex-1 sm:flex-none"
+              title="Import Transactions"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span className="whitespace-nowrap">Import Data</span>
+            </button>
+          )}
 
           <button
             onClick={() =>

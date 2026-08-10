@@ -33,7 +33,7 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
   if (!isOpen) return null;
 
   const handleDownloadTemplate = () => {
-    const csvContent = "date,title,category,account,amount,currency,type,description,installments\n2026-08-10,Groceries,Food,Debit Card,150.50,USD,EXPENSE,Walmart,\n2026-08-11,Salary,Income,Bank Account,2000,USD,INCOME,August Salary,";
+    const csvContent = "date,title,category,account,amount,currency,type,description,installments,toAccount,receiveAmount,receiveCurrency\n2026-08-10,Groceries,Food,Debit Card,150.50,USD,EXPENSE,Walmart,,,\n2026-08-11,Salary,Income,Bank Account,2000,USD,INCOME,August Salary,,,\n2026-08-12,Transfer to Savings,,Checking Account,500,USD,TRANSFER,,Savings Account,500,USD";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -126,7 +126,7 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
           }
 
           let type = row.type?.toUpperCase();
-          if (type !== 'EXPENSE' && type !== 'INCOME' && type !== 'TRANSFER' && type !== 'CC_PAYMENT') {
+          if (type !== 'EXPENSE' && type !== 'INCOME' && type !== 'TRANSFER' && type !== 'CC_PAYMENT') { 
              type = amount < 0 ? 'EXPENSE' : 'INCOME';
              amount = Math.abs(amount);
              errors.push({ row: rowNum, message: `Invalid type '${row.type}'. Auto-inferred as ${type} based on amount.`, type: 'warning' });
@@ -142,6 +142,19 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
              errors.push({ row: rowNum, message: `Account '${row.account}' does not exist. It will be created.`, type: 'warning' });
           }
 
+          let toAccount = row.toAccount;
+          let receiveAmount = row.receiveAmount ? parseFloat(row.receiveAmount) : undefined;
+          let receiveCurrency = row.receiveCurrency?.toUpperCase();
+
+          if (type === 'TRANSFER' && !toAccount) {
+            errors.push({ row: rowNum, message: `Type is TRANSFER but toAccount is missing.`, type: 'error' });
+            return;
+          }
+
+          if (toAccount && !existingAccounts.find(a => a.name.toLowerCase() === toAccount.toLowerCase())) {
+             errors.push({ row: rowNum, message: `Target account '${toAccount}' does not exist. It will be created.`, type: 'warning' });
+          }
+
           txs.push({
             id: row.id || `tx-${Date.now()}-${Math.random().toString(36).substring(2)}`,
             date: row.date,
@@ -152,7 +165,10 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
             currency: currency === 'USD' ? 'USD' : 'ARS',
             type: type as 'EXPENSE'|'INCOME'|'TRANSFER'|'CC_PAYMENT',
             description: row.description || '',
-            installments: row.installments || ''
+            installments: row.installments || '',
+            toAccount: toAccount,
+            receiveAmount: receiveAmount,
+            receiveCurrency: receiveCurrency === 'USD' ? 'USD' : (receiveCurrency === 'ARS' ? 'ARS' : undefined),
           });
         });
 

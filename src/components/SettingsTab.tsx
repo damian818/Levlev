@@ -82,6 +82,7 @@ interface SettingsTabProps {
   onEditAccount: (oldName: string, updatedAccount: AccountItem, updateTransactions: boolean) => void;
   onDeleteAccount: (accountName: string) => void;
   onImportBackup?: (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[] }) => void;
+  onOpenImportModal?: () => void;
   onRecalculateBalances?: () => void;
   onLogout: () => void;
 }
@@ -108,6 +109,7 @@ export function SettingsTab({
   onEditAccount,
   onDeleteAccount,
   onImportBackup,
+  onOpenImportModal,
   onRecalculateBalances,
   onLogout,
 }: SettingsTabProps) {
@@ -197,7 +199,6 @@ export function SettingsTab({
   const [accNthInput, setAccNthInput] = useState<number>(4); // 4th
   const [accDueDaysInput, setAccDueDaysInput] = useState<number>(10);
   const [accUpdateTxs, setAccUpdateTxs] = useState(true);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const [deletingAccName, setDeletingAccName] = useState<string | null>(null);
 
@@ -819,9 +820,9 @@ export function SettingsTab({
                 <span>Export JSON Backup</span>
               </button>
 
-              {onImportBackup && (
+              {onOpenImportModal && (
                 <button
-                  onClick={() => setIsImportModalOpen(true)}
+                  onClick={onOpenImportModal}
                   className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
                 >
                   <Upload className="w-4 h-4 text-slate-400" />
@@ -1532,17 +1533,6 @@ export function SettingsTab({
           </div>
         </div>
       )}
-
-      <ImportWizardModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onImport={(data) => {
-          if (onImportBackup) onImportBackup(data);
-          alert('Data imported successfully!');
-        }}
-        existingAccounts={accounts}
-        existingCategories={categories}
-      />
     </div>
   );
 }
