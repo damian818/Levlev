@@ -194,7 +194,17 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       for (let i = 0; i < txRows.length; i += batchSize) {
         const batch = txRows.slice(i, i + batchSize);
         const { error: txErr } = await client.from('transactions').upsert(batch, { onConflict: 'id' });
-        if (txErr) console.error(`Error upserting transactions batch ${i} to Supabase:`, txErr);
+        if (txErr) {
+          console.error(`Error upserting transactions batch ${i} to Supabase:`, txErr);
+          // Fallback retry stripping transfer_amount/transfer_currency if column missing in DB schema cache
+          if (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency')) {
+            const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, ...rest }) => rest);
+            const { error: fbErr } = await client.from('transactions').upsert(fallbackBatch, { onConflict: 'id' });
+            if (fbErr) {
+              console.error(`Fallback transactions batch ${i} error:`, fbErr);
+            }
+          }
+        }
       }
     } else if (data.transactions && data.transactions.length === 0) {
       const { error: delTxErr } = await client.from('transactions').delete().eq('user_id', userId);
@@ -238,10 +248,11 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       const { error: accErr } = await client.from('accounts').upsert(accRows, { onConflict: 'id' });
       if (accErr) {
         console.error('Error upserting accounts to Supabase:', accErr);
-        // Fallback if closing_rule column does not exist on target database
-        if (accErr.message?.includes('closing_rule') || accErr.code === 'PGRST204') {
-          const fallbackAccRows = accRows.map(({ closing_rule, ...rest }) => rest);
-          await client.from('accounts').upsert(fallbackAccRows, { onConflict: 'id' });
+        // Fallback if closing_rule, is_shared, or shared_members columns do not exist in target database
+        if (accErr.code === 'PGRST204' || accErr.message?.includes('closing_rule') || accErr.message?.includes('is_shared') || accErr.message?.includes('shared_members')) {
+          const fallbackAccRows = accRows.map(({ closing_rule, is_shared, shared_members, ...rest }) => rest);
+          const { error: fbAccErr } = await client.from('accounts').upsert(fallbackAccRows, { onConflict: 'id' });
+          if (fbAccErr) console.error('Fallback accounts upsert error:', fbAccErr);
         }
       }
     }

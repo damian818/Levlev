@@ -24,12 +24,18 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     total_installments INTEGER,
     original_amount NUMERIC,
     statement_close_date TEXT,
+    transfer_amount NUMERIC,
+    transfer_currency TEXT,
     fx_rate NUMERIC,
     receive_amount NUMERIC,
     receive_currency TEXT,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Ensure columns exist on existing transactions table
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS transfer_amount NUMERIC;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS transfer_currency TEXT;
 
 -- 3. CATEGORIES TABLE
 CREATE TABLE IF NOT EXISTS public.categories (
@@ -51,11 +57,15 @@ CREATE TABLE IF NOT EXISTS public.accounts (
     color TEXT NOT NULL DEFAULT '#3b82f6',
     initial_balance NUMERIC DEFAULT 0,
     closing_rule JSONB,
+    is_shared BOOLEAN DEFAULT FALSE,
+    shared_members JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Ensure closing_rule column exists on existing accounts table if created previously
+-- Ensure columns exist on existing accounts table if created previously
 ALTER TABLE public.accounts ADD COLUMN IF NOT EXISTS closing_rule JSONB;
+ALTER TABLE public.accounts ADD COLUMN IF NOT EXISTS is_shared BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.accounts ADD COLUMN IF NOT EXISTS shared_members JSONB DEFAULT '[]'::jsonb;
 
 -- 5. BUDGETS TABLE
 CREATE TABLE IF NOT EXISTS public.budgets (
