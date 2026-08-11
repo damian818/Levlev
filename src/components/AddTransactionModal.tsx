@@ -114,18 +114,39 @@ export function AddTransactionModal({
     }
   }, [accountsList, existingAccounts]);
 
+  // Helper to accurately check if an account is configured as a credit card
+  const isAccountCreditCard = (acc: AccountItem): boolean => {
+    // 1. Check user custom CC map override from Accounts tab
+    try {
+      const savedMap = localStorage.getItem('finance_app_cc_map');
+      if (savedMap) {
+        const map = JSON.parse(savedMap);
+        if (map[acc.name] !== undefined) {
+          return map[acc.name];
+        }
+      }
+    } catch (e) {}
+
+    // 2. Explicit type set on AccountItem
+    if (acc.type) {
+      return acc.type === 'CREDIT_CARD';
+    }
+
+    // 3. Keyword fallback
+    return isCreditCardAccount(acc.name);
+  };
+
   const accountNames = useMemo(() => accountItems.map(a => a.name), [accountItems]);
 
   // Non-credit card accounts for "Paid From" in CC_PAYMENT mode
   const nonCcAccounts = useMemo(() => {
-    const filtered = accountItems.filter(a => a.type !== 'CREDIT_CARD' && !isCreditCardAccount(a.name));
+    const filtered = accountItems.filter(a => !isAccountCreditCard(a));
     return filtered.length > 0 ? filtered : accountItems;
   }, [accountItems]);
 
   // Credit card accounts for "Paid To" in CC_PAYMENT mode
   const ccAccounts = useMemo(() => {
-    const filtered = accountItems.filter(a => a.type === 'CREDIT_CARD' || isCreditCardAccount(a.name));
-    return filtered.length > 0 ? filtered : accountItems;
+    return accountItems.filter(a => isAccountCreditCard(a));
   }, [accountItems]);
 
   // Lookup currency for account
@@ -139,10 +160,22 @@ export function AddTransactionModal({
     return 'ARS';
   };
 
-  // Lookup closing rule for account
+  // Lookup closing rule for account (from account item or persisted ccRulesMap)
   const lookupAccountClosingRule = (accName: string) => {
     const match = accountItems.find(a => a.name.toLowerCase() === accName.toLowerCase());
-    return match?.closingRule;
+    if (match?.closingRule) {
+      return match.closingRule;
+    }
+    try {
+      const savedRules = localStorage.getItem('finance_app_cc_rules');
+      if (savedRules) {
+        const map = JSON.parse(savedRules);
+        if (map[accName]) return map[accName];
+        const key = Object.keys(map).find(k => k.toLowerCase() === accName.toLowerCase());
+        if (key && map[key]) return map[key];
+      }
+    } catch (e) {}
+    return { ruleType: 'FIXED_DAY', fixedDay: 25 };
   };
 
   // State
@@ -304,7 +337,7 @@ export function AddTransactionModal({
   const isCC = useMemo(() => {
     if (type === 'CC_PAYMENT') return true;
     const match = accountItems.find(a => a.name === account);
-    if (match) return match.type === 'CREDIT_CARD' || isCreditCardAccount(match.name);
+    if (match) return isAccountCreditCard(match);
     return isCreditCardAccount(account);
   }, [account, accountItems, type]);
 
@@ -992,23 +1025,42 @@ export function AddTransactionModal({
                 </span>
               </div>
 
-              {/* Quick cuota preset buttons */}
-              <div className="flex items-center gap-1.5">
+              {/* Quick cuota preset buttons + Custom input */}
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] text-slate-500 font-semibold shrink-0">Presets:</span>
-                {[1, 3, 6, 12, 18, 24].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setNumInstallments(num)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                      numInstallments === num
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-xs'
-                        : 'bg-[#161b22] text-slate-400 hover:text-slate-200 border border-slate-800'
-                    }`}
-                  >
-                    {num === 1 ? '1x' : `${num}x`}
-                  </button>
-                ))}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {[1, 3, 6, 12, 18, 24].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setNumInstallments(num)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                        numInstallments === num
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-xs'
+                          : 'bg-[#161b22] text-slate-400 hover:text-slate-200 border border-slate-800'
+                      }`}
+                    >
+                      {num === 1 ? '1x' : `${num}x`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1.5 ml-auto shrink-0 bg-[#161b22] px-2.5 py-1 rounded-lg border border-slate-800">
+                  <span className="text-[10px] text-slate-400 font-medium">Custom:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    placeholder="e.g. 2, 4"
+                    value={numInstallments}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setNumInstallments(isNaN(val) || val < 1 ? 1 : val);
+                    }}
+                    className="w-14 px-1.5 py-0.5 bg-[#0a0c10] border border-amber-500/40 text-amber-300 font-mono font-bold text-xs rounded focus:outline-none focus:ring-1 focus:ring-amber-500 text-center"
+                  />
+                  <span className="text-[10px] text-slate-400 font-medium">cuotas</span>
+                </div>
               </div>
 
               {/* Installment breakdown list */}
