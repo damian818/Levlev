@@ -14,7 +14,10 @@ export interface Transaction {
   receiveCurrency?: string;
   description?: string;
   dueDate?: string;
-  installments?: string; // e.g. "6/6"
+  installments?: string; // e.g. "1/3"
+  installmentNumber?: number; // e.g. 1
+  totalInstallments?: number; // e.g. 3
+  originalAmount?: number; // total amount before split
   statementCloseDate?: string; // e.g. "2026-08-25"
   isPaid?: boolean;
 }

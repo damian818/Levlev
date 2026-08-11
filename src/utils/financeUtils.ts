@@ -135,6 +135,8 @@ export function getStatementCloseDateForTx(
   return `${closeNext.getFullYear()}-${pad(closeNext.getMonth() + 1)}-${pad(closeNext.getDate())}`;
 }
 
+export const calculateStatementCloseDate = getStatementCloseDateForTx;
+
 export function getStatementCloseDateForPayment(
   dateStr: string,
   ruleOrCloseDay?: number | CreditCardClosingRule

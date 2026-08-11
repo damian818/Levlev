@@ -21,6 +21,7 @@ import {
   getStatementCloseDateForTx, 
   getUpcomingStatementCloseDates,
   getCloseDateForMonthAndYear,
+  calculateStatementCloseDate,
   formatCurrency 
 } from '../utils/financeUtils';
 
@@ -445,37 +446,42 @@ export function AddTransactionModal({
     const rule = lookupAccountClosingRule(targetAcc);
     const pad = (n: number) => String(n).padStart(2, '0');
 
-    const baseDateStr = statementCloseDate || date;
-    const baseDt = new Date(baseDateStr);
-    const validBase = !isNaN(baseDt.getTime()) ? baseDt : new Date();
-    const startYear = validBase.getFullYear();
-    const startMonth = validBase.getMonth();
+    // Parse the selected purchase date (YYYY-MM-DD)
+    const dateParts = (date || getTodayStr()).split('-');
+    const baseYear = parseInt(dateParts[0], 10) || new Date().getFullYear();
+    const baseMonth = (parseInt(dateParts[1], 10) || (new Date().getMonth() + 1)) - 1; // 0-indexed
+    const baseDay = parseInt(dateParts[2], 10) || new Date().getDate();
 
     const list = [];
     for (let i = 1; i <= numInstallments; i++) {
-      // 1st installment takes the remainder cents!
+      // 1st installment takes the remainder cents (e.g. 33.34 + 33.33 + 33.33 = 100)
       const centsForThisCuota = i === 1 ? baseCents + remainderCents : baseCents;
       const amtForThisCuota = centsForThisCuota / 100;
 
-      let cuotaDate: string;
-      if (i === 1 && statementCloseDate) {
-        cuotaDate = statementCloseDate;
-      } else {
-        const closeDt = getCloseDateForMonthAndYear(startYear, startMonth + (i - 1), rule);
-        cuotaDate = `${closeDt.getFullYear()}-${pad(closeDt.getMonth() + 1)}-${pad(closeDt.getDate())}`;
+      // Purchase date for installment i: same day of month shifted by (i - 1) months
+      const targetDt = new Date(baseYear, baseMonth + (i - 1), 1);
+      const daysInMonth = new Date(targetDt.getFullYear(), targetDt.getMonth() + 1, 0).getDate();
+      const actualDay = Math.min(baseDay, daysInMonth);
+      const instTxDate = `${targetDt.getFullYear()}-${pad(targetDt.getMonth() + 1)}-${pad(actualDay)}`;
+
+      // Calculate credit card statement close date for this installment date
+      let stmtCloseDate = '';
+      if (isCC) {
+        stmtCloseDate = calculateStatementCloseDate(instTxDate, rule);
       }
 
       list.push({
         installmentNum: i,
         label: `${i}/${numInstallments}`,
         amount: amtForThisCuota,
-        date: cuotaDate,
+        instTxDate,
+        stmtCloseDate,
         isFirst: i === 1
       });
     }
 
     return list;
-  }, [amount, numInstallments, statementCloseDate, date, account, toAccount, type, accountItems]);
+  }, [amount, numInstallments, date, account, toAccount, type, isCC, accountItems]);
 
   if (!isOpen) return null;
 
@@ -528,7 +534,7 @@ export function AddTransactionModal({
         // Create multiple installment transactions
         const txList: Transaction[] = installmentSchedule.map((cuota, idx) => ({
           id: `manual-${Date.now()}-${idx + 1}`,
-          date: new Date(cuota.date).toISOString(),
+          date: new Date(`${cuota.instTxDate}T12:00:00`).toISOString(),
           title: title || 'Expense',
           category: category || 'General',
           account: account,
@@ -537,7 +543,10 @@ export function AddTransactionModal({
           type,
           description: description ? `${description} (Cuota ${cuota.label})` : `Cuota ${cuota.label}`,
           installments: cuota.label,
-          statementCloseDate: isCC ? cuota.date : undefined,
+          installmentNumber: cuota.installmentNum,
+          totalInstallments: numInstallments,
+          originalAmount: parsedAmount,
+          statementCloseDate: isCC ? cuota.stmtCloseDate : undefined,
         }));
         onAddTransaction(txList);
       } else {
@@ -552,6 +561,8 @@ export function AddTransactionModal({
           type,
           description: description || undefined,
           installments: numInstallments > 1 ? `1/${numInstallments}` : undefined,
+          installmentNumber: 1,
+          totalInstallments: numInstallments > 1 ? numInstallments : undefined,
           statementCloseDate: isCC ? statementCloseDate : undefined,
         };
         onAddTransaction(newTx);
