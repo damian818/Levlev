@@ -212,10 +212,23 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
   const userId = session.user.id;
 
   try {
+    // Helper to preserve shared row IDs and user_ids
+    const resolveSyncId = (itemId: string | undefined | null, currentUserId: string) => {
+      if (!itemId) return { id: `${currentUserId}_${Math.random().toString(36).substring(2)}`, userId: currentUserId };
+      if (itemId.includes('_')) {
+        const parts = itemId.split('_');
+        if (parts[0].length === 36) {
+          // Looks like a valid UUID prefix
+          return { id: itemId, userId: parts[0] };
+        }
+      }
+      return { id: `${currentUserId}_${itemId}`, userId: currentUserId };
+    };
+
     // 1. Transactions upsert or clear in batches of 500
     if (data.transactions && data.transactions.length > 0) {
       const txRows = data.transactions.map(t => {
-        const rowId = (t.id && t.id.startsWith(userId)) ? t.id : `${userId}_${t.id || Math.random().toString(36).substring(2)}`;
+        const { id: rowId, userId: targetUserId } = resolveSyncId(t.id, userId);
         
         let safeInstallments: number | null = null;
         if (t.totalInstallments && typeof t.totalInstallments === 'number') {
@@ -238,7 +251,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
 
         return {
           id: rowId,
-          user_id: userId,
+          user_id: targetUserId,
           date: t.date,
           title: t.title,
           amount: cleanAmount,
@@ -281,10 +294,10 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
     // 2. Categories upsert
     if (data.categories && data.categories.length > 0) {
       const catRows = data.categories.map(c => {
-        const rowId = (c.id && c.id.startsWith(userId)) ? c.id : `${userId}_${c.id || Math.random().toString(36).substring(2)}`;
+        const { id: rowId, userId: targetUserId } = resolveSyncId(c.id, userId);
         return {
           id: rowId,
-          user_id: userId,
+          user_id: targetUserId,
           name: c.name,
           type: c.type || 'BOTH',
           color: c.description || '#64748b',
@@ -298,10 +311,10 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
     // 3. Accounts upsert
     if (data.accounts && data.accounts.length > 0) {
       const accRows = data.accounts.map(a => {
-        const rowId = (a.id && a.id.startsWith(userId)) ? a.id : `${userId}_${a.id || Math.random().toString(36).substring(2)}`;
+        const { id: rowId, userId: targetUserId } = resolveSyncId(a.id, userId);
         return {
           id: rowId,
-          user_id: userId,
+          user_id: targetUserId,
           name: a.name,
           type: a.type || 'CHECKING',
           currency: a.currency || 'ARS',
@@ -384,7 +397,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
         queryIds.push(id);
         if (!id.startsWith(userId)) queryIds.push(`${userId}_${id}`);
       });
-      const { error: delErr } = await client.from('transactions').delete().in('id', queryIds).eq('user_id', userId);
+      const { error: delErr } = await client.from('transactions').delete().in('id', queryIds);
       if (!delErr) {
         removeDeletedTxIds(pendingIds);
       }
@@ -422,8 +435,7 @@ export async function deleteTransactionFromSupabase(txId: string | string[]): Pr
     const { error } = await client
       .from('transactions')
       .delete()
-      .in('id', queryIds)
-      .eq('user_id', userId);
+      .in('id', queryIds);
 
     if (error) {
       console.error('Error deleting transaction from Supabase:', error);
@@ -449,8 +461,7 @@ export async function deleteCategoryFromSupabase(catName: string): Promise<boole
     const { error } = await client
       .from('categories')
       .delete()
-      .eq('name', catName)
-      .eq('user_id', session.user.id);
+      .eq('name', catName);
     if (error) {
       console.error('Error deleting category from Supabase:', error);
       return false;
@@ -472,8 +483,7 @@ export async function deleteAccountFromSupabase(accName: string): Promise<boolea
     const { error } = await client
       .from('accounts')
       .delete()
-      .eq('name', accName)
-      .eq('user_id', session.user.id);
+      .eq('name', accName);
     if (error) {
       console.error('Error deleting account from Supabase:', error);
       return false;

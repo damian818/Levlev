@@ -1,6 +1,7 @@
 -- ==========================================
 -- FINLEV - SUPABASE DATABASE SCHEMA
 -- ==========================================
+
 -- Execute this SQL script in your Supabase SQL Editor
 -- to set up tables, indexes, and Row Level Security (RLS) for Google OAuth users.
 
@@ -17,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     currency TEXT NOT NULL DEFAULT 'ARS',
     category TEXT NOT NULL,
     account TEXT NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('INCOME', 'EXPENSE', 'TRANSFER')),
+    type TEXT NOT NULL CHECK (type IN ('INCOME', 'EXPENSE', 'TRANSFER', 'CC_PAYMENT')),
     to_account TEXT,
     installments INTEGER,
     installment_number INTEGER,
@@ -93,7 +94,26 @@ CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON public.accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_budgets_user_id ON public.budgets(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON public.user_settings(user_id);
 
--- 8. ROW LEVEL SECURITY (RLS) POLICIES
+-- 8. SECURITY DEFINER FUNCTION FOR WORKSPACE SHARING
+-- This function allows checking if a user has shared their workspace with the current user,
+-- bypassing RLS on user_settings so that we can evaluate policies correctly.
+CREATE OR REPLACE FUNCTION public.is_workspace_shared_with_me(owner_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.user_settings us
+        WHERE us.user_id = owner_id
+        AND jsonb_typeof(us.settings->'workspaceSharing'->'members') = 'array'
+        AND EXISTS (
+            SELECT 1 FROM jsonb_array_elements(us.settings->'workspaceSharing'->'members') AS member
+            WHERE member->>'email' = auth.jwt()->>'email'
+        )
+    );
+$$;
+
+-- 9. ROW LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
@@ -101,77 +121,97 @@ ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
 
 -- Transactions Policies
+DROP POLICY IF EXISTS "Users can select own or shared transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users can insert own or shared transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users can update own or shared transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users can delete own or shared transactions" ON public.transactions;
 DROP POLICY IF EXISTS "Users can select own transactions" ON public.transactions;
 DROP POLICY IF EXISTS "Users can insert own transactions" ON public.transactions;
 DROP POLICY IF EXISTS "Users can update own transactions" ON public.transactions;
 DROP POLICY IF EXISTS "Users can delete own transactions" ON public.transactions;
 
-CREATE POLICY "Users can select own transactions" ON public.transactions 
-    FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own transactions" ON public.transactions 
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own transactions" ON public.transactions 
-    FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own transactions" ON public.transactions 
-    FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can select own or shared transactions" ON public.transactions 
+    FOR SELECT USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can insert own or shared transactions" ON public.transactions 
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can update own or shared transactions" ON public.transactions 
+    FOR UPDATE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can delete own or shared transactions" ON public.transactions 
+    FOR DELETE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
 
 -- Categories Policies
+DROP POLICY IF EXISTS "Users can select own or shared categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can insert own or shared categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can update own or shared categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can delete own or shared categories" ON public.categories;
 DROP POLICY IF EXISTS "Users can select own categories" ON public.categories;
 DROP POLICY IF EXISTS "Users can insert own categories" ON public.categories;
 DROP POLICY IF EXISTS "Users can update own categories" ON public.categories;
 DROP POLICY IF EXISTS "Users can delete own categories" ON public.categories;
 
-CREATE POLICY "Users can select own categories" ON public.categories 
-    FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own categories" ON public.categories 
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own categories" ON public.categories 
-    FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own categories" ON public.categories 
-    FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can select own or shared categories" ON public.categories 
+    FOR SELECT USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can insert own or shared categories" ON public.categories 
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can update own or shared categories" ON public.categories 
+    FOR UPDATE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can delete own or shared categories" ON public.categories 
+    FOR DELETE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
 
 -- Accounts Policies
+DROP POLICY IF EXISTS "Users can select own or shared accounts" ON public.accounts;
+DROP POLICY IF EXISTS "Users can insert own or shared accounts" ON public.accounts;
+DROP POLICY IF EXISTS "Users can update own or shared accounts" ON public.accounts;
+DROP POLICY IF EXISTS "Users can delete own or shared accounts" ON public.accounts;
 DROP POLICY IF EXISTS "Users can select own accounts" ON public.accounts;
 DROP POLICY IF EXISTS "Users can insert own accounts" ON public.accounts;
 DROP POLICY IF EXISTS "Users can update own accounts" ON public.accounts;
 DROP POLICY IF EXISTS "Users can delete own accounts" ON public.accounts;
 
-CREATE POLICY "Users can select own accounts" ON public.accounts 
-    FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own accounts" ON public.accounts 
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own accounts" ON public.accounts 
-    FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own accounts" ON public.accounts 
-    FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can select own or shared accounts" ON public.accounts 
+    FOR SELECT USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can insert own or shared accounts" ON public.accounts 
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can update own or shared accounts" ON public.accounts 
+    FOR UPDATE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can delete own or shared accounts" ON public.accounts 
+    FOR DELETE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
 
 -- Budgets Policies
+DROP POLICY IF EXISTS "Users can select own or shared budgets" ON public.budgets;
+DROP POLICY IF EXISTS "Users can insert own or shared budgets" ON public.budgets;
+DROP POLICY IF EXISTS "Users can update own or shared budgets" ON public.budgets;
+DROP POLICY IF EXISTS "Users can delete own or shared budgets" ON public.budgets;
 DROP POLICY IF EXISTS "Users can select own budgets" ON public.budgets;
 DROP POLICY IF EXISTS "Users can insert own budgets" ON public.budgets;
 DROP POLICY IF EXISTS "Users can update own budgets" ON public.budgets;
 DROP POLICY IF EXISTS "Users can delete own budgets" ON public.budgets;
 
-CREATE POLICY "Users can select own budgets" ON public.budgets 
-    FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own budgets" ON public.budgets 
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own budgets" ON public.budgets 
-    FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own budgets" ON public.budgets 
-    FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can select own or shared budgets" ON public.budgets 
+    FOR SELECT USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can insert own or shared budgets" ON public.budgets 
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can update own or shared budgets" ON public.budgets 
+    FOR UPDATE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can delete own or shared budgets" ON public.budgets 
+    FOR DELETE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
 
 -- User Settings Policies
+DROP POLICY IF EXISTS "Users can select own or shared settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can insert own or shared settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can update own or shared settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can delete own or shared settings" ON public.user_settings;
 DROP POLICY IF EXISTS "Users can select own settings" ON public.user_settings;
 DROP POLICY IF EXISTS "Users can insert own settings" ON public.user_settings;
 DROP POLICY IF EXISTS "Users can update own settings" ON public.user_settings;
 DROP POLICY IF EXISTS "Users can delete own settings" ON public.user_settings;
 
-CREATE POLICY "Users can select own settings" ON public.user_settings 
-    FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own settings" ON public.user_settings 
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own settings" ON public.user_settings 
-    FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own settings" ON public.user_settings 
-    FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can select own or shared settings" ON public.user_settings 
+    FOR SELECT USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can insert own or shared settings" ON public.user_settings 
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can update own or shared settings" ON public.user_settings 
+    FOR UPDATE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can delete own or shared settings" ON public.user_settings 
+    FOR DELETE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
 
