@@ -26,6 +26,17 @@ import {
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from '../lib/supabase';
 import { LevLevLogo } from './LevLevLogo';
 
+// Helper for mobile tactile haptic feedback
+const triggerHaptic = (pattern: number | number[] = 12) => {
+  if (typeof window !== 'undefined' && 'navigator' in window && typeof navigator.vibrate === 'function') {
+    try {
+      navigator.vibrate(pattern);
+    } catch (e) {
+      // Ignore if unsupported
+    }
+  }
+};
+
 interface NavbarProps {
   currentTab: ViewTab;
   setTab: (tab: ViewTab) => void;
@@ -79,6 +90,7 @@ export function Navbar({
   }, []);
 
   const handleSsoClick = async () => {
+    triggerHaptic(10);
     if (user) {
       setTab('settings');
     } else {
@@ -90,6 +102,7 @@ export function Navbar({
   };
 
   const handleLogoutClick = async () => {
+    triggerHaptic(15);
     try {
       await signOutFromSupabase();
     } catch (e) {
@@ -114,14 +127,20 @@ export function Navbar({
 
   return (
     <>
-      <header className="bg-[#0f131a] border-b border-slate-800/80 sticky top-0 z-30 shadow-md backdrop-blur-md bg-opacity-95">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <header className="bg-[#0f131a] border-b border-slate-800/80 sticky top-0 z-30 shadow-md backdrop-blur-md bg-opacity-95 max-w-full overflow-x-hidden">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 max-w-full">
           
           {/* MAIN TOP BAR */}
           <div className="flex justify-between items-center h-16 sm:h-20 gap-2">
             
             {/* Left: Brand Logo */}
-            <button onClick={() => setTab('overview')} className="text-left focus:outline-none cursor-pointer group shrink-0 min-h-[44px] flex items-center">
+            <button 
+              onClick={() => {
+                triggerHaptic(10);
+                setTab('overview');
+              }} 
+              className="text-left focus:outline-none cursor-pointer group shrink-0 min-h-[44px] flex items-center"
+            >
               <LevLevLogo badgeText="GLOBAL" size="md" />
             </button>
 
@@ -130,7 +149,10 @@ export function Navbar({
               
               {/* DESKTOP "ADD TRANSACTION" BUTTON */}
               <button
-                onClick={onOpenAddModal}
+                onClick={() => {
+                  triggerHaptic([15, 30, 20]);
+                  onOpenAddModal();
+                }}
                 className="hidden lg:inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-950/50 border border-emerald-400/30 transition-all transform active:scale-95 shrink-0 cursor-pointer min-h-[44px]"
               >
                 <Plus className="w-4.5 h-4.5 text-emerald-100 stroke-[3]" />
@@ -141,7 +163,10 @@ export function Navbar({
               <div className="flex bg-[#161b22] p-1 rounded-xl border border-slate-800 shrink-0 items-center min-h-[44px]">
                 <select
                   value={displayCurrency}
-                  onChange={(e) => setDisplayCurrency(e.target.value)}
+                  onChange={(e) => {
+                    triggerHaptic(10);
+                    setDisplayCurrency(e.target.value as DisplayCurrency);
+                  }}
                   className="bg-[#0f131a] text-slate-200 text-xs font-bold px-2.5 py-2 rounded-lg border border-slate-700 focus:outline-none cursor-pointer hover:border-slate-600 transition-colors min-h-[36px]"
                   title="Select active view currency"
                 >
@@ -172,7 +197,10 @@ export function Navbar({
 
                 {/* Privacy Mode */}
                 <button
-                  onClick={onTogglePrivacyMode}
+                  onClick={() => {
+                    triggerHaptic(10);
+                    if (onTogglePrivacyMode) onTogglePrivacyMode();
+                  }}
                   className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shrink-0 active:scale-95 min-h-[44px] min-w-[44px] ${
                     privacyMode
                       ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-xs shadow-amber-950/50'
@@ -195,7 +223,10 @@ export function Navbar({
 
                 {/* Share Household */}
                 <button
-                  onClick={onOpenShareWorkspaceModal}
+                  onClick={() => {
+                    triggerHaptic(10);
+                    if (onOpenShareWorkspaceModal) onOpenShareWorkspaceModal();
+                  }}
                   className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shrink-0 active:scale-95 min-h-[44px] min-w-[44px] ${
                     isWorkspaceShared
                       ? 'bg-purple-500/20 border-purple-500/40 text-purple-300 shadow-xs shadow-purple-950/50'
@@ -211,7 +242,10 @@ export function Navbar({
 
                 {/* Import CSV */}
                 <button
-                  onClick={onOpenImportModal}
+                  onClick={() => {
+                    triggerHaptic(10);
+                    onOpenImportModal();
+                  }}
                   className="cursor-pointer inline-flex items-center justify-center px-3.5 py-2.5 border border-slate-800 rounded-xl text-xs font-medium text-slate-300 bg-[#161b22] hover:bg-slate-800 transition-colors shrink-0 min-h-[44px] min-w-[44px]"
                 >
                   <Upload className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
@@ -255,7 +289,10 @@ export function Navbar({
 
                 {/* Delete Data */}
                 <button
-                  onClick={onOpenDeleteModal}
+                  onClick={() => {
+                    triggerHaptic(15);
+                    onOpenDeleteModal();
+                  }}
                   title="Delete data"
                   className="p-2.5 text-rose-500/60 hover:text-rose-400 transition-colors rounded-xl hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 min-h-[44px] min-w-[44px] flex items-center justify-center"
                 >
@@ -265,7 +302,10 @@ export function Navbar({
 
               {/* MOBILE TOOLS MENU TOGGLE BUTTON */}
               <button
-                onClick={() => setMobileToolsOpen(prev => !prev)}
+                onClick={() => {
+                  triggerHaptic(12);
+                  setMobileToolsOpen(prev => !prev);
+                }}
                 className={`lg:hidden p-2.5 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${
                   mobileToolsOpen
                     ? 'bg-slate-800 text-white border-slate-600'
@@ -305,6 +345,7 @@ export function Navbar({
                 {/* Privacy Mode Toggle */}
                 <button
                   onClick={() => {
+                    triggerHaptic(10);
                     if (onTogglePrivacyMode) onTogglePrivacyMode();
                   }}
                   className={`flex items-center justify-center gap-2 p-2.5 rounded-xl font-bold border transition-all min-h-[44px] ${
@@ -320,6 +361,7 @@ export function Navbar({
                 {/* Share Household */}
                 <button
                   onClick={() => {
+                    triggerHaptic(10);
                     if (onOpenShareWorkspaceModal) onOpenShareWorkspaceModal();
                     setMobileToolsOpen(false);
                   }}
@@ -336,6 +378,7 @@ export function Navbar({
                 {/* Import CSV */}
                 <button
                   onClick={() => {
+                    triggerHaptic(10);
                     onOpenImportModal();
                     setMobileToolsOpen(false);
                   }}
@@ -348,6 +391,7 @@ export function Navbar({
                 {/* Google SSO Login / Account */}
                 <button
                   onClick={() => {
+                    triggerHaptic(10);
                     handleSsoClick();
                     setMobileToolsOpen(false);
                   }}
@@ -366,6 +410,7 @@ export function Navbar({
                 {user || onLogout ? (
                   <button
                     onClick={() => {
+                      triggerHaptic(15);
                       handleLogoutClick();
                       setMobileToolsOpen(false);
                     }}
@@ -378,6 +423,7 @@ export function Navbar({
 
                 <button
                   onClick={() => {
+                    triggerHaptic(15);
                     onOpenDeleteModal();
                     setMobileToolsOpen(false);
                   }}
@@ -397,7 +443,10 @@ export function Navbar({
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setTab(tab.id)}
+                  onClick={() => {
+                    triggerHaptic(10);
+                    setTab(tab.id);
+                  }}
                   className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer min-h-[44px] min-w-[44px] shrink-0 active:scale-95 ${
                     isActive
                       ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
@@ -414,11 +463,12 @@ export function Navbar({
       </header>
 
       {/* MOBILE BOTTOM-DOCKED NAVIGATION BAR */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c0e14]/95 backdrop-blur-xl border-t border-slate-800/90 shadow-2xl px-2 py-1.5 pb-safe flex items-center justify-around">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c0e14]/95 backdrop-blur-xl border-t border-slate-800/90 shadow-2xl px-2 py-1.5 pb-safe flex items-center justify-around max-w-full overflow-x-hidden">
         
         {/* 1. Overview */}
         <button
           onClick={() => {
+            triggerHaptic(12);
             setTab('overview');
             setMoreMenuOpen(false);
           }}
@@ -435,6 +485,7 @@ export function Navbar({
         {/* 2. Transactions */}
         <button
           onClick={() => {
+            triggerHaptic(12);
             setTab('transactions');
             setMoreMenuOpen(false);
           }}
@@ -448,9 +499,10 @@ export function Navbar({
           <span className="text-[10px] mt-0.5 tracking-tight font-semibold">Txs</span>
         </button>
 
-        {/* 3. CENTER PROMINENT FLOATING "+ NEW TRANSACTION" ACTION BUTTON */}
+        {/* 3. CENTER PROMINENT FLOATING "+ NEW TRANSACTION" ACTION BUTTON WITH DISTINCT HAPTIC FEEDBACK */}
         <button
           onClick={() => {
+            triggerHaptic([15, 30, 20]);
             onOpenAddModal();
             setMoreMenuOpen(false);
           }}
@@ -463,6 +515,7 @@ export function Navbar({
         {/* 4. Accounts */}
         <button
           onClick={() => {
+            triggerHaptic(12);
             setTab('accounts');
             setMoreMenuOpen(false);
           }}
@@ -478,7 +531,10 @@ export function Navbar({
 
         {/* 5. More Tabs Menu Drawer Trigger */}
         <button
-          onClick={() => setMoreMenuOpen(prev => !prev)}
+          onClick={() => {
+            triggerHaptic(12);
+            setMoreMenuOpen(prev => !prev);
+          }}
           className={`flex flex-col items-center justify-center min-h-[48px] min-w-[56px] px-2 py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
             moreMenuOpen || !['overview', 'transactions', 'accounts'].includes(currentTab)
               ? 'text-emerald-400 font-extrabold'
@@ -492,12 +548,15 @@ export function Navbar({
 
       {/* MOBILE ALL TABS DRAWER / SHEET */}
       {moreMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 max-w-full overflow-x-hidden">
           <div 
             className="fixed inset-0" 
-            onClick={() => setMoreMenuOpen(false)} 
+            onClick={() => {
+              triggerHaptic(10);
+              setMoreMenuOpen(false);
+            }} 
           />
-          <div className="relative z-10 bg-[#121620] border-t border-slate-800 rounded-t-3xl p-5 shadow-2xl space-y-4 animate-in slide-in-from-bottom-5 duration-200 max-h-[80vh] overflow-y-auto">
+          <div className="relative z-10 bg-[#121620] border-t border-slate-800 rounded-t-3xl p-5 shadow-2xl space-y-4 animate-in slide-in-from-bottom-5 duration-200 max-h-[80vh] overflow-y-auto max-w-full">
             
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
@@ -505,7 +564,10 @@ export function Navbar({
                 <h3 className="font-extrabold text-white text-base">All Views & Modules</h3>
               </div>
               <button 
-                onClick={() => setMoreMenuOpen(false)}
+                onClick={() => {
+                  triggerHaptic(10);
+                  setMoreMenuOpen(false);
+                }}
                 className="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800/60 min-h-[44px] min-w-[44px] flex items-center justify-center"
               >
                 <X className="w-5 h-5" />
@@ -519,6 +581,7 @@ export function Navbar({
                   <button
                     key={tab.id}
                     onClick={() => {
+                      triggerHaptic(12);
                       setTab(tab.id);
                       setMoreMenuOpen(false);
                     }}

@@ -567,7 +567,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0b0d] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen max-w-full overflow-x-hidden bg-[#0a0b0d] text-slate-100 flex flex-col font-sans">
       <Navbar
         currentTab={currentTab}
         setTab={(tab) => {
@@ -589,7 +589,7 @@ export default function App() {
         onLogout={handleLogout}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 lg:pb-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 pb-28 lg:pb-8 max-w-full overflow-x-hidden">
         {currentTab === 'overview' && (
           <OverviewTab
             transactions={transactions}
