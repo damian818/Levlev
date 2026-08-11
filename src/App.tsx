@@ -292,6 +292,45 @@ export default function App() {
         if (data.categories && data.categories.length > 0) setCategories(data.categories);
         if (data.accounts && data.accounts.length > 0) setAccounts(data.accounts);
         setBudgets(data.budgets || []);
+
+        if (data.settings) {
+          if (data.settings.ccPeriodStatuses) {
+            setPeriodStatusOverrides(data.settings.ccPeriodStatuses);
+            try {
+              localStorage.setItem('finance_app_cc_period_statuses', JSON.stringify(data.settings.ccPeriodStatuses));
+            } catch (e) {}
+          }
+          if (data.settings.customBalances) {
+            setCustomBalances(data.settings.customBalances);
+            try {
+              localStorage.setItem('finance_app_account_balances', JSON.stringify(data.settings.customBalances));
+            } catch (e) {}
+          }
+          if (data.settings.ccRulesMap) {
+            try {
+              localStorage.setItem('finance_app_cc_rules', JSON.stringify(data.settings.ccRulesMap));
+            } catch (e) {}
+          }
+          if (data.settings.ccMap) {
+            try {
+              localStorage.setItem('finance_app_cc_map', JSON.stringify(data.settings.ccMap));
+            } catch (e) {}
+          }
+          if (data.settings.workspaceSharing) {
+            if (data.settings.workspaceSharing.isShared !== undefined) {
+              setIsWorkspaceShared(data.settings.workspaceSharing.isShared);
+              try {
+                localStorage.setItem('finance_app_workspace_is_shared', String(data.settings.workspaceSharing.isShared));
+              } catch (e) {}
+            }
+            if (data.settings.workspaceSharing.members) {
+              setWorkspaceMembers(data.settings.workspaceSharing.members);
+              try {
+                localStorage.setItem('finance_app_workspace_members', JSON.stringify(data.settings.workspaceSharing.members));
+              } catch (e) {}
+            }
+          }
+        }
       }
     } catch (err) {
       console.warn('Failed to fetch user data from Supabase:', err);
@@ -462,10 +501,23 @@ export default function App() {
   useEffect(() => {
     if (!authUser || !hasInitialSynced) return;
     const timer = setTimeout(() => {
-      saveAllUserDataToSupabase({ transactions, categories, accounts, budgets });
+      saveAllUserDataToSupabase({
+        transactions,
+        categories,
+        accounts,
+        budgets,
+        settings: {
+          ccPeriodStatuses: periodStatusOverrides,
+          customBalances,
+          workspaceSharing: {
+            isShared: isWorkspaceShared,
+            members: workspaceMembers,
+          },
+        },
+      });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [transactions, categories, accounts, budgets, authUser, hasInitialSynced]);
+  }, [transactions, categories, accounts, budgets, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, authUser, hasInitialSynced]);
 
   if (authLoading) {
     return (
@@ -653,6 +705,7 @@ export default function App() {
             onReassignTransactionPeriod={handleReassignTransactionPeriod}
             onUpdateAccountSharing={handleUpdateAccountSharing}
             onEditAccount={handleEditAccount}
+            onAddAccount={handleAddAccount}
           />
         )}
         {currentTab === 'reports' && (

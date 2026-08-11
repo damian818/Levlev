@@ -1,12 +1,33 @@
 import { Transaction, DisplayCurrency, RecurringRule, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem, AccountCustomBalance } from '../types';
 
-export function isCreditCardAccount(accountName: string, customCCMap?: Record<string, boolean>): boolean {
-  if (customCCMap && customCCMap[accountName] !== undefined) {
+export function isCreditCardAccount(
+  accountName: string, 
+  customCCMap?: Record<string, boolean> | AccountItem[],
+  accountsList?: AccountItem[]
+): boolean {
+  const normName = (accountName || '').toLowerCase().trim();
+
+  // 1. If customCCMap is an array of AccountItem
+  if (Array.isArray(customCCMap)) {
+    const match = customCCMap.find(a => (a.name || '').toLowerCase().trim() === normName);
+    if (match && match.type) {
+      return match.type === 'CREDIT_CARD';
+    }
+  } else if (customCCMap && typeof customCCMap === 'object' && customCCMap[accountName] !== undefined) {
     return customCCMap[accountName];
   }
-  const nameLower = (accountName || '').toLowerCase();
+
+  // 2. If accountsList is provided
+  if (accountsList && Array.isArray(accountsList)) {
+    const match = accountsList.find(a => (a.name || '').toLowerCase().trim() === normName);
+    if (match && match.type) {
+      return match.type === 'CREDIT_CARD';
+    }
+  }
+
+  // 3. Fallback keyword search
   const keywords = ['visa', 'master', 'tarjeta', 'tc', 'credit', 'amex', 'naranja', 'comafi', 'caball', 'american express'];
-  return keywords.some(kw => nameLower.includes(kw));
+  return keywords.some(kw => normName.includes(kw));
 }
 
 /**

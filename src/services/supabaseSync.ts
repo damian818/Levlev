@@ -1,11 +1,21 @@
 import { getSupabaseClient } from '../lib/supabase';
-import { Transaction, CategoryItem, AccountItem, BudgetGoal } from '../types';
+import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember } from '../types';
 
 export interface SupabaseUserData {
   transactions: Transaction[];
   categories: CategoryItem[];
   accounts: AccountItem[];
   budgets: BudgetGoal[];
+  settings?: {
+    ccRulesMap?: Record<string, CreditCardClosingRule>;
+    ccMap?: Record<string, boolean>;
+    ccPeriodStatuses?: Record<string, 'PAID' | 'OPEN'>;
+    customBalances?: Record<string, AccountCustomBalance>;
+    workspaceSharing?: {
+      isShared?: boolean;
+      members?: SharedMember[];
+    };
+  };
 }
 
 export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | null> {
@@ -16,15 +26,30 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
   if (!session?.user) return null;
 
   try {
-    const [catRes, accRes, budRes] = await Promise.all([
+    const [catRes, accRes, budRes, setRes] = await Promise.all([
       client.from('categories').select('*'),
       client.from('accounts').select('*'),
       client.from('budgets').select('*'),
+      client.from('user_settings').select('*').eq('user_id', session.user.id).maybeSingle(),
     ]);
 
     if (catRes.error) console.warn('Supabase fetch categories error:', catRes.error);
     if (accRes.error) console.warn('Supabase fetch accounts error:', accRes.error);
     if (budRes.error) console.warn('Supabase fetch budgets error:', budRes.error);
+
+    let userSettings: SupabaseUserData['settings'] = undefined;
+    if (setRes && setRes.data && setRes.data.settings) {
+      try {
+        userSettings = typeof setRes.data.settings === 'string'
+          ? JSON.parse(setRes.data.settings)
+          : setRes.data.settings;
+      } catch (e) {
+        console.warn('Error parsing user_settings from Supabase:', e);
+      }
+    }
+
+    const ccRulesMap = userSettings?.ccRulesMap || {};
+    const ccMap = userSettings?.ccMap || {};
 
     // Fetch transactions in paginated chunks of 1000 to bypass PostgREST max row limit
     let rawTxRows: any[] = [];
@@ -84,22 +109,46 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       description: row.color || '#64748b',
     }));
 
-    const accounts: AccountItem[] = (accRes.data || []).map((row: any) => ({
-      id: row.id || `acc-${Math.random().toString(36).substring(2)}`,
-      name: row.name || 'Account',
-      type: row.type || 'CHECKING',
-      currency: row.currency || 'ARS',
-      initialBalance: (row.initial_balance !== undefined && row.initial_balance !== null) ? Number(row.initial_balance) : 0,
-      isShared: row.is_shared || false,
-      sharedMembers: Array.isArray(row.shared_members) ? row.shared_members : [],
-    }));
+    const accounts: AccountItem[] = (accRes.data || []).map((row: any) => {
+      let closingRule: CreditCardClosingRule | undefined = undefined;
+      if (row.closing_rule) {
+        try {
+          closingRule = typeof row.closing_rule === 'string' ? JSON.parse(row.closing_rule) : row.closing_rule;
+        } catch (e) {
+          console.warn('Error parsing closing_rule on account row:', e);
+        }
+      }
+      if (!closingRule && ccRulesMap[row.name]) {
+        closingRule = ccRulesMap[row.name];
+      }
+
+      let accType = row.type || 'CHECKING';
+      if (ccMap[row.name] !== undefined) {
+        if (ccMap[row.name] === true) {
+          accType = 'CREDIT_CARD';
+        } else if (ccMap[row.name] === false && accType === 'CREDIT_CARD') {
+          accType = 'CHECKING';
+        }
+      }
+
+      return {
+        id: row.id || `acc-${Math.random().toString(36).substring(2)}`,
+        name: row.name || 'Account',
+        type: accType,
+        currency: row.currency || 'ARS',
+        initialBalance: (row.initial_balance !== undefined && row.initial_balance !== null) ? Number(row.initial_balance) : 0,
+        isShared: row.is_shared || false,
+        sharedMembers: Array.isArray(row.shared_members) ? row.shared_members : [],
+        closingRule,
+      };
+    });
 
     const budgets: BudgetGoal[] = (budRes.data || []).map((row: any) => ({
       category: row.category || 'General',
       monthlyLimitARS: Number(row.monthly_limit) || 0,
     }));
 
-    return { transactions, categories, accounts, budgets };
+    return { transactions, categories, accounts, budgets, settings: userSettings };
   } catch (err) {
     console.error('Error fetching data from Supabase:', err);
     return null;
@@ -182,11 +231,19 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           initial_balance: a.initialBalance || 0,
           is_shared: a.isShared || false,
           shared_members: a.sharedMembers || [],
+          closing_rule: a.closingRule ? a.closingRule : null,
         };
       });
 
       const { error: accErr } = await client.from('accounts').upsert(accRows, { onConflict: 'id' });
-      if (accErr) console.error('Error upserting accounts to Supabase:', accErr);
+      if (accErr) {
+        console.error('Error upserting accounts to Supabase:', accErr);
+        // Fallback if closing_rule column does not exist on target database
+        if (accErr.message?.includes('closing_rule') || accErr.code === 'PGRST204') {
+          const fallbackAccRows = accRows.map(({ closing_rule, ...rest }) => rest);
+          await client.from('accounts').upsert(fallbackAccRows, { onConflict: 'id' });
+        }
+      }
     }
 
     // 4. Budgets upsert or clear
@@ -204,6 +261,40 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
     } else if (data.budgets && data.budgets.length === 0) {
       const { error: delBudErr } = await client.from('budgets').delete().eq('user_id', userId);
       if (delBudErr) console.error('Error clearing budgets in Supabase:', delBudErr);
+    }
+
+    // 5. User Settings upsert (CC Rules, CC Classification map, Period Statuses, Custom Balances)
+    const ccRulesMapFromAccs: Record<string, CreditCardClosingRule> = {};
+    const ccMapFromAccs: Record<string, boolean> = {};
+
+    (data.accounts || []).forEach(a => {
+      if (a.closingRule) {
+        ccRulesMapFromAccs[a.name] = a.closingRule;
+      }
+      ccMapFromAccs[a.name] = a.type === 'CREDIT_CARD';
+    });
+
+    const settingsObj = {
+      ccRulesMap: { ...ccRulesMapFromAccs, ...(data.settings?.ccRulesMap || {}) },
+      ccMap: { ...ccMapFromAccs, ...(data.settings?.ccMap || {}) },
+      ccPeriodStatuses: data.settings?.ccPeriodStatuses || {},
+      customBalances: data.settings?.customBalances || {},
+      workspaceSharing: data.settings?.workspaceSharing || {},
+    };
+
+    try {
+      const { error: setErr } = await client.from('user_settings').upsert({
+        id: `${userId}_settings`,
+        user_id: userId,
+        settings: settingsObj,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+      if (setErr) {
+        console.warn('User settings sync note (user_settings table):', setErr.message);
+      }
+    } catch (e) {
+      console.warn('user_settings table sync catch:', e);
     }
 
     return true;

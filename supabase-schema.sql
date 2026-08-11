@@ -50,8 +50,12 @@ CREATE TABLE IF NOT EXISTS public.accounts (
     currency TEXT NOT NULL DEFAULT 'ARS',
     color TEXT NOT NULL DEFAULT '#3b82f6',
     initial_balance NUMERIC DEFAULT 0,
+    closing_rule JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Ensure closing_rule column exists on existing accounts table if created previously
+ALTER TABLE public.accounts ADD COLUMN IF NOT EXISTS closing_rule JSONB;
 
 -- 5. BUDGETS TABLE
 CREATE TABLE IF NOT EXISTS public.budgets (
@@ -63,20 +67,35 @@ CREATE TABLE IF NOT EXISTS public.budgets (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 6. INDEXES FOR HIGH-PERFORMANCE QUERIES
+-- 6. USER SETTINGS TABLE (Stores preferences, credit card period statuses, closing rules map)
+CREATE TABLE IF NOT EXISTS public.user_settings (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 7. INDEXES FOR HIGH-PERFORMANCE QUERIES
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions(date);
 CREATE INDEX IF NOT EXISTS idx_categories_user_id ON public.categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON public.accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_budgets_user_id ON public.budgets(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON public.user_settings(user_id);
 
--- 7. ROW LEVEL SECURITY (RLS) POLICIES
+-- 8. ROW LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
 
 -- Transactions Policies
+DROP POLICY IF EXISTS "Users can select own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users can insert own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users can update own transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Users can delete own transactions" ON public.transactions;
+
 CREATE POLICY "Users can select own transactions" ON public.transactions 
     FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own transactions" ON public.transactions 
@@ -87,6 +106,11 @@ CREATE POLICY "Users can delete own transactions" ON public.transactions
     FOR DELETE USING (auth.uid() = user_id);
 
 -- Categories Policies
+DROP POLICY IF EXISTS "Users can select own categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can insert own categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can update own categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can delete own categories" ON public.categories;
+
 CREATE POLICY "Users can select own categories" ON public.categories 
     FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own categories" ON public.categories 
@@ -97,6 +121,11 @@ CREATE POLICY "Users can delete own categories" ON public.categories
     FOR DELETE USING (auth.uid() = user_id);
 
 -- Accounts Policies
+DROP POLICY IF EXISTS "Users can select own accounts" ON public.accounts;
+DROP POLICY IF EXISTS "Users can insert own accounts" ON public.accounts;
+DROP POLICY IF EXISTS "Users can update own accounts" ON public.accounts;
+DROP POLICY IF EXISTS "Users can delete own accounts" ON public.accounts;
+
 CREATE POLICY "Users can select own accounts" ON public.accounts 
     FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own accounts" ON public.accounts 
@@ -107,6 +136,11 @@ CREATE POLICY "Users can delete own accounts" ON public.accounts
     FOR DELETE USING (auth.uid() = user_id);
 
 -- Budgets Policies
+DROP POLICY IF EXISTS "Users can select own budgets" ON public.budgets;
+DROP POLICY IF EXISTS "Users can insert own budgets" ON public.budgets;
+DROP POLICY IF EXISTS "Users can update own budgets" ON public.budgets;
+DROP POLICY IF EXISTS "Users can delete own budgets" ON public.budgets;
+
 CREATE POLICY "Users can select own budgets" ON public.budgets 
     FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own budgets" ON public.budgets 
@@ -115,3 +149,19 @@ CREATE POLICY "Users can update own budgets" ON public.budgets
     FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own budgets" ON public.budgets 
     FOR DELETE USING (auth.uid() = user_id);
+
+-- User Settings Policies
+DROP POLICY IF EXISTS "Users can select own settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can insert own settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can update own settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can delete own settings" ON public.user_settings;
+
+CREATE POLICY "Users can select own settings" ON public.user_settings 
+    FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own settings" ON public.user_settings 
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own settings" ON public.user_settings 
+    FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own settings" ON public.user_settings 
+    FOR DELETE USING (auth.uid() = user_id);
+

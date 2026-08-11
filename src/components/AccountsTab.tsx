@@ -23,6 +23,7 @@ interface AccountsTabProps {
   onReassignTransactionPeriod?: (txId: string, statementCloseDate: string | undefined) => void;
   onUpdateAccountSharing?: (accName: string, isShared: boolean, sharedMembers: SharedMember[]) => void;
   onEditAccount?: (oldName: string, updatedAcc: AccountItem, updateTransactions: boolean) => void;
+  onAddAccount?: (newAcc: AccountItem) => void;
 }
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
@@ -32,7 +33,7 @@ export function AccountsTab({
   displayCurrency,
   usdArsRate,
   customBalances,
-  accounts,
+  accounts = [],
   periodStatusOverrides,
   isWorkspaceShared = false,
   workspaceMembersCount = 0,
@@ -44,6 +45,7 @@ export function AccountsTab({
   onReassignTransactionPeriod,
   onUpdateAccountSharing,
   onEditAccount,
+  onAddAccount,
 }: AccountsTabProps) {
   const [editingAccount, setEditingAccount] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -92,11 +94,25 @@ export function AccountsTab({
   };
 
   const toggleAccountClassification = (accName: string, currentIsCC: boolean) => {
-    const updated = { ...customCCMap, [accName]: !currentIsCC };
+    const nextIsCC = !currentIsCC;
+    const updated = { ...customCCMap, [accName]: nextIsCC };
     setCustomCCMap(updated);
     try {
       localStorage.setItem('finance_app_cc_map', JSON.stringify(updated));
     } catch (e) {}
+
+    const existingAcc = accounts.find(a => a.name.toLowerCase() === accName.toLowerCase());
+    if (existingAcc && onEditAccount) {
+      onEditAccount(existingAcc.name, { ...existingAcc, type: nextIsCC ? 'CREDIT_CARD' : 'CHECKING' }, false);
+    } else if (onAddAccount) {
+      onAddAccount({
+        id: `acc-${Date.now()}`,
+        name: accName,
+        type: nextIsCC ? 'CREDIT_CARD' : 'CHECKING',
+        currency: accName.toLowerCase().includes('usd') ? 'USD' : 'ARS',
+        closingRule: ccRulesMap[accName] || { ruleType: 'FIXED_DAY', fixedDay: 25 },
+      });
+    }
   };
 
   // Calculate account summaries using central financeUtils helper
@@ -111,7 +127,7 @@ export function AccountsTab({
     const currentARS = summary.balanceARS;
     const currentUSD = summary.balanceUSD;
 
-    const isCC = isCreditCardAccount(name, customCCMap);
+    const isCC = isCreditCardAccount(name, customCCMap, accounts);
     const accountRule = ccRulesMap[name] || { ruleType: 'FIXED_DAY', fixedDay: 25 };
 
     // If it's a credit card, compute statement summary based on current date & time
