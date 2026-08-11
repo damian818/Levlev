@@ -22,6 +22,7 @@ interface AccountsTabProps {
   onAddTransaction: (tx: Transaction) => void;
   onReassignTransactionPeriod?: (txId: string, statementCloseDate: string | undefined) => void;
   onUpdateAccountSharing?: (accName: string, isShared: boolean, sharedMembers: SharedMember[]) => void;
+  onEditAccount?: (oldName: string, updatedAcc: AccountItem, updateTransactions: boolean) => void;
 }
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
@@ -42,6 +43,7 @@ export function AccountsTab({
   onAddTransaction,
   onReassignTransactionPeriod,
   onUpdateAccountSharing,
+  onEditAccount,
 }: AccountsTabProps) {
   const [editingAccount, setEditingAccount] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -63,11 +65,17 @@ export function AccountsTab({
 
   // Credit Card closing rules map
   const [ccRulesMap, setCcRulesMap] = useState<Record<string, CreditCardClosingRule>>(() => {
+    let map: Record<string, CreditCardClosingRule> = {};
     try {
       const saved = localStorage.getItem('finance_app_cc_rules');
-      if (saved) return JSON.parse(saved);
+      if (saved) map = JSON.parse(saved);
     } catch (e) {}
-    return {};
+    accounts?.forEach(acc => {
+      if (acc.closingRule && !map[acc.name]) {
+        map[acc.name] = acc.closingRule;
+      }
+    });
+    return map;
   });
 
   const handleSaveCcRule = (accName: string, rule: CreditCardClosingRule) => {
@@ -76,6 +84,11 @@ export function AccountsTab({
     try {
       localStorage.setItem('finance_app_cc_rules', JSON.stringify(updated));
     } catch (e) {}
+
+    const existingAcc = accounts.find(a => a.name.toLowerCase() === accName.toLowerCase());
+    if (existingAcc && onEditAccount) {
+      onEditAccount(existingAcc.name, { ...existingAcc, closingRule: rule }, false);
+    }
   };
 
   const toggleAccountClassification = (accName: string, currentIsCC: boolean) => {

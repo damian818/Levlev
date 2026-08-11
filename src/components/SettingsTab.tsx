@@ -417,49 +417,49 @@ export function SettingsTab({
         </div>
 
         {/* Sub Navigation */}
-        <div className="flex bg-[#0f131a] p-1.5 rounded-xl border border-slate-800 gap-1 self-start md:self-auto">
+        <div className="flex max-w-full overflow-x-auto scrollbar-none bg-[#0f131a] p-1.5 rounded-xl border border-slate-800 gap-1 self-start md:self-auto w-full md:w-auto">
           <button
             onClick={() => setActiveSubTab('accounts')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all shrink-0 whitespace-nowrap ${
               activeSubTab === 'accounts'
                 ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
-            <Wallet className="w-4 h-4 text-emerald-400" />
+            <Wallet className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>Accounts ({accounts.length})</span>
           </button>
           <button
             onClick={() => setActiveSubTab('categories')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all shrink-0 whitespace-nowrap ${
               activeSubTab === 'categories'
                 ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
-            <Tag className="w-4 h-4 text-indigo-400" />
+            <Tag className="w-4 h-4 text-indigo-400 shrink-0" />
             <span>Categories ({categories.length})</span>
           </button>
           <button
             onClick={() => setActiveSubTab('preferences')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all shrink-0 whitespace-nowrap ${
               activeSubTab === 'preferences'
                 ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
-            <Sliders className="w-4 h-4 text-amber-400" />
+            <Sliders className="w-4 h-4 text-amber-400 shrink-0" />
             <span>Preferences & Data</span>
           </button>
           <button
             onClick={() => setActiveSubTab('sharing')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all shrink-0 whitespace-nowrap ${
               activeSubTab === 'sharing'
                 ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
-            <Users className="w-4 h-4 text-purple-400" />
+            <Users className="w-4 h-4 text-purple-400 shrink-0" />
             <span>Household Sharing</span>
           </button>
         </div>
@@ -993,8 +993,8 @@ export function SettingsTab({
 
       {/* ==================== ADD CATEGORY MODAL ==================== */}
       {isAddCatOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-4 sm:p-6 max-w-md max-w-[calc(100vw-2rem)] w-full space-y-5 shadow-2xl animate-in fade-in zoom-in-95 my-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                 <Tag className="w-4 h-4 text-indigo-400" />
@@ -1023,7 +1023,7 @@ export function SettingsTab({
                 <select
                   value={catTypeInput}
                   onChange={(e) => setCatTypeInput(e.target.value as 'EXPENSE' | 'INCOME' | 'BOTH')}
-                  className="w-full px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-indigo-500"
                 >
                   <option value="EXPENSE">EXPENSE (Gasto)</option>
                   <option value="INCOME">INCOME (Ingreso)</option>
@@ -1053,8 +1053,8 @@ export function SettingsTab({
 
       {/* ==================== EDIT CATEGORY MODAL ==================== */}
       {editingCat && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-4 sm:p-6 max-w-md max-w-[calc(100vw-2rem)] w-full space-y-5 shadow-2xl animate-in fade-in zoom-in-95 my-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-indigo-400" />
@@ -1082,7 +1082,7 @@ export function SettingsTab({
                 <select
                   value={catTypeInput}
                   onChange={(e) => setCatTypeInput(e.target.value as 'EXPENSE' | 'INCOME' | 'BOTH')}
-                  className="w-full px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-indigo-500"
                 >
                   <option value="EXPENSE">EXPENSE</option>
                   <option value="INCOME">INCOME</option>
@@ -1125,8 +1125,8 @@ export function SettingsTab({
 
       {/* ==================== DELETE CATEGORY CONFIRMATION ==================== */}
       {deletingCatName && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-4 sm:p-6 max-w-md max-w-[calc(100vw-2rem)] w-full space-y-5 shadow-2xl animate-in fade-in zoom-in-95 my-auto">
             <div className="flex items-center gap-3 text-rose-400">
               <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl">
                 <AlertTriangle className="w-6 h-6" />
@@ -1144,7 +1144,7 @@ export function SettingsTab({
                 <select
                   value={reassignCatTo}
                   onChange={(e) => setReassignCatTo(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none"
+                  className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none"
                 >
                   {categories.filter(c => c.name !== deletingCatName).map(c => (
                     <option key={c.id} value={c.name}>{c.name}</option>
@@ -1175,8 +1175,8 @@ export function SettingsTab({
 
       {/* ==================== ADD ACCOUNT MODAL ==================== */}
       {isAddAccOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-4 sm:p-6 max-w-md max-w-[calc(100vw-2rem)] w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto my-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                 <Wallet className="w-4 h-4 text-emerald-400" />
@@ -1200,13 +1200,13 @@ export function SettingsTab({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Type</label>
                   <select
                     value={accTypeInput}
                     onChange={(e) => setAccTypeInput(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500"
+                    className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500"
                   >
                     <option value="CHECKING">Checking / Bank</option>
                     <option value="SAVINGS">Savings Account</option>
@@ -1222,7 +1222,7 @@ export function SettingsTab({
                   <select
                     value={accCurrencyInput}
                     onChange={(e) => setAccCurrencyInput(e.target.value as 'ARS' | 'USD')}
-                    className="w-full px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500"
+                    className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500"
                   >
                     <option value="ARS">ARS ($)</option>
                     <option value="USD">USD ($)</option>
@@ -1253,12 +1253,12 @@ export function SettingsTab({
                     <select
                       value={accRuleTypeInput}
                       onChange={(e) => setAccRuleTypeInput(e.target.value as ClosingRuleType)}
-                      className="w-full px-2.5 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
+                      className="w-full max-w-full truncate px-2.5 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
                     >
                       <option value="FIXED_DAY">Fixed Day of Month (e.g. 25th)</option>
                       <option value="LAST_WEEKDAY">Last Weekday of Month</option>
-                      <option value="PREVIOUS_TO_LAST_WEEKDAY">Previous to Last Weekday of Month</option>
-                      <option value="NTH_WEEKDAY">Nth Weekday of Month (e.g. 4th Thursday)</option>
+                      <option value="PREVIOUS_TO_LAST_WEEKDAY">Previous to Last Weekday</option>
+                      <option value="NTH_WEEKDAY">Nth Weekday of Month (e.g. 4th Thu)</option>
                     </select>
                   </div>
 
@@ -1283,7 +1283,7 @@ export function SettingsTab({
                         <select
                           value={accNthInput}
                           onChange={(e) => setAccNthInput(parseInt(e.target.value) || 1)}
-                          className="w-full px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
+                          className="w-full max-w-full truncate px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
                         >
                           <option value={1}>1st</option>
                           <option value={2}>2nd</option>
@@ -1296,7 +1296,7 @@ export function SettingsTab({
                         <select
                           value={accWeekdayInput}
                           onChange={(e) => setAccWeekdayInput(parseInt(e.target.value) || 4)}
-                          className="w-full px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
+                          className="w-full max-w-full truncate px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
                         >
                           <option value={1}>Monday</option>
                           <option value={2}>Tuesday</option>
@@ -1332,14 +1332,14 @@ export function SettingsTab({
 
       {/* ==================== EDIT ACCOUNT MODAL ==================== */}
       {editingAcc && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-4 sm:p-6 max-w-md max-w-[calc(100vw-2rem)] w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto my-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-emerald-400" />
-                <span>Edit Account "{editingAcc.name}"</span>
+                <span className="truncate">Edit Account "{editingAcc.name}"</span>
               </h3>
-              <button onClick={() => setEditingAcc(null)} className="text-slate-400 hover:text-slate-200">
+              <button onClick={() => setEditingAcc(null)} className="text-slate-400 hover:text-slate-200 shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1356,13 +1356,13 @@ export function SettingsTab({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Type</label>
                   <select
                     value={accTypeInput}
                     onChange={(e) => setAccTypeInput(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500"
+                    className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500"
                   >
                     <option value="CHECKING">Checking / Bank</option>
                     <option value="SAVINGS">Savings Account</option>
@@ -1378,7 +1378,7 @@ export function SettingsTab({
                   <select
                     value={accCurrencyInput}
                     onChange={(e) => setAccCurrencyInput(e.target.value as 'ARS' | 'USD')}
-                    className="w-full px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500"
+                    className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500"
                   >
                     <option value="ARS">ARS ($)</option>
                     <option value="USD">USD ($)</option>
@@ -1409,12 +1409,12 @@ export function SettingsTab({
                     <select
                       value={accRuleTypeInput}
                       onChange={(e) => setAccRuleTypeInput(e.target.value as ClosingRuleType)}
-                      className="w-full px-2.5 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
+                      className="w-full max-w-full truncate px-2.5 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
                     >
                       <option value="FIXED_DAY">Fixed Day of Month (e.g. 25th)</option>
                       <option value="LAST_WEEKDAY">Last Weekday of Month</option>
-                      <option value="PREVIOUS_TO_LAST_WEEKDAY">Previous to Last Weekday of Month</option>
-                      <option value="NTH_WEEKDAY">Nth Weekday of Month (e.g. 4th Thursday)</option>
+                      <option value="PREVIOUS_TO_LAST_WEEKDAY">Previous to Last Weekday</option>
+                      <option value="NTH_WEEKDAY">Nth Weekday of Month (e.g. 4th Thu)</option>
                     </select>
                   </div>
 
@@ -1439,7 +1439,7 @@ export function SettingsTab({
                         <select
                           value={accNthInput}
                           onChange={(e) => setAccNthInput(parseInt(e.target.value) || 1)}
-                          className="w-full px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
+                          className="w-full max-w-full truncate px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
                         >
                           <option value={1}>1st</option>
                           <option value={2}>2nd</option>
@@ -1452,7 +1452,7 @@ export function SettingsTab({
                         <select
                           value={accWeekdayInput}
                           onChange={(e) => setAccWeekdayInput(parseInt(e.target.value) || 4)}
-                          className="w-full px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
+                          className="w-full max-w-full truncate px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
                         >
                           <option value={1}>Monday</option>
                           <option value={2}>Tuesday</option>
@@ -1501,13 +1501,13 @@ export function SettingsTab({
 
       {/* ==================== DELETE ACCOUNT CONFIRMATION ==================== */}
       {deletingAccName && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-4 sm:p-6 max-w-md max-w-[calc(100vw-2rem)] w-full space-y-5 shadow-2xl animate-in fade-in zoom-in-95 my-auto">
             <div className="flex items-center gap-3 text-rose-400">
               <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-slate-100">Delete Account "{deletingAccName}"?</h3>
+              <h3 className="text-base font-bold text-slate-100 truncate">Delete Account "{deletingAccName}"?</h3>
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">

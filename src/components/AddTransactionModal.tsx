@@ -20,6 +20,7 @@ import {
   isCreditCardAccount, 
   getStatementCloseDateForTx, 
   getUpcomingStatementCloseDates,
+  getCloseDateForMonthAndYear,
   formatCurrency 
 } from '../utils/financeUtils';
 
@@ -162,10 +163,15 @@ export function AddTransactionModal({
 
   // Lookup closing rule for account (from account item or persisted ccRulesMap)
   const lookupAccountClosingRule = (accName: string) => {
+    if (!accName) return { ruleType: 'FIXED_DAY', fixedDay: 25 };
+
+    // 1. Check accountItems in state
     const match = accountItems.find(a => a.name.toLowerCase() === accName.toLowerCase());
     if (match?.closingRule) {
       return match.closingRule;
     }
+
+    // 2. Check finance_app_cc_rules in localStorage
     try {
       const savedRules = localStorage.getItem('finance_app_cc_rules');
       if (savedRules) {
@@ -175,6 +181,17 @@ export function AddTransactionModal({
         if (key && map[key]) return map[key];
       }
     } catch (e) {}
+
+    // 3. Check finance_app_custom_accounts in localStorage
+    try {
+      const savedAccounts = localStorage.getItem('finance_app_custom_accounts');
+      if (savedAccounts) {
+        const list: AccountItem[] = JSON.parse(savedAccounts);
+        const matchAcc = list.find(a => a.name.toLowerCase() === accName.toLowerCase());
+        if (matchAcc?.closingRule) return matchAcc.closingRule;
+      }
+    } catch (e) {}
+
     return { ruleType: 'FIXED_DAY', fixedDay: 25 };
   };
 
@@ -346,7 +363,7 @@ export function AddTransactionModal({
     const targetAcc = type === 'CC_PAYMENT' ? toAccount : account;
     const rule = lookupAccountClosingRule(targetAcc);
     return getUpcomingStatementCloseDates(date, rule);
-  }, [date, account, toAccount, type, accountItems]);
+  }, [date, account, toAccount, type, accountItems, isOpen]);
 
   // Auto set statement close date to default current period when date or account changes
   useEffect(() => {
@@ -424,14 +441,29 @@ export function AddTransactionModal({
     const baseCents = Math.floor(totalCents / numInstallments);
     const remainderCents = totalCents - (baseCents * numInstallments);
 
-    const baseDate = statementCloseDate || date;
+    const targetAcc = type === 'CC_PAYMENT' ? toAccount : account;
+    const rule = lookupAccountClosingRule(targetAcc);
+    const pad = (n: number) => String(n).padStart(2, '0');
+
+    const baseDateStr = statementCloseDate || date;
+    const baseDt = new Date(baseDateStr);
+    const validBase = !isNaN(baseDt.getTime()) ? baseDt : new Date();
+    const startYear = validBase.getFullYear();
+    const startMonth = validBase.getMonth();
 
     const list = [];
     for (let i = 1; i <= numInstallments; i++) {
       // 1st installment takes the remainder cents!
       const centsForThisCuota = i === 1 ? baseCents + remainderCents : baseCents;
       const amtForThisCuota = centsForThisCuota / 100;
-      const cuotaDate = addMonthsToDateStr(baseDate, i - 1);
+
+      let cuotaDate: string;
+      if (i === 1 && statementCloseDate) {
+        cuotaDate = statementCloseDate;
+      } else {
+        const closeDt = getCloseDateForMonthAndYear(startYear, startMonth + (i - 1), rule);
+        cuotaDate = `${closeDt.getFullYear()}-${pad(closeDt.getMonth() + 1)}-${pad(closeDt.getDate())}`;
+      }
 
       list.push({
         installmentNum: i,
@@ -443,7 +475,7 @@ export function AddTransactionModal({
     }
 
     return list;
-  }, [amount, numInstallments, statementCloseDate, date]);
+  }, [amount, numInstallments, statementCloseDate, date, account, toAccount, type, accountItems]);
 
   if (!isOpen) return null;
 

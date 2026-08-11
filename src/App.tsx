@@ -176,6 +176,14 @@ export default function App() {
     if (newAcc.initialBalance !== undefined) {
       handleUpdateAccountBalance(newAcc.name, newAcc.initialBalance, newAcc.currency);
     }
+    if (newAcc.closingRule) {
+      try {
+        const saved = localStorage.getItem('finance_app_cc_rules');
+        const map = saved ? JSON.parse(saved) : {};
+        map[newAcc.name] = newAcc.closingRule;
+        localStorage.setItem('finance_app_cc_rules', JSON.stringify(map));
+      } catch (e) {}
+    }
   };
 
   const handleEditAccount = (oldName: string, updatedAcc: AccountItem, updateTransactions: boolean) => {
@@ -183,6 +191,18 @@ export default function App() {
 
     if (updatedAcc.initialBalance !== undefined) {
       handleUpdateAccountBalance(updatedAcc.name, updatedAcc.initialBalance, updatedAcc.currency);
+    }
+
+    if (updatedAcc.closingRule) {
+      try {
+        const saved = localStorage.getItem('finance_app_cc_rules');
+        const map = saved ? JSON.parse(saved) : {};
+        map[updatedAcc.name] = updatedAcc.closingRule;
+        if (oldName !== updatedAcc.name && map[oldName]) {
+          delete map[oldName];
+        }
+        localStorage.setItem('finance_app_cc_rules', JSON.stringify(map));
+      } catch (e) {}
     }
 
     if (updateTransactions && oldName !== updatedAcc.name) {
@@ -632,6 +652,7 @@ export default function App() {
             onAddTransaction={handleAddTransaction}
             onReassignTransactionPeriod={handleReassignTransactionPeriod}
             onUpdateAccountSharing={handleUpdateAccountSharing}
+            onEditAccount={handleEditAccount}
           />
         )}
         {currentTab === 'reports' && (

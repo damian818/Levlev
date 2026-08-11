@@ -119,8 +119,8 @@ export function ShareAccountModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-      <div className="bg-[#121620] border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-[#121620] border border-slate-800 rounded-2xl w-full max-w-lg max-w-[calc(100vw-2rem)] overflow-hidden shadow-2xl flex flex-col max-h-[90vh] my-auto animate-in fade-in zoom-in-95 duration-150">
         
         {/* Modal Header */}
         <div className="p-5 border-b border-slate-800/80 bg-[#161b22] flex items-center justify-between">

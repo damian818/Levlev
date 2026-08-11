@@ -97,7 +97,7 @@ export function AiChatWidget({
       {/* Floating Chat Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-40 bg-emerald-600 hover:bg-emerald-500 text-white p-3.5 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+        className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-40 bg-emerald-600 hover:bg-emerald-500 text-white p-3.5 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
         title="Ask AI Financial Assistant"
       >
         <MessageSquare className="w-6 h-6" />
@@ -106,7 +106,7 @@ export function AiChatWidget({
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-20 right-6 z-50 w-96 max-w-[calc(100vw-2rem)] h-[500px] max-h-[calc(100vh-7rem)] bg-[#161b22] border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed bottom-36 lg:bottom-20 right-4 sm:right-6 z-50 w-96 max-w-[calc(100vw-2rem)] h-[500px] max-h-[calc(100vh-10rem)] bg-[#161b22] border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-[#121620] border-b border-slate-800">
