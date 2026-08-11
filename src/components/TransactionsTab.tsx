@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint } from '../types';
 import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString, normalizeCleanTitle, isInstallmentTx, detectRecurringItems } from '../utils/financeUtils';
 import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat } from 'lucide-react';
@@ -29,6 +30,7 @@ export function TransactionsTab({
   activeFilter,
   onClearFilter,
 }: TransactionsTabProps) {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState(activeFilter?.search || '');
   const [selectedType, setSelectedType] = useState<string>(activeFilter?.type || 'ALL');
   const [selectedCategory, setSelectedCategory] = useState<string>(activeFilter?.category || 'ALL');
@@ -244,18 +246,18 @@ export function TransactionsTab({
         <div className="bg-[#121620] px-4 py-2 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
           <div className="flex items-center space-x-2 text-slate-300 flex-wrap gap-y-1">
             <Filter className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Active Drill-down Filter:</span>
+            <span>{t('common.filter')}:</span>
             {recurringFilter !== 'ALL' && (
               <span className="px-2 py-0.5 bg-purple-500/15 border border-purple-500/30 rounded font-semibold text-purple-300 flex items-center gap-1">
                 <Repeat className="w-3 h-3" />
                 {recurringFilter === 'RECURRING' ? 'Recurring / Fixed Costs' : 'One-time Transactions'}
               </span>
             )}
-            {selectedType !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">Type: {selectedType}</span>}
-            {selectedCategory !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">Category: {selectedCategory}</span>}
-            {selectedAccount !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">Account: {selectedAccount}</span>}
-            {selectedMonth !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">Month: {selectedMonth}</span>}
-            {searchTerm && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">Search: "{searchTerm}"</span>}
+            {selectedType !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.type')}: {selectedType}</span>}
+            {selectedCategory !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.category')}: {selectedCategory}</span>}
+            {selectedAccount !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.account')}: {selectedAccount}</span>}
+            {selectedMonth !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.month')}: {selectedMonth}</span>}
+            {searchTerm && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.search')}: "{searchTerm}"</span>}
           </div>
           <button
             onClick={handleResetFilters}
@@ -274,7 +276,7 @@ export function TransactionsTab({
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search transactions..."
+              placeholder={t('transactions.search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-[#0f131a] border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-500 placeholder-slate-500"
@@ -292,7 +294,7 @@ export function TransactionsTab({
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              All
+              {t('common.all')}
             </button>
             <button
               type="button"
@@ -330,7 +332,7 @@ export function TransactionsTab({
           >
             <option value="ALL">All Months</option>
             {availableMonths.map(m => (
-              <option key={m} value={m}>{m} {m === currentMonthKey ? '(Current)' : ''}</option>
+              <option key={m} value={m}>{m} {m === currentMonthKey ? `(${t('common.today')})` : ''}</option>
             ))}
           </select>
 
@@ -339,11 +341,11 @@ export function TransactionsTab({
             onChange={(e) => setSelectedType(e.target.value)}
             className="px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-500"
           >
-            <option value="ALL">All Types</option>
-            <option value="EXPENSE">Expense</option>
-            <option value="INCOME">Income</option>
-            <option value="TRANSFER">Transfer</option>
-            <option value="CC_PAYMENT">Credit Card Payment</option>
+            <option value="ALL">{t('transactions.filter_type')}</option>
+            <option value="EXPENSE">{t('common.expense')}</option>
+            <option value="INCOME">{t('common.income')}</option>
+            <option value="TRANSFER">{t('common.transfer')}</option>
+            <option value="CC_PAYMENT">{t('common.credit_card')}</option>
           </select>
 
           <select
@@ -351,7 +353,7 @@ export function TransactionsTab({
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-500"
           >
-            <option value="ALL">All Categories</option>
+            <option value="ALL">{t('transactions.filter_category')}</option>
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
 
@@ -360,7 +362,7 @@ export function TransactionsTab({
             onChange={(e) => setSelectedAccount(e.target.value)}
             className="px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-500"
           >
-            <option value="ALL">All Accounts</option>
+            <option value="ALL">{t('transactions.filter_account')}</option>
             {accounts.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
 
@@ -369,17 +371,17 @@ export function TransactionsTab({
             className="inline-flex items-center px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-xs font-medium hover:bg-slate-700 transition-colors ml-auto shadow-xs"
           >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
-            <span>Add Transaction</span>
+            <span>{t('overview.quick_add')}</span>
           </button>
 
           {onOpenDeleteModal && (
             <button
               onClick={onOpenDeleteModal}
-              title="Delete existing transactions"
+              title={t('transactions.delete_title')}
               className="inline-flex items-center px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-medium transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5 text-rose-400" />
-              <span>Delete Data</span>
+              <span>{t('common.delete')}</span>
             </button>
           )}
         </div>

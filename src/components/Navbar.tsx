@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ViewTab, DisplayCurrency } from '../types';
 import { 
   LayoutDashboard, 
@@ -21,7 +22,8 @@ import {
   Menu, 
   X,
   Plus,
-  Grid
+  Grid,
+  Globe
 } from 'lucide-react';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from '../lib/supabase';
 import { LevLevLogo } from './LevLevLogo';
@@ -72,6 +74,7 @@ export function Navbar({
   onOpenDeleteModal,
   onLogout,
 }: NavbarProps) {
+  const { t, i18n } = useTranslation();
   const [user, setUser] = useState<any>(null);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -113,16 +116,22 @@ export function Navbar({
     }
   };
 
+  const currentLang = (i18n.language || 'en').substring(0, 2);
+  const toggleLanguage = () => {
+    const nextLang = currentLang === 'es' ? 'en' : 'es';
+    i18n.changeLanguage(nextLang);
+  };
+
   const tabs: { id: ViewTab; label: string; shortLabel?: string; icon: React.ReactNode }[] = [
-    { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
-    { id: 'reports', label: 'Reports', icon: <BarChart3 className="w-4 h-4 text-emerald-400" /> },
-    { id: 'transactions', label: 'Transactions', shortLabel: 'Txs', icon: <Receipt className="w-4 h-4" /> },
-    { id: 'accounts', label: 'Accounts', icon: <Wallet className="w-4 h-4" /> },
-    { id: 'budgets', label: 'Budgets', icon: <Target className="w-4 h-4" /> },
-    { id: 'recurring', label: 'Recurring & Installments', shortLabel: 'Recurring', icon: <Repeat className="w-4 h-4" /> },
-    { id: 'inflation', label: 'Inflation vs FX', shortLabel: 'Eco', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'ai-advisor', label: 'AI Advisor', icon: <Sparkles className="w-4 h-4 text-amber-500" /> },
-    { id: 'settings', label: 'Settings', icon: <Sliders className="w-4 h-4 text-slate-400" /> },
+    { id: 'overview', label: t('nav.overview'), icon: <LayoutDashboard className="w-4 h-4" /> },
+    { id: 'reports', label: t('nav.reports'), icon: <BarChart3 className="w-4 h-4 text-emerald-400" /> },
+    { id: 'transactions', label: t('nav.transactions'), shortLabel: t('nav.transactions_short'), icon: <Receipt className="w-4 h-4" /> },
+    { id: 'accounts', label: t('nav.accounts'), icon: <Wallet className="w-4 h-4" /> },
+    { id: 'budgets', label: t('nav.budgets'), icon: <Target className="w-4 h-4" /> },
+    { id: 'recurring', label: t('nav.recurring'), shortLabel: t('nav.recurring_short'), icon: <Repeat className="w-4 h-4" /> },
+    { id: 'inflation', label: t('nav.inflation'), shortLabel: t('nav.inflation_short'), icon: <TrendingUp className="w-4 h-4" /> },
+    { id: 'ai-advisor', label: t('nav.ai_advisor'), icon: <Sparkles className="w-4 h-4 text-amber-500" /> },
+    { id: 'settings', label: t('nav.settings'), icon: <Sliders className="w-4 h-4 text-slate-400" /> },
   ];
 
   return (
@@ -147,6 +156,19 @@ export function Navbar({
             {/* Right Controls Container */}
             <div className="flex items-center gap-1.5 sm:gap-3">
               
+              {/* Language Switcher Pill */}
+              <button
+                onClick={() => {
+                  triggerHaptic(10);
+                  toggleLanguage();
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#161b22] hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all min-h-[44px]"
+                title="Switch Language / Cambiar Idioma"
+              >
+                <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{currentLang === 'es' ? 'ES' : 'EN'}</span>
+              </button>
+
               {/* DESKTOP "ADD TRANSACTION" BUTTON */}
               <button
                 onClick={() => {
@@ -156,7 +178,7 @@ export function Navbar({
                 className="hidden lg:inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-950/50 border border-emerald-400/30 transition-all transform active:scale-95 shrink-0 cursor-pointer min-h-[44px]"
               >
                 <Plus className="w-4.5 h-4.5 text-emerald-100 stroke-[3]" />
-                <span className="font-extrabold tracking-tight">+ New Transaction</span>
+                <span className="font-extrabold tracking-tight">{t('nav.new_transaction')}</span>
               </button>
 
               {/* Currency Selector Pill */}
@@ -186,7 +208,7 @@ export function Navbar({
                 
                 {/* Rate input */}
                 <div className="flex items-center space-x-2 bg-[#161b22] p-1 rounded-xl border border-slate-800 text-xs min-h-[44px]">
-                  <span className="text-slate-400 px-2 font-medium">Rate:</span>
+                  <span className="text-slate-400 px-2 font-medium">{t('nav.rate')}</span>
                   <input
                     type="number"
                     value={usdArsRate}
@@ -211,12 +233,12 @@ export function Navbar({
                   {privacyMode ? (
                     <>
                       <EyeOff className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                      <span>Private</span>
+                      <span>{t('nav.private')}</span>
                     </>
                   ) : (
                     <>
                       <Eye className="w-3.5 h-3.5" />
-                      <span>Privacy</span>
+                      <span>{t('nav.privacy')}</span>
                     </>
                   )}
                 </button>
@@ -236,7 +258,7 @@ export function Navbar({
                 >
                   <Users className="w-3.5 h-3.5 text-purple-400" />
                   <span>
-                    {isWorkspaceShared ? `Household (${workspaceMembersCount})` : 'Share Household'}
+                    {isWorkspaceShared ? `Household (${workspaceMembersCount})` : t('nav.share_household')}
                   </span>
                 </button>
 

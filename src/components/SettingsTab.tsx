@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   CategoryItem, 
   AccountItem, 
@@ -113,6 +114,7 @@ export function SettingsTab({
   onRecalculateBalances,
   onLogout,
 }: SettingsTabProps) {
+  const { t, i18n } = useTranslation();
   const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'categories' | 'preferences' | 'sharing'>('accounts');
 
   // Diagnostic State for Balance Verification
@@ -427,7 +429,7 @@ export function SettingsTab({
             }`}
           >
             <Wallet className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Accounts ({accounts.length})</span>
+            <span>{t('settings.accounts_management')} ({accounts.length})</span>
           </button>
           <button
             onClick={() => setActiveSubTab('categories')}
@@ -438,7 +440,7 @@ export function SettingsTab({
             }`}
           >
             <Tag className="w-4 h-4 text-indigo-400 shrink-0" />
-            <span>Categories ({categories.length})</span>
+            <span>{t('common.category')} ({categories.length})</span>
           </button>
           <button
             onClick={() => setActiveSubTab('preferences')}
@@ -449,7 +451,7 @@ export function SettingsTab({
             }`}
           >
             <Sliders className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Preferences & Data</span>
+            <span>{t('nav.quick_options')}</span>
           </button>
           <button
             onClick={() => setActiveSubTab('sharing')}
@@ -460,7 +462,7 @@ export function SettingsTab({
             }`}
           >
             <Users className="w-4 h-4 text-purple-400 shrink-0" />
-            <span>Household Sharing</span>
+            <span>{t('nav.share_household')}</span>
           </button>
         </div>
       </div>
@@ -657,6 +659,43 @@ export function SettingsTab({
       {/* -------------------- PREFERENCES & DATA SUB-TAB -------------------- */}
       {activeSubTab === 'preferences' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* Regional & Language Settings Box */}
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 space-y-4 md:col-span-2 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
+                <Globe className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">{t('settings.regional')}</h3>
+                <p className="text-xs text-slate-400">{t('settings.auto_detect')}</p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 pt-2">
+              <div className="flex-1 space-y-2">
+                <label className="text-xs font-bold text-slate-300">{t('settings.language')}</label>
+                <div className="flex items-center bg-[#161b22] p-1 rounded-xl border border-slate-800">
+                  <button
+                    onClick={() => i18n.changeLanguage('en')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                      i18n.language.startsWith('en') ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    English (EN)
+                  </button>
+                  <button
+                    onClick={() => i18n.changeLanguage('es')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                      i18n.language.startsWith('es') ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Español (ES)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Authentication Status */}
           <div className="bg-[#121720] border border-emerald-500/30 rounded-2xl p-6 space-y-5 md:col-span-2 shadow-lg relative overflow-hidden">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">

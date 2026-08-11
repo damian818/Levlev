@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
 import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
@@ -33,6 +34,7 @@ export function OverviewTab({
   onNavigateToTransactionsWithFilter,
   onOpenImportModal
 }: OverviewTabProps) {
+  const { t } = useTranslation();
   const [velocityMultiplier, setVelocityMultiplier] = useState<number>(1.0);
   const [showCategoryTrend, setShowCategoryTrend] = useState<boolean>(false);
 
@@ -156,10 +158,10 @@ export function OverviewTab({
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="bg-transparent border-none py-0 text-xs text-slate-100 font-semibold focus:outline-none focus:ring-0 w-full sm:w-auto"
             >
-              <option value="ALL">All Available Months</option>
+              <option value="ALL">{t('common.all')}</option>
               {availableMonths.map((m) => (
                 <option key={m} value={m}>
-                  {m} {m === currentMonthKey ? '(Current Month)' : ''}
+                  {m} {m === currentMonthKey ? `(${t('common.today')})` : ''}
                 </option>
               ))}
             </select>
@@ -169,10 +171,10 @@ export function OverviewTab({
             <button
               onClick={onOpenImportModal}
               className="flex items-center justify-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[10px] sm:text-xs font-semibold px-2.5 py-2 rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer flex-1 sm:flex-none"
-              title="Import Transactions"
+              title={t('common.import_csv')}
             >
               <Upload className="w-3.5 h-3.5" />
-              <span className="whitespace-nowrap">Import Data</span>
+              <span className="whitespace-nowrap">{t('nav.import')}</span>
             </button>
           )}
 
@@ -186,10 +188,10 @@ export function OverviewTab({
               })
             }
             className="flex items-center justify-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] sm:text-xs font-semibold px-2.5 py-2 rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer flex-1 sm:flex-none"
-            title="Download PDF Summary Report"
+            title={t('reports.export_pdf_report')}
           >
             <FileDown className="w-3.5 h-3.5" />
-            <span className="whitespace-nowrap">PDF Report</span>
+            <span className="whitespace-nowrap">{t('common.export_pdf')}</span>
           </button>
         </div>
       </div>
@@ -206,7 +208,7 @@ export function OverviewTab({
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center">
-                Total Income
+                {t('overview.monthly_income')}
                 <ChevronRight className="w-3 h-3 ml-1 text-slate-500 group-hover:text-emerald-400 transition-colors" />
               </p>
               <h3 className="text-xl sm:text-2xl font-bold text-slate-100 mt-1">{formatCurrency(spending.totalIncome, displayCurrency)}</h3>
@@ -216,8 +218,8 @@ export function OverviewTab({
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-[10px] sm:text-xs text-emerald-400 font-medium">
-            <span>Inflows</span>
-            <span className="text-[9px] sm:text-[10px] text-slate-500 group-hover:text-slate-300 transition-colors">View details →</span>
+            <span>{t('common.income')}</span>
+            <span className="text-[9px] sm:text-[10px] text-slate-500 group-hover:text-slate-300 transition-colors">{t('overview.view_all')} →</span>
           </div>
         </div>
 
@@ -232,7 +234,7 @@ export function OverviewTab({
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center">
-                Total Expenses
+                {t('overview.monthly_expenses')}
                 <ChevronRight className="w-3 h-3 ml-1 text-slate-500 group-hover:text-rose-400 transition-colors" />
               </p>
               <h3 className="text-xl sm:text-2xl font-bold text-slate-100 mt-1">{formatCurrency(spending.totalExpenses, displayCurrency)}</h3>
@@ -242,8 +244,8 @@ export function OverviewTab({
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-[10px] sm:text-xs text-rose-400 font-medium">
-            <span>Outflows</span>
-            <span className="text-[9px] sm:text-[10px] text-slate-500 group-hover:text-slate-300 transition-colors">View details →</span>
+            <span>{t('common.expense')}</span>
+            <span className="text-[9px] sm:text-[10px] text-slate-500 group-hover:text-slate-300 transition-colors">{t('overview.view_all')} →</span>
           </div>
         </div>
 
@@ -257,7 +259,7 @@ export function OverviewTab({
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center">
-                Net Savings
+                {t('overview.net_savings')}
                 <ChevronRight className="w-3 h-3 ml-1 text-slate-500 group-hover:text-slate-300 transition-colors" />
               </p>
               <h3 className={`text-xl sm:text-2xl font-bold mt-1 ${spending.netSavings >= 0 ? 'text-slate-100' : 'text-rose-400'}`}>
@@ -269,8 +271,8 @@ export function OverviewTab({
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-[10px] sm:text-xs text-slate-400 font-medium">
-            <span>Rate: <strong className="text-slate-200">{spending.savingsRate.toFixed(1)}%</strong></span>
-            <span className="text-[9px] sm:text-[10px] text-slate-500 group-hover:text-slate-300 transition-colors">View details →</span>
+            <span>{t('nav.rate')} <strong className="text-slate-200">{spending.savingsRate.toFixed(1)}%</strong></span>
+            <span className="text-[9px] sm:text-[10px] text-slate-500 group-hover:text-slate-300 transition-colors">{t('overview.view_all')} →</span>
           </div>
         </div>
 
@@ -282,7 +284,7 @@ export function OverviewTab({
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center">
-                Liquid Assets
+                {t('overview.total_net_worth')}
                 <ChevronRight className="w-3 h-3 ml-1 text-slate-500 group-hover:text-amber-400 transition-colors" />
               </p>
               <h3 className="text-xl sm:text-2xl font-bold text-slate-100 mt-1">{formatCurrency(totalAssetsDisplay, displayCurrency)}</h3>
@@ -292,8 +294,8 @@ export function OverviewTab({
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-[10px] sm:text-xs text-slate-400 font-medium">
-            <span>{accounts.length} Accounts</span>
-            <span className="text-[9px] sm:text-[10px] text-amber-400/80 group-hover:text-amber-300 transition-colors">Manage →</span>
+            <span>{accounts.length} {t('nav.accounts')}</span>
+            <span className="text-[9px] sm:text-[10px] text-amber-400/80 group-hover:text-amber-300 transition-colors">{t('common.edit')} →</span>
           </div>
         </div>
       </div>
@@ -309,11 +311,14 @@ export function OverviewTab({
           </div>
           <div>
             <h4 className="text-xs sm:text-sm font-semibold text-slate-100 group-hover:text-amber-300 transition-colors flex items-center">
-              Spending Concentration Risk
+              {t('overview.concentration_risk')}
               <ExternalLink className="w-3 h-3 ml-1.5 opacity-60 group-hover:opacity-100" />
             </h4>
             <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">
-              Top category (<strong className="text-slate-200">{spending.topCategories[0]?.category || 'N/A'}</strong>) accounts for {topCategoryShare.toFixed(1)}%.
+              {t('overview.top_category_accounts_for', { 
+                category: spending.topCategories[0]?.category || 'N/A', 
+                percentage: topCategoryShare.toFixed(1) 
+              })}
             </p>
           </div>
         </div>
@@ -322,7 +327,7 @@ export function OverviewTab({
           onClick={() => onNavigateTab('inflation')}
           className="text-[10px] sm:text-xs text-slate-300 bg-[#1a212d] hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700/80 cursor-pointer transition-colors flex items-center space-x-1 w-full md:w-auto justify-center md:justify-start"
         >
-          <span>Rate: <strong className="text-slate-100">${usdArsRate.toLocaleString()} ARS</strong></span>
+          <span>{t('nav.rate')} <strong className="text-slate-100">${usdArsRate.toLocaleString()} ARS</strong></span>
           <ChevronRight className="w-3 h-3 text-slate-400" />
         </div>
       </div>
@@ -336,29 +341,29 @@ export function OverviewTab({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <span>End-of-Month Predictive Liquid Balance Forecast</span>
+                <span>{t('overview.eom_forecast_title')}</span>
                 <span className="px-2 py-0.5 text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-semibold">
-                  Live Velocity Model
+                  {t('overview.live_velocity_model')}
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
-                Prorates current daily run-rate ({metrics.currentDayOfMonth} days elapsed) + pending recurring salaries & bills.
+                {t('overview.prorates_desc', { days: metrics.currentDayOfMonth })}
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2 bg-[#121620] px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
             <Sliders className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-400">Spending Pace:</span>
+            <span className="text-slate-400">{t('overview.spending_pace')}</span>
             <select
               value={velocityMultiplier}
               onChange={(e) => setVelocityMultiplier(Number(e.target.value))}
               className="bg-[#161b22] border border-slate-700 rounded px-2 py-0.5 text-xs text-amber-400 font-semibold focus:outline-none"
             >
-              <option value={0.8}>0.8x (-20% Frugal)</option>
-              <option value={1.0}>1.0x (Current Pace)</option>
-              <option value={1.2}>1.2x (+20% Higher)</option>
-              <option value={1.5}>1.5x (+50% High Burn)</option>
+              <option value={0.8}>0.8x (-20%)</option>
+              <option value={1.0}>1.0x (100%)</option>
+              <option value={1.2}>1.2x (+20%)</option>
+              <option value={1.5}>1.5x (+50%)</option>
             </select>
           </div>
         </div>
@@ -367,52 +372,46 @@ export function OverviewTab({
           <div className="bg-[#121620] p-3 sm:p-3.5 rounded-xl border border-slate-800 space-y-1">
             <div className="text-[10px] sm:text-[11px] text-slate-400 flex items-center">
               <Zap className="w-3.5 h-3.5 text-amber-400 mr-1 shrink-0" />
-              <span>Current Daily Velocity</span>
+              <span>{t('overview.current_daily_velocity')}</span>
             </div>
             <div className="text-sm sm:text-base font-bold text-slate-100 truncate">
               {formatCurrency(metrics.dailyExpenseVelocity, displayCurrency)}<span className="text-[10px] sm:text-[11px] font-normal text-slate-500">/day</span>
             </div>
             <div className="text-[9px] sm:text-[10px] text-slate-500 truncate">
-              Prorated variable remaining: {formatCurrency(adjustedMetrics.projectedRemainingVariableExpense, displayCurrency)}
+              {formatCurrency(adjustedMetrics.projectedRemainingVariableExpense, displayCurrency)}
             </div>
           </div>
 
           <div className="bg-[#121620] p-3 sm:p-3.5 rounded-xl border border-slate-800 space-y-1">
             <div className="text-[10px] sm:text-[11px] text-slate-400 flex items-center">
               <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 mr-1 shrink-0" />
-              <span>Pending Recurring Inflow</span>
+              <span>{t('overview.pending_recurring_inflow')}</span>
             </div>
             <div className="text-sm sm:text-base font-bold text-emerald-400 truncate">
               +{formatCurrency(metrics.pendingRecurringIncome, displayCurrency)}
-            </div>
-            <div className="text-[9px] sm:text-[10px] text-slate-500 truncate">
-              Includes expected salary on 15th
             </div>
           </div>
 
           <div className="bg-[#121620] p-3 sm:p-3.5 rounded-xl border border-slate-800 space-y-1">
             <div className="text-[10px] sm:text-[11px] text-slate-400 flex items-center">
               <ArrowDownRight className="w-3.5 h-3.5 text-rose-400 mr-1 shrink-0" />
-              <span>Pending Recurring Bills</span>
+              <span>{t('overview.pending_recurring_bills')}</span>
             </div>
             <div className="text-sm sm:text-base font-bold text-rose-400 truncate">
               -{formatCurrency(metrics.pendingRecurringExpense, displayCurrency)}
-            </div>
-            <div className="text-[9px] sm:text-[10px] text-slate-500 truncate">
-              OSDE, Expensas, Cissab & utilities
             </div>
           </div>
 
           <div className="bg-[#121620] p-3 sm:p-3.5 rounded-xl border border-slate-800 space-y-1">
             <div className="text-[10px] sm:text-[11px] text-slate-400 flex items-center justify-between">
-              <span>Predicted EOM Assets</span>
+              <span>{t('overview.predicted_eom_assets')}</span>
               <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             </div>
             <div className="text-sm sm:text-base font-bold text-amber-400 truncate">
               {formatCurrency(adjustedMetrics.projectedEOMBalance, displayCurrency)}
             </div>
             <div className="text-[9px] sm:text-[10px] text-emerald-400 font-semibold truncate">
-              Net EOM Delta: {adjustedMetrics.projectedEOMNet >= 0 ? '+' : ''}{formatCurrency(adjustedMetrics.projectedEOMNet, displayCurrency)}
+              {t('overview.net_eom_delta')}: {adjustedMetrics.projectedEOMNet >= 0 ? '+' : ''}{formatCurrency(adjustedMetrics.projectedEOMNet, displayCurrency)}
             </div>
           </div>
         </div>
@@ -425,10 +424,10 @@ export function OverviewTab({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-xs sm:text-sm font-semibold text-slate-100 flex items-center gap-2">
-                <span>Monthly Cash Flow & Predictive Balance Line</span>
+                <span>{t('overview.cash_flow_trend_title')}</span>
               </h3>
               <p className="text-[10px] sm:text-xs text-slate-400">
-                Overlaying end-of-month liquid balance trajectory.
+                {t('overview.cash_flow_trend_desc')}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
