@@ -169,22 +169,42 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
     if (data.transactions && data.transactions.length > 0) {
       const txRows = data.transactions.map(t => {
         const rowId = (t.id && t.id.startsWith(userId)) ? t.id : `${userId}_${t.id || Math.random().toString(36).substring(2)}`;
+        
+        let safeInstallments: number | null = null;
+        if (t.totalInstallments && typeof t.totalInstallments === 'number') {
+          safeInstallments = t.totalInstallments;
+        } else if (typeof t.installments === 'number') {
+          safeInstallments = t.installments;
+        } else if (typeof t.installments === 'string') {
+          if (t.installments.includes('/')) {
+            const parts = t.installments.split('/');
+            const total = parseInt(parts[1], 10);
+            safeInstallments = !isNaN(total) ? total : (parseInt(parts[0], 10) || null);
+          } else {
+            const num = parseInt(t.installments, 10);
+            safeInstallments = !isNaN(num) ? num : null;
+          }
+        }
+
+        const rawAmount = (t.amount !== undefined && t.amount !== null && t.amount > 0) ? t.amount : ((t.transferAmount && t.transferAmount > 0) ? t.transferAmount : (t.amount || 0));
+        const cleanAmount = Math.round(rawAmount * 100) / 100;
+
         return {
           id: rowId,
           user_id: userId,
           date: t.date,
           title: t.title,
-          amount: (t.amount !== undefined && t.amount !== null && t.amount > 0) ? t.amount : ((t.transferAmount && t.transferAmount > 0) ? t.transferAmount : (t.amount || 0)),
+          amount: cleanAmount,
           currency: t.currency || 'ARS',
           category: t.category || 'General',
           account: t.account || 'Main',
           type: t.type,
           to_account: t.toAccount || null,
-          installments: t.installments || null,
+          installments: safeInstallments,
           statement_close_date: t.statementCloseDate || null,
-          transfer_amount: t.transferAmount !== undefined && t.transferAmount !== null ? t.transferAmount : null,
+          transfer_amount: t.transferAmount !== undefined && t.transferAmount !== null ? Math.round(t.transferAmount * 100) / 100 : null,
           transfer_currency: t.transferCurrency || null,
-          receive_amount: t.receiveAmount !== undefined && t.receiveAmount !== null ? t.receiveAmount : null,
+          receive_amount: t.receiveAmount !== undefined && t.receiveAmount !== null ? Math.round(t.receiveAmount * 100) / 100 : null,
           receive_currency: t.receiveCurrency || null,
           notes: t.description || null,
         };

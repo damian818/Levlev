@@ -1133,7 +1133,7 @@ export function AddTransactionModal({
                           )}
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-slate-400 text-[10px] font-sans">{cuota.date}</span>
+                          <span className="text-slate-400 text-[10px] font-sans">{cuota.instTxDate}</span>
                           <span className="font-bold text-emerald-400">
                             {formatCurrency(cuota.amount, currency)}
                           </span>

@@ -600,10 +600,12 @@ export function formatCurrency(amount: number, currency: DisplayCurrency, forceP
   const currencyCode = currencyMap[curr] || 'USD';
 
   try {
+    const hasCents = Math.abs(amount % 1) >= 0.001;
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: currencyCode,
-      maximumFractionDigits: curr === 'ARS' || curr === 'CLP' ? 0 : 2,
+      minimumFractionDigits: hasCents ? 2 : ((curr === 'ARS' || curr === 'CLP') ? 0 : 2),
+      maximumFractionDigits: 2,
     }).format(amount);
   } catch (e) {
     return `${curr} ${amount.toFixed(2)}`;
