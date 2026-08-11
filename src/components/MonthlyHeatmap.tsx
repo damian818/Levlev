@@ -87,7 +87,7 @@ export function MonthlyHeatmap({
   const weekDaysFull = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="bg-[#161b22] border border-slate-800/80 rounded-2xl p-3 sm:p-5 shadow-sm space-y-4">
+    <div className="bg-[#11141c] border border-slate-800/80 rounded-2xl p-3 sm:p-5 shadow-sm space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="flex items-center space-x-2">
           <div className="p-1.5 sm:p-2 bg-emerald-500/10 rounded-lg text-emerald-400 border border-emerald-500/20">
@@ -95,7 +95,7 @@ export function MonthlyHeatmap({
           </div>
           <div>
             <h3 className="text-xs sm:text-sm font-bold text-slate-100">Daily Spending & Scheduled Bills ({activeMonth})</h3>
-            <p className="text-[11px] text-slate-400">Includes actual daily expenses + expected recurring bills/income.</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-400">Includes actual daily expenses + expected recurring bills/income.</p>
           </div>
         </div>
         <span className="text-[10px] sm:text-xs text-slate-400 font-mono self-start sm:self-auto">
@@ -104,9 +104,9 @@ export function MonthlyHeatmap({
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-1.5 sm:gap-2 text-center">
+      <div className="grid grid-cols-7 gap-1 xs:gap-1.5 sm:gap-2 text-center">
         {weekDays.map((d, i) => (
-          <div key={i} className="text-[10px] sm:text-xs font-bold text-slate-400 py-1.5 uppercase tracking-wider bg-[#121620] rounded-md">
+          <div key={i} className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-slate-400 py-1 sm:py-1.5 uppercase tracking-wider bg-[#121620] rounded-md">
             <span className="sm:hidden">{d}</span>
             <span className="hidden sm:inline">{weekDaysFull[i]}</span>
           </div>
@@ -114,7 +114,7 @@ export function MonthlyHeatmap({
 
         {/* Blank padding for first day offset */}
         {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-          <div key={`empty-${i}`} className="min-h-[60px] sm:min-h-[76px] lg:min-h-[88px] bg-transparent rounded-lg" />
+          <div key={`empty-${i}`} className="min-h-[48px] xs:min-h-[56px] sm:min-h-[76px] lg:min-h-[88px] bg-transparent rounded-lg" />
         ))}
 
         {/* Days */}
@@ -144,39 +144,41 @@ export function MonthlyHeatmap({
               title={`Day ${dayNum}: ${totalSpent > 0 ? formatCurrency(totalSpent, displayCurrency) : 'No logged expenses'}${
                 hasRecurring ? ` • ${recurringForDay.length} expected recurring rule(s)` : ''
               }`}
-              className={`min-h-[60px] sm:min-h-[76px] lg:min-h-[88px] rounded-xl border p-1.5 sm:p-2 flex flex-col justify-between transition-all ${styleClass} ${
+              className={`min-h-[48px] xs:min-h-[56px] sm:min-h-[76px] lg:min-h-[88px] rounded-lg sm:rounded-xl border p-1 sm:p-2 flex flex-col justify-between transition-all ${styleClass} ${
                 isInteractive ? 'cursor-pointer hover:scale-[1.02] active:scale-95 hover:z-10 shadow-md' : 'cursor-default opacity-80'
               }`}
             >
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] sm:text-xs font-bold text-slate-200 bg-black/20 px-1.5 py-0.5 rounded">{dayNum}</span>
-                <div className="flex items-center gap-1">
+              <div className="flex justify-between items-center gap-0.5">
+                <span className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-slate-200 bg-black/30 px-1 sm:px-1.5 py-0.5 rounded shrink-0">{dayNum}</span>
+                <div className="flex items-center gap-0.5">
                   {hasRecurring && (
                     <span 
-                      className="px-1 py-0.5 text-[9px] font-bold bg-amber-500/25 text-amber-200 border border-amber-500/50 rounded flex items-center gap-0.5"
+                      className="px-0.5 sm:px-1 py-0.5 text-[8px] xs:text-[9px] font-bold bg-amber-500/25 text-amber-200 border border-amber-500/50 rounded flex items-center gap-0.5 shrink-0"
                       title={`${recurringForDay.length} scheduled recurring item(s)`}
                     >
-                      <Repeat className="w-2.5 h-2.5 shrink-0" />
+                      <Repeat className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
                       <span className="hidden sm:inline">{recurringForDay.length}</span>
                     </span>
                   )}
-                  {totalSpent > 0 && <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />}
+                  {totalSpent > 0 && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />}
                 </div>
               </div>
 
-              <div className="space-y-0.5 text-left mt-1">
+              <div className="space-y-0.5 text-left mt-0.5 overflow-hidden">
                 {totalSpent > 0 ? (
-                  <div className="text-[10px] sm:text-xs font-mono font-extrabold text-rose-300 truncate leading-snug">
+                  <div className="text-[8px] xs:text-[9px] sm:text-xs font-mono font-extrabold text-rose-300 truncate leading-snug">
                     -{formatCurrencyCompact(totalSpent, displayCurrency)}
                   </div>
                 ) : (
-                  <div className="text-[9px] text-slate-600 font-mono">–</div>
+                  <div className="text-[8px] sm:text-[9px] text-slate-600 font-mono">–</div>
                 )}
 
                 {hasRecurring && (
-                  <div className="text-[9px] font-mono text-amber-300 font-medium truncate leading-none flex items-center gap-0.5">
-                    <span className="text-amber-400">⚡</span>
-                    {recurringForDay.map(r => r.type === 'INCOME' ? `+${formatCurrencyCompact(r.amount, r.currency as DisplayCurrency)}` : `-${formatCurrencyCompact(r.amount, r.currency as DisplayCurrency)}`).join(', ')}
+                  <div className="text-[8px] xs:text-[9px] font-mono text-amber-300 font-medium truncate leading-none flex items-center gap-0.5">
+                    <span className="text-amber-400 text-[8px]">⚡</span>
+                    <span className="truncate">
+                      {recurringForDay.map(r => r.type === 'INCOME' ? `+${formatCurrencyCompact(r.amount, r.currency as DisplayCurrency)}` : `-${formatCurrencyCompact(r.amount, r.currency as DisplayCurrency)}`).join(', ')}
+                    </span>
                   </div>
                 )}
               </div>
@@ -205,16 +207,16 @@ export function MonthlyHeatmap({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 text-amber-400 font-medium">
-          <Repeat className="w-3 h-3" />
+        <div className="flex items-center gap-1 text-amber-400 font-medium text-[10px] sm:text-xs">
+          <Repeat className="w-3 h-3 shrink-0" />
           <span>Badge indicates scheduled recurring rule due date</span>
         </div>
       </div>
 
       {/* Day details modal / popover */}
       {selectedDayDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-          <div className="bg-[#161b22] border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-[#11141c] border border-slate-800 rounded-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center pb-3 border-b border-slate-800">
               <div>
                 <h4 className="text-base font-bold text-slate-100 flex items-center gap-2">

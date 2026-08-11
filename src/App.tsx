@@ -693,8 +693,10 @@ export default function App() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddTransaction={handleAddTransaction}
+        accountsList={accounts}
         existingAccounts={accounts.map(a => a.name)}
         existingCategories={categories.map(c => c.name)}
+        usdArsRate={usdArsRate}
       />
 
       <ImportWizardModal

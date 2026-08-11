@@ -85,7 +85,7 @@ export function MonthlyCategoryDonut({
   const monthLabel = localMonth === 'ALL' ? 'All Time' : localMonth;
 
   return (
-    <div className="bg-[#161b22] p-4 sm:p-5 rounded-xl border border-slate-800 shadow-sm space-y-4">
+    <div className="bg-[#11141c] p-4 sm:p-5 rounded-xl border border-slate-800 shadow-sm space-y-4">
       {/* Header with Month Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
         <div className="flex items-center space-x-2.5">

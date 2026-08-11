@@ -134,7 +134,7 @@ export function OverviewTab({
   return (
     <div className="space-y-6">
       {/* Month Filter Selector Bar */}
-      <div className="bg-[#161b22] px-3 sm:px-5 py-3 sm:py-3.5 rounded-xl border border-slate-800 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
+      <div className="bg-[#11141c] px-3 sm:px-5 py-3 sm:py-3.5 rounded-xl border border-slate-800 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
         <div className="flex items-center space-x-2.5">
           <div className="p-1.5 sm:p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg">
             <Calendar className="w-4 h-4" />
@@ -201,7 +201,7 @@ export function OverviewTab({
             type: 'INCOME', 
             month: selectedMonth !== 'ALL' ? selectedMonth : undefined 
           })}
-          className="bg-[#161b22] p-4 sm:p-5 rounded-xl border border-slate-800 hover:border-emerald-500/50 hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm group"
+          className="bg-[#11141c] p-4 sm:p-5 rounded-xl border border-slate-800 hover:border-emerald-500/50 hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm group"
         >
           <div className="flex justify-between items-start">
             <div>
@@ -227,7 +227,7 @@ export function OverviewTab({
             type: 'EXPENSE', 
             month: selectedMonth !== 'ALL' ? selectedMonth : undefined 
           })}
-          className="bg-[#161b22] p-4 sm:p-5 rounded-xl border border-slate-800 hover:border-rose-500/50 hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm group"
+          className="bg-[#11141c] p-4 sm:p-5 rounded-xl border border-slate-800 hover:border-rose-500/50 hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm group"
         >
           <div className="flex justify-between items-start">
             <div>
@@ -252,7 +252,7 @@ export function OverviewTab({
           onClick={() => onNavigateToTransactionsWithFilter({ 
             month: selectedMonth !== 'ALL' ? selectedMonth : undefined 
           })}
-          className="bg-[#161b22] p-4 sm:p-5 rounded-xl border border-slate-800 hover:border-slate-700 hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm group"
+          className="bg-[#11141c] p-4 sm:p-5 rounded-xl border border-slate-800 hover:border-slate-700 hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm group"
         >
           <div className="flex justify-between items-start">
             <div>
@@ -277,7 +277,7 @@ export function OverviewTab({
         {/* Liquid Assets Card */}
         <div 
           onClick={() => onNavigateTab('accounts')}
-          className="bg-[#161b22] p-4 sm:p-5 rounded-xl border border-slate-800 hover:border-amber-500/50 hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm group"
+          className="bg-[#11141c] p-4 sm:p-5 rounded-xl border border-slate-800 hover:border-amber-500/50 hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm group"
         >
           <div className="flex justify-between items-start">
             <div>
@@ -328,7 +328,7 @@ export function OverviewTab({
       </div>
 
       {/* NEW: End-of-Month Predictive Forecasting Intelligence Card */}
-      <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm space-y-4">
+      <div className="bg-[#11141c] p-5 rounded-xl border border-slate-800 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <div className="flex items-center space-x-2.5">
             <div className="p-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg">
@@ -363,55 +363,55 @@ export function OverviewTab({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-[#121620] p-3.5 rounded-xl border border-slate-800 space-y-1">
-            <div className="text-[11px] text-slate-400 flex items-center">
-              <Zap className="w-3.5 h-3.5 text-amber-400 mr-1" />
+        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="bg-[#121620] p-3 sm:p-3.5 rounded-xl border border-slate-800 space-y-1">
+            <div className="text-[10px] sm:text-[11px] text-slate-400 flex items-center">
+              <Zap className="w-3.5 h-3.5 text-amber-400 mr-1 shrink-0" />
               <span>Current Daily Velocity</span>
             </div>
-            <div className="text-base font-bold text-slate-100">
-              {formatCurrency(metrics.dailyExpenseVelocity, displayCurrency)}<span className="text-[11px] font-normal text-slate-500">/day</span>
+            <div className="text-sm sm:text-base font-bold text-slate-100 truncate">
+              {formatCurrency(metrics.dailyExpenseVelocity, displayCurrency)}<span className="text-[10px] sm:text-[11px] font-normal text-slate-500">/day</span>
             </div>
-            <div className="text-[10px] text-slate-500">
+            <div className="text-[9px] sm:text-[10px] text-slate-500 truncate">
               Prorated variable remaining: {formatCurrency(adjustedMetrics.projectedRemainingVariableExpense, displayCurrency)}
             </div>
           </div>
 
-          <div className="bg-[#121620] p-3.5 rounded-xl border border-slate-800 space-y-1">
-            <div className="text-[11px] text-slate-400 flex items-center">
-              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 mr-1" />
+          <div className="bg-[#121620] p-3 sm:p-3.5 rounded-xl border border-slate-800 space-y-1">
+            <div className="text-[10px] sm:text-[11px] text-slate-400 flex items-center">
+              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 mr-1 shrink-0" />
               <span>Pending Recurring Inflow</span>
             </div>
-            <div className="text-base font-bold text-emerald-400">
+            <div className="text-sm sm:text-base font-bold text-emerald-400 truncate">
               +{formatCurrency(metrics.pendingRecurringIncome, displayCurrency)}
             </div>
-            <div className="text-[10px] text-slate-500">
+            <div className="text-[9px] sm:text-[10px] text-slate-500 truncate">
               Includes expected salary on 15th
             </div>
           </div>
 
-          <div className="bg-[#121620] p-3.5 rounded-xl border border-slate-800 space-y-1">
-            <div className="text-[11px] text-slate-400 flex items-center">
-              <ArrowDownRight className="w-3.5 h-3.5 text-rose-400 mr-1" />
+          <div className="bg-[#121620] p-3 sm:p-3.5 rounded-xl border border-slate-800 space-y-1">
+            <div className="text-[10px] sm:text-[11px] text-slate-400 flex items-center">
+              <ArrowDownRight className="w-3.5 h-3.5 text-rose-400 mr-1 shrink-0" />
               <span>Pending Recurring Bills</span>
             </div>
-            <div className="text-base font-bold text-rose-400">
+            <div className="text-sm sm:text-base font-bold text-rose-400 truncate">
               -{formatCurrency(metrics.pendingRecurringExpense, displayCurrency)}
             </div>
-            <div className="text-[10px] text-slate-500">
+            <div className="text-[9px] sm:text-[10px] text-slate-500 truncate">
               OSDE, Expensas, Cissab & utilities
             </div>
           </div>
 
-          <div className="bg-[#121620] p-3.5 rounded-xl border border-slate-800 space-y-1">
-            <div className="text-[11px] text-slate-400 flex items-center justify-between">
+          <div className="bg-[#121620] p-3 sm:p-3.5 rounded-xl border border-slate-800 space-y-1">
+            <div className="text-[10px] sm:text-[11px] text-slate-400 flex items-center justify-between">
               <span>Predicted EOM Assets</span>
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             </div>
-            <div className="text-base font-bold text-amber-400">
+            <div className="text-sm sm:text-base font-bold text-amber-400 truncate">
               {formatCurrency(adjustedMetrics.projectedEOMBalance, displayCurrency)}
             </div>
-            <div className="text-[10px] text-emerald-400 font-semibold">
+            <div className="text-[9px] sm:text-[10px] text-emerald-400 font-semibold truncate">
               Net EOM Delta: {adjustedMetrics.projectedEOMNet >= 0 ? '+' : ''}{formatCurrency(adjustedMetrics.projectedEOMNet, displayCurrency)}
             </div>
           </div>
@@ -421,7 +421,7 @@ export function OverviewTab({
       {/* Main Charts & Visualization Section */}
       <div className="space-y-6">
         {/* Cash Flow Trends with Predictive Line */}
-        <div className="bg-[#161b22] p-4 sm:p-5 rounded-xl border border-slate-800 shadow-sm space-y-3">
+        <div className="bg-[#11141c] p-4 sm:p-5 rounded-xl border border-slate-800 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-xs sm:text-sm font-semibold text-slate-100 flex items-center gap-2">
@@ -557,7 +557,7 @@ export function OverviewTab({
       </div>
 
       {/* Biggest Expenses (Top Merchants Table) - Clickable Rows */}
-      <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm">
+      <div className="bg-[#11141c] p-5 rounded-xl border border-slate-800 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-slate-100">Biggest Expenses (Top Merchants)</h3>
