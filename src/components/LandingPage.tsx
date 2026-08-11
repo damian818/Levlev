@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Wallet,
   TrendingUp,
@@ -6,14 +7,12 @@ import {
   Sparkles,
   ArrowRight,
   Lock,
-  DollarSign,
   ChevronDown,
   HelpCircle,
   Zap,
   Globe,
   Users,
   CheckCircle2,
-  PieChart,
   Calculator,
   RefreshCw
 } from 'lucide-react';
@@ -33,6 +32,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   authError,
   usdArsRate = 1521,
 }) => {
+  const { t, i18n } = useTranslation();
+
   // Simulator State for interactive FX / Inflation preview widget
   const [simUsdAmount, setSimUsdAmount] = useState<number>(1000);
   const [simArsRate, setSimArsRate] = useState<number>(usdArsRate);
@@ -48,26 +49,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   const faqs = [
     {
-      q: 'How does LevLev calculate my net worth across ARS and USD?',
-      a: 'LevLev automatically converts all accounts (bank balances, credit cards, Deel, DollarApp, cash) into your preferred display currency (ARS or USD) using live Dólar MEP exchange rates. You can also override custom conversion rates at any time.',
+      q: t('landing.faq_q1'),
+      a: t('landing.faq_a1'),
     },
     {
-      q: 'Is my financial data safe and private?',
-      a: 'Yes, 100%. LevLev runs client-side inside your browser with optional encrypted Supabase cloud backup. We never sell, track, or share your financial records with third parties.',
+      q: t('landing.faq_q2'),
+      a: t('landing.faq_a2'),
     },
     {
-      q: 'How does credit card cuotas (installments) tracking work?',
-      a: 'LevLev lets you log installment purchases (e.g. 12 cuotas fijas). It automatically calculates monthly closing dates, remaining installments, and evaluates the real cost after inflation.',
+      q: t('landing.faq_q3'),
+      a: t('landing.faq_a3'),
     },
     {
-      q: 'Do I need a credit card or bank credentials to use LevLev?',
-      a: 'No! LevLev does not connect directly to open-banking APIs or request bank passwords. You maintain total control by importing CSV statements or manually adding transactions with one click.',
+      q: t('landing.faq_q4'),
+      a: t('landing.faq_a4'),
     },
     {
-      q: 'What is Guest / Demo Mode?',
-      a: 'Guest Mode allows you to instantly explore all features, sample transactions, charts, and AI advisors with pre-filled mock data—without signing in or creating an account.',
+      q: t('landing.faq_q5'),
+      a: t('landing.faq_a5'),
     },
   ];
+
+  const currentLang = (i18n.language || 'en').substring(0, 2);
+
+  const toggleLanguage = () => {
+    const nextLang = currentLang === 'es' ? 'en' : 'es';
+    i18n.changeLanguage(nextLang);
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-slate-100 flex flex-col justify-between selection:bg-rose-500 selection:text-white font-sans relative overflow-x-hidden">
@@ -79,22 +87,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Navigation Header */}
       <header className="border-b border-slate-800/80 bg-[#0f131a]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
-          <LevLevLogo badgeText="INTELLIGENCE" size="md" />
+          <LevLevLogo badgeText={t('landing.badge_intelligence')} size="md" />
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Language Switcher */}
+            <button
+              onClick={toggleLanguage}
+              className="px-2.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all border border-slate-700/80 flex items-center gap-1.5"
+              title="Switch Language / Cambiar Idioma"
+            >
+              <Globe className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{currentLang === 'es' ? 'ES' : 'EN'}</span>
+            </button>
+
             <button
               onClick={onEnterGuestMode}
               className="px-3.5 py-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-semibold text-xs sm:text-sm rounded-xl transition-all border border-slate-700/80 flex items-center gap-1.5 active:scale-95"
             >
               <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span>Explore Demo</span>
+              <span>{t('landing.explore_demo')}</span>
             </button>
 
             <button
               onClick={onSignInWithGoogle}
               className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-lg shadow-emerald-900/30 flex items-center gap-1.5 active:scale-95"
             >
-              <span>Sign In</span>
+              <span>{t('landing.sign_in')}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -106,20 +124,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* Top Announcement Badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-800/90 border border-slate-700/80 text-rose-300 text-xs font-semibold mb-6 shadow-inner animate-pulse">
           <LevLevIcon className="w-4 h-4 shrink-0" variant="white" />
-          <span>Multi-Currency ARS/USD &amp; Inflation Intelligence Engine</span>
+          <span>{t('landing.badge_announcement')}</span>
         </div>
 
         {/* Hero Headline */}
         <h1 className="text-3xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight max-w-4xl text-center leading-[1.12] mb-6">
-          Master your net worth with{' '}
+          {t('landing.hero_title_prefix')}{' '}
           <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-rose-400 bg-clip-text text-transparent">
-            clarity, precision &amp; heart
+            {t('landing.hero_title_highlight')}
           </span>
         </h1>
 
         {/* Hero Subtitle */}
         <p className="text-slate-400 text-sm sm:text-xl max-w-2xl text-center mb-10 leading-relaxed font-normal">
-          Track multi-currency accounts in ARS &amp; USD, monitor live Dólar MEP rates, evaluate real INDEC inflation purchasing power, and manage cuotas effortlessly.
+          {t('landing.hero_subtitle')}
         </p>
 
         {/* CTA Action Cluster */}
@@ -131,7 +149,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
               <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
             </svg>
-            <span>Sign in with Google</span>
+            <span>{t('landing.sign_in_google')}</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
 
@@ -140,7 +158,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             className="px-6 py-4 bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold rounded-2xl border border-slate-700 transition-all active:scale-95 flex items-center justify-center gap-2 text-base sm:text-lg w-full sm:w-auto shrink-0"
           >
             <Zap className="w-5 h-5 text-amber-400" />
-            <span>Try Live Demo</span>
+            <span>{t('landing.try_demo')}</span>
           </button>
         </div>
 
@@ -156,11 +174,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-slate-400 mb-16">
           <div className="flex items-center gap-1.5 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800">
             <Lock className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Client-side Privacy Encrypted</span>
+            <span>{t('landing.client_privacy')}</span>
           </div>
           <div className="flex items-center gap-1.5 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800">
             <RefreshCw className="w-3.5 h-3.5 text-teal-400" />
-            <span>Dólar MEP Rate: <strong className="text-slate-200">${usdArsRate.toLocaleString()} ARS</strong></span>
+            <span>{t('landing.mep_rate')} <strong className="text-slate-200">${usdArsRate.toLocaleString()} ARS</strong></span>
           </div>
         </div>
 
@@ -170,14 +188,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs font-semibold mb-2">
                 <Calculator className="w-3.5 h-3.5" />
-                <span>Interactive Yield &amp; Inflation Simulator</span>
+                <span>{t('landing.sim_title_badge')}</span>
               </div>
               <h3 className="text-xl sm:text-2xl font-bold text-white">
-                See How Inflation Affects Your ARS vs USD Holdings
+                {t('landing.sim_headline')}
               </h3>
             </div>
             <span className="text-xs text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
-              Live Interactive Widget
+              {t('landing.sim_live_widget')}
             </span>
           </div>
 
@@ -186,7 +204,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="md:col-span-2 space-y-5">
               <div>
                 <div className="flex justify-between text-xs font-semibold text-slate-300 mb-2">
-                  <label htmlFor="sim-usd-amount">USD Balance or Salary ($USD):</label>
+                  <label htmlFor="sim-usd-amount">{t('landing.sim_usd_label')}</label>
                   <span className="text-emerald-400 font-bold">${simUsdAmount.toLocaleString()} USD</span>
                 </div>
                 <input
@@ -204,7 +222,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
               <div>
                 <div className="flex justify-between text-xs font-semibold text-slate-300 mb-2">
-                  <label htmlFor="sim-mep-rate">Dólar MEP Rate ($ARS / USD):</label>
+                  <label htmlFor="sim-mep-rate">{t('landing.sim_mep_label')}</label>
                   <span className="text-teal-400 font-bold">${simArsRate.toLocaleString()} ARS</span>
                 </div>
                 <input
@@ -222,7 +240,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
               <div>
                 <div className="flex justify-between text-xs font-semibold text-slate-300 mb-2">
-                  <label htmlFor="sim-monthly-ipc">Estimated Monthly IPC Inflation (%):</label>
+                  <label htmlFor="sim-monthly-ipc">{t('landing.sim_ipc_label')}</label>
                   <span className="text-rose-400 font-bold">{simInflationRate.toFixed(1)}% / month</span>
                 </div>
                 <input
@@ -243,20 +261,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
               <div>
                 <span className="text-slate-400 text-xs font-medium uppercase tracking-wider block mb-1">
-                  12-Month Real Loss If Kept in Uninvested ARS:
+                  {t('landing.sim_loss_label')}
                 </span>
                 <p className="text-2xl sm:text-3xl font-extrabold text-rose-400 mb-2">
                   -${Math.round(lostPurchasingPowerArs).toLocaleString()} ARS
                 </p>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Equivalent to losing ~<strong>${Math.round(lostPurchasingPowerArs / simArsRate).toLocaleString()} USD</strong> in real purchasing power over 1 year.
+                  {t('landing.sim_loss_equiv', { amount: Math.round(lostPurchasingPowerArs / simArsRate).toLocaleString() })}
                 </p>
               </div>
 
               <div className="pt-4 border-t border-slate-800/80 mt-4">
                 <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  LevLev tracks inflation-adjusted wealth
+                  {t('landing.sim_feature_check')}
                 </span>
               </div>
             </div>
@@ -270,10 +288,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <section className="w-full my-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-              Built for Modern Argentine &amp; International Finances
+              {t('landing.feature_section_title')}
             </h2>
             <p className="text-slate-400 text-sm sm:text-base mt-3 max-w-2xl mx-auto">
-              Everything you need to navigate dual currencies, volatile FX markets, inflation, and complex credit card statements in one elegant dashboard.
+              {t('landing.feature_section_sub')}
             </p>
           </div>
 
@@ -283,9 +301,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-5 group-hover:scale-110 transition-transform">
                 <Wallet className="w-6 h-6" />
               </div>
-              <h3 className="text-slate-100 font-bold text-lg mb-2">Dual Currency ARS &amp; USD</h3>
+              <h3 className="text-slate-100 font-bold text-lg mb-2">{t('landing.card_dual_title')}</h3>
               <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-                Automatically convert balances across Mercado Pago, Deel, DollarApp, Payoneer, local banks, and cash holding at live Dólar MEP rates.
+                {t('landing.card_dual_desc')}
               </p>
             </div>
 
@@ -294,9 +312,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-5 group-hover:scale-110 transition-transform">
                 <TrendingUp className="w-6 h-6" />
               </div>
-              <h3 className="text-slate-100 font-bold text-lg mb-2">INDEC IPC Inflation Engine</h3>
+              <h3 className="text-slate-100 font-bold text-lg mb-2">{t('landing.card_inflation_title')}</h3>
               <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-                Evaluate your nominal net worth against official monthly INDEC IPC inflation to measure actual purchasing power growth or decay.
+                {t('landing.card_inflation_desc')}
               </p>
             </div>
 
@@ -305,9 +323,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 mb-5 group-hover:scale-110 transition-transform">
                 <ShieldCheck className="w-6 h-6" />
               </div>
-              <h3 className="text-slate-100 font-bold text-lg mb-2">Cuotas &amp; Closing Dates</h3>
+              <h3 className="text-slate-100 font-bold text-lg mb-2">{t('landing.card_cuotas_title')}</h3>
               <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-                Organize credit card statement closing dates, interest-free installment plans (cuotas), and upcoming bill due dates with precision.
+                {t('landing.card_cuotas_desc')}
               </p>
             </div>
 
@@ -316,9 +334,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-5 group-hover:scale-110 transition-transform">
                 <Sparkles className="w-6 h-6" />
               </div>
-              <h3 className="text-slate-100 font-bold text-lg mb-2">AI Financial Advisor</h3>
+              <h3 className="text-slate-100 font-bold text-lg mb-2">{t('landing.card_ai_title')}</h3>
               <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-                Powered by Gemini API, LevLev analyzes monthly spending spikes, highlights recurring leaks, and gives tailormade financial insights.
+                {t('landing.card_ai_desc')}
               </p>
             </div>
 
@@ -327,9 +345,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-5 group-hover:scale-110 transition-transform">
                 <Lock className="w-6 h-6" />
               </div>
-              <h3 className="text-slate-100 font-bold text-lg mb-2">Client-Side Privacy</h3>
+              <h3 className="text-slate-100 font-bold text-lg mb-2">{t('landing.card_privacy_title')}</h3>
               <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-                Your data is stored locally in your browser with optional encrypted cloud backup. Toggle Privacy Mode anytime to blur figures on screen.
+                {t('landing.card_privacy_desc')}
               </p>
             </div>
 
@@ -338,9 +356,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-5 group-hover:scale-110 transition-transform">
                 <Users className="w-6 h-6" />
               </div>
-              <h3 className="text-slate-100 font-bold text-lg mb-2">Shared Workspaces</h3>
+              <h3 className="text-slate-100 font-bold text-lg mb-2">{t('landing.card_shared_title')}</h3>
               <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-                Share full workspaces or individual accounts with family members or business partners while keeping your private accounts separate.
+                {t('landing.card_shared_desc')}
               </p>
             </div>
           </div>
@@ -353,20 +371,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <Lock className="w-6 h-6" />
             </div>
             <h3 className="text-2xl sm:text-3xl font-extrabold text-white mb-3">
-              Your Financial Privacy is Non-Negotiable
+              {t('landing.trust_title')}
             </h3>
             <p className="text-slate-300 text-sm leading-relaxed mb-6">
-              LevLev never asks for bank account passwords, credit card numbers, or SSNs. You maintain full ownership of your data with one-click JSON backup and CSV export.
+              {t('landing.trust_sub')}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400">
               <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> No Bank Password Requirements
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> {t('landing.trust_check1')}
               </span>
               <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> One-Click JSON Backup &amp; Restore
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> {t('landing.trust_check2')}
               </span>
               <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Zero Data Selling
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> {t('landing.trust_check3')}
               </span>
             </div>
           </div>
@@ -377,10 +395,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/80 text-slate-300 text-xs font-semibold mb-3">
               <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Got Questions?</span>
+              <span>{t('landing.faq_badge')}</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Frequently Asked Questions
+              {t('landing.faq_title')}
             </h2>
           </div>
 
@@ -418,17 +436,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <section className="w-full max-w-4xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 rounded-3xl p-8 sm:p-12 text-center shadow-2xl my-12 relative overflow-hidden">
           <div className="relative z-10 max-w-2xl mx-auto">
             <h2 className="text-2xl sm:text-4xl font-black text-white mb-4">
-              Start Managing Your Multi-Currency Net Worth Today
+              {t('landing.cta_title')}
             </h2>
             <p className="text-emerald-100 text-sm sm:text-base mb-8 opacity-90">
-              Join thousands who track ARS &amp; USD balances with inflation clarity. No credit card required.
+              {t('landing.cta_sub')}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <button
                 onClick={onSignInWithGoogle}
                 className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-slate-100 text-slate-950 font-extrabold rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 text-base"
               >
-                <span>Sign in with Google</span>
+                <span>{t('landing.sign_in_google')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
               <button
@@ -436,7 +454,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 className="w-full sm:w-auto px-6 py-4 bg-emerald-950/60 hover:bg-emerald-950 text-white font-bold rounded-2xl border border-emerald-400/40 transition-all active:scale-95 flex items-center justify-center gap-2 text-base"
               >
                 <Zap className="w-4 h-4 text-amber-400" />
-                <span>Instant Demo Mode</span>
+                <span>{t('landing.cta_demo_btn')}</span>
               </button>
             </div>
           </div>
@@ -449,10 +467,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex items-center space-x-2">
             <LevLevIcon className="w-5 h-5" variant="white" />
             <span className="font-bold text-slate-300">LevLev</span>
-            <span>— Personal Finance with Heart</span>
+            <span>{t('landing.footer_tagline')}</span>
           </div>
           <p className="text-[11px] text-slate-600">
-            Multi-currency intelligence engine for ARS &amp; USD • Real-time Dólar MEP &amp; IPC Inflation
+            {t('landing.footer_sub')}
           </p>
         </div>
       </footer>
