@@ -105,10 +105,11 @@ AS $$
     SELECT EXISTS (
         SELECT 1 FROM public.user_settings us
         WHERE us.user_id = owner_id
+        AND (us.settings->'workspaceSharing'->>'isShared')::boolean = true
         AND jsonb_typeof(us.settings->'workspaceSharing'->'members') = 'array'
         AND EXISTS (
             SELECT 1 FROM jsonb_array_elements(us.settings->'workspaceSharing'->'members') AS member
-            WHERE member->>'email' = auth.jwt()->>'email'
+            WHERE LOWER(TRIM(member->>'email')) = LOWER(TRIM(auth.jwt()->>'email'))
         )
     );
 $$;

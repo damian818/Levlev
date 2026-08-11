@@ -213,8 +213,11 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
 
   try {
     // Helper to preserve shared row IDs and user_ids
-    const resolveSyncId = (itemId: string | undefined | null, currentUserId: string) => {
-      if (!itemId) return { id: `${currentUserId}_${Math.random().toString(36).substring(2)}`, userId: currentUserId };
+    const resolveSyncId = (itemId: string | undefined | null, currentUserId: string, ownerHint?: string) => {
+      if (!itemId) {
+        const owner = ownerHint || currentUserId;
+        return { id: `${owner}_${Math.random().toString(36).substring(2)}`, userId: owner };
+      }
       if (itemId.includes('_')) {
         const parts = itemId.split('_');
         if (parts[0].length === 36) {
@@ -222,13 +225,29 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           return { id: itemId, userId: parts[0] };
         }
       }
-      return { id: `${currentUserId}_${itemId}`, userId: currentUserId };
+      const owner = ownerHint || currentUserId;
+      return { id: `${owner}_${itemId}`, userId: owner };
     };
+
+    const accountOwnerMap: Record<string, string> = {};
+    let firstForeignOwner: string | undefined = undefined;
+    (data.accounts || []).forEach(a => {
+      if (a.id && a.id.includes('_')) {
+        const parts = a.id.split('_');
+        if (parts[0].length === 36) {
+          accountOwnerMap[a.name] = parts[0];
+          if (parts[0] !== userId && !firstForeignOwner) {
+            firstForeignOwner = parts[0];
+          }
+        }
+      }
+    });
 
     // 1. Transactions upsert or clear in batches of 500
     if (data.transactions && data.transactions.length > 0) {
       const txRows = data.transactions.map(t => {
-        const { id: rowId, userId: targetUserId } = resolveSyncId(t.id, userId);
+        const ownerHint = (t.account ? accountOwnerMap[t.account] : undefined) || firstForeignOwner;
+        const { id: rowId, userId: targetUserId } = resolveSyncId(t.id, userId, ownerHint);
         
         let safeInstallments: number | null = null;
         if (t.totalInstallments && typeof t.totalInstallments === 'number') {
@@ -294,7 +313,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
     // 2. Categories upsert
     if (data.categories && data.categories.length > 0) {
       const catRows = data.categories.map(c => {
-        const { id: rowId, userId: targetUserId } = resolveSyncId(c.id, userId);
+        const { id: rowId, userId: targetUserId } = resolveSyncId(c.id, userId, firstForeignOwner);
         return {
           id: rowId,
           user_id: targetUserId,
@@ -311,7 +330,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
     // 3. Accounts upsert
     if (data.accounts && data.accounts.length > 0) {
       const accRows = data.accounts.map(a => {
-        const { id: rowId, userId: targetUserId } = resolveSyncId(a.id, userId);
+        const { id: rowId, userId: targetUserId } = resolveSyncId(a.id, userId, firstForeignOwner);
         return {
           id: rowId,
           user_id: targetUserId,
@@ -339,13 +358,16 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
 
     // 4. Budgets upsert or clear
     if (data.budgets && data.budgets.length > 0) {
-      const budRows = data.budgets.map(b => ({
-        id: `${userId}_${b.category}`,
-        user_id: userId,
-        category: b.category,
-        monthly_limit: b.monthlyLimitARS,
-        currency: 'ARS',
-      }));
+      const budRows = data.budgets.map(b => {
+        const targetUserId = firstForeignOwner || userId;
+        return {
+          id: `${targetUserId}_${b.category}`,
+          user_id: targetUserId,
+          category: b.category,
+          monthly_limit: b.monthlyLimitARS,
+          currency: 'ARS',
+        };
+      });
 
       const { error: budErr } = await client.from('budgets').upsert(budRows, { onConflict: 'id' });
       if (budErr) console.error('Error upserting budgets to Supabase:', budErr);
