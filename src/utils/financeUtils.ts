@@ -150,6 +150,40 @@ export function getStatementCloseDateForPayment(
   return `${closePrev.getFullYear()}-${pad(closePrev.getMonth() + 1)}-${pad(closePrev.getDate())}`;
 }
 
+export function getUpcomingStatementCloseDates(
+  txDateStr: string,
+  closingRule?: CreditCardClosingRule,
+  countPast: number = 3,
+  countFuture: number = 8
+): { dateStr: string; label: string; isDefault: boolean }[] {
+  const dt = txDateStr ? new Date(txDateStr) : new Date();
+  const baseYear = isNaN(dt.getTime()) ? new Date().getFullYear() : dt.getFullYear();
+  const baseMonth = isNaN(dt.getTime()) ? new Date().getMonth() : dt.getMonth();
+
+  const rule: CreditCardClosingRule = closingRule || { ruleType: 'FIXED_DAY', fixedDay: 25 };
+  const defaultCloseStr = getStatementCloseDateForTx(txDateStr || new Date().toISOString().substring(0, 10), rule);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const results: { dateStr: string; label: string; isDefault: boolean }[] = [];
+  const seen = new Set<string>();
+
+  for (let offset = -countPast; offset <= countFuture; offset++) {
+    const d = new Date(baseYear, baseMonth + offset, 1);
+    const closeDt = getCloseDateForMonthAndYear(d.getFullYear(), d.getMonth(), rule);
+    const dateStr = `${closeDt.getFullYear()}-${pad(closeDt.getMonth() + 1)}-${pad(closeDt.getDate())}`;
+
+    if (!seen.has(dateStr)) {
+      seen.add(dateStr);
+      const monthName = closeDt.toLocaleString('en-US', { month: 'short' });
+      const isDefault = dateStr === defaultCloseStr;
+      const label = `${closeDt.getDate()} ${monthName} ${closeDt.getFullYear()}${isDefault ? ' (Current Period)' : ''}`;
+      results.push({ dateStr, label, isDefault });
+    }
+  }
+
+  return results.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+}
+
 export function getCreditCardStatements(
   transactions: Transaction[],
   accountName: string,

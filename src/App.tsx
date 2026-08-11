@@ -542,8 +542,12 @@ export default function App() {
     deleteTransactionFromSupabase(id);
   };
 
-  const handleAddTransaction = (newTx: Transaction) => {
-    setTransactions(prev => [newTx, ...prev]);
+  const handleAddTransaction = (newTx: Transaction | Transaction[]) => {
+    if (Array.isArray(newTx)) {
+      setTransactions(prev => [...newTx, ...prev]);
+    } else {
+      setTransactions(prev => [newTx, ...prev]);
+    }
   };
 
   const handleLogout = async () => {
@@ -696,6 +700,9 @@ export default function App() {
         accountsList={accounts}
         existingAccounts={accounts.map(a => a.name)}
         existingCategories={categories.map(c => c.name)}
+        existingTransactions={transactions}
+        onAddCategory={handleAddCategory}
+        onAddAccount={handleAddAccount}
         usdArsRate={usdArsRate}
       />
 
