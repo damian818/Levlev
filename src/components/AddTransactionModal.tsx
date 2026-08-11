@@ -354,10 +354,17 @@ export function AddTransactionModal({
   // Check if current active account is Credit Card
   const isCC = useMemo(() => {
     if (type === 'CC_PAYMENT') return true;
-    const match = accountItems.find(a => a.name === account);
+    const match = accountItems.find(a => a.name.toLowerCase() === account.toLowerCase());
     if (match) return isAccountCreditCard(match);
     return isCreditCardAccount(account);
   }, [account, accountItems, type]);
+
+  // Reset installments to 1 if the account is not a credit card
+  useEffect(() => {
+    if (!isCC) {
+      setNumInstallments(1);
+    }
+  }, [isCC]);
 
   // Statement close dates list for the selected CC account
   const statementCloseDatesList = useMemo(() => {
@@ -530,7 +537,7 @@ export function AddTransactionModal({
       onAddTransaction(transferTx);
     } else {
       // EXPENSE or INCOME
-      if (numInstallments > 1 && installmentSchedule.length > 0) {
+      if (type === 'EXPENSE' && isCC && numInstallments > 1 && installmentSchedule.length > 0) {
         // Create multiple installment transactions
         const txList: Transaction[] = installmentSchedule.map((cuota, idx) => ({
           id: `manual-${Date.now()}-${idx + 1}`,
@@ -1056,8 +1063,8 @@ export function AddTransactionModal({
             </div>
           )}
 
-          {/* CREDIT CARD INSTALLMENTS BREAKDOWN ENGINE (For Expenses) */}
-          {type === 'EXPENSE' && (
+          {/* CREDIT CARD INSTALLMENTS BREAKDOWN ENGINE (For Expenses on Credit Cards) */}
+          {type === 'EXPENSE' && isCC && (
             <div className="p-3.5 bg-[#0d1017] border border-slate-800 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">

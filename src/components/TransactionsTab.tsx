@@ -8,7 +8,7 @@ interface TransactionsTabProps {
   displayCurrency: DisplayCurrency;
   usdArsRate: number;
   historyData?: InflationPoint[];
-  onDeleteTransaction: (id: string) => void;
+  onDeleteTransaction: (id: string | string[]) => void;
   onOpenAddModal: () => void;
   onOpenDeleteModal?: () => void;
   activeFilter?: TransactionFilter;
@@ -37,6 +37,40 @@ export function TransactionsTab({
   const [recurringFilter, setRecurringFilter] = useState<'ALL' | 'ONE_TIME' | 'RECURRING'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  // Installment deletion options modal
+  const [installmentTxToDelete, setInstallmentTxToDelete] = useState<Transaction | null>(null);
+
+  const handleDeleteClick = (tx: Transaction) => {
+    if (tx.installments || tx.totalInstallments || isInstallmentTx(tx)) {
+      setInstallmentTxToDelete(tx);
+    } else {
+      onDeleteTransaction(tx.id);
+    }
+  };
+
+  const handleDeleteOnlySingleCuota = () => {
+    if (installmentTxToDelete) {
+      onDeleteTransaction(installmentTxToDelete.id);
+      setInstallmentTxToDelete(null);
+    }
+  };
+
+  const handleDeleteAllCuotasInGroup = () => {
+    if (installmentTxToDelete) {
+      const targetTitle = (installmentTxToDelete.title || '').toLowerCase().trim();
+      const targetAccount = (installmentTxToDelete.account || '').toLowerCase().trim();
+      const matching = transactions.filter(t => {
+        const matchTitle = (t.title || '').toLowerCase().trim() === targetTitle;
+        const matchAccount = (t.account || '').toLowerCase().trim() === targetAccount;
+        const isInst = Boolean(t.installments || t.totalInstallments || isInstallmentTx(t));
+        return matchTitle && matchAccount && isInst;
+      });
+      const idsToDelete = matching.map(t => t.id);
+      onDeleteTransaction(idsToDelete.length > 0 ? idsToDelete : [installmentTxToDelete.id]);
+      setInstallmentTxToDelete(null);
+    }
+  };
 
   // Sorting state
   const [sortField, setSortField] = useState<SortField>('date');
@@ -526,7 +560,7 @@ export function TransactionsTab({
                       </td>
                       <td className="p-3 text-center">
                         <button
-                          onClick={() => onDeleteTransaction(tx.id)}
+                          onClick={() => handleDeleteClick(tx)}
                           className="p-1 text-slate-400 hover:text-rose-400 rounded-md hover:bg-rose-950/50 transition-colors"
                           title="Delete transaction"
                         >
@@ -568,6 +602,68 @@ export function TransactionsTab({
           </div>
         )}
       </div>
+
+      {/* Installment Deletion Options Modal */}
+      {installmentTxToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+          <div className="bg-[#161b22] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-start">
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <button
+                onClick={() => setInstallmentTxToDelete(null)}
+                className="p-1 text-slate-400 hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-slate-100">Delete Installment Purchase?</h3>
+              <p className="text-xs text-slate-400">
+                "<span className="text-slate-200 font-semibold">{installmentTxToDelete.title}</span>" on account{' '}
+                <span className="text-slate-200 font-semibold">{installmentTxToDelete.account}</span> is part of an installment plan.
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-[#0d1017] rounded-xl border border-slate-800 space-y-2 text-xs">
+              <div className="flex justify-between text-slate-400">
+                <span>Selected Cuota:</span>
+                <span className="font-mono font-bold text-amber-300">{installmentTxToDelete.installments || '1'}</span>
+              </div>
+              <div className="flex justify-between text-slate-400">
+                <span>Amount:</span>
+                <span className="font-mono font-bold text-slate-200">{formatCurrency(installmentTxToDelete.amount, installmentTxToDelete.currency as DisplayCurrency)}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5 pt-1">
+              <button
+                onClick={handleDeleteAllCuotasInGroup}
+                className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete ALL Installments in this Series</span>
+              </button>
+
+              <button
+                onClick={handleDeleteOnlySingleCuota}
+                className="w-full py-2.5 px-4 bg-[#21262d] hover:bg-[#30363d] border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors text-center"
+              >
+                Delete ONLY this single Cuota ({installmentTxToDelete.installments || '1'})
+              </button>
+
+              <button
+                onClick={() => setInstallmentTxToDelete(null)}
+                className="w-full py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors text-center mt-1"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

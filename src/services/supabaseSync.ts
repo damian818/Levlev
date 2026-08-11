@@ -1,6 +1,46 @@
 import { getSupabaseClient } from '../lib/supabase';
 import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember } from '../types';
 
+const DELETED_TX_KEY = 'finance_app_deleted_tx_ids';
+
+export function getDeletedTxIds(): Set<string> {
+  try {
+    const saved = localStorage.getItem(DELETED_TX_KEY);
+    if (saved) {
+      const arr = JSON.parse(saved);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch (e) {}
+  return new Set();
+}
+
+export function addDeletedTxIds(ids: string[]) {
+  try {
+    const current = getDeletedTxIds();
+    ids.forEach(id => {
+      if (id) {
+        current.add(id);
+        // Also strip user_id prefix if present, or add with prefix
+        const cleanId = id.includes('_') ? id.split('_').slice(1).join('_') : id;
+        current.add(cleanId);
+      }
+    });
+    localStorage.setItem(DELETED_TX_KEY, JSON.stringify(Array.from(current)));
+  } catch (e) {}
+}
+
+export function removeDeletedTxIds(ids: string[]) {
+  try {
+    const current = getDeletedTxIds();
+    ids.forEach(id => {
+      current.delete(id);
+      const cleanId = id.includes('_') ? id.split('_').slice(1).join('_') : id;
+      current.delete(cleanId);
+    });
+    localStorage.setItem(DELETED_TX_KEY, JSON.stringify(Array.from(current)));
+  } catch (e) {}
+}
+
 export interface SupabaseUserData {
   transactions: Transaction[];
   categories: CategoryItem[];
@@ -83,8 +123,15 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       }
     }
 
-    const transactions: Transaction[] = rawTxRows.map((row: any) => ({
-      id: row.id || `tx-${Math.random().toString(36).substring(2)}`,
+    const deletedIds = getDeletedTxIds();
+    const transactions: Transaction[] = rawTxRows
+      .filter((row: any) => {
+        const rowId = row.id || '';
+        const cleanId = rowId.includes('_') ? rowId.split('_').slice(1).join('_') : rowId;
+        return !deletedIds.has(rowId) && !deletedIds.has(cleanId);
+      })
+      .map((row: any) => ({
+        id: row.id || `tx-${Math.random().toString(36).substring(2)}`,
       date: row.date || new Date().toISOString().substring(0, 10),
       title: row.title || 'Untitled',
       amount: Number(row.amount) || 0,
@@ -328,6 +375,21 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       console.warn('user_settings table sync catch:', e);
     }
 
+    // 6. Purge any pending cached deleted transactions in Supabase
+    const pendingDeleted = getDeletedTxIds();
+    if (pendingDeleted.size > 0) {
+      const pendingIds = Array.from(pendingDeleted);
+      const queryIds: string[] = [];
+      pendingIds.forEach(id => {
+        queryIds.push(id);
+        if (!id.startsWith(userId)) queryIds.push(`${userId}_${id}`);
+      });
+      const { error: delErr } = await client.from('transactions').delete().in('id', queryIds).eq('user_id', userId);
+      if (!delErr) {
+        removeDeletedTxIds(pendingIds);
+      }
+    }
+
     return true;
   } catch (err) {
     console.error('Error syncing data to Supabase:', err);
@@ -335,26 +397,40 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
   }
 }
 
-export async function deleteTransactionFromSupabase(txId: string): Promise<boolean> {
+export async function deleteTransactionFromSupabase(txId: string | string[]): Promise<boolean> {
+  const idsArr = Array.isArray(txId) ? txId : [txId];
+  if (idsArr.length === 0) return true;
+
+  addDeletedTxIds(idsArr);
+
   const client = getSupabaseClient();
-  if (!client) return false;
+  if (!client) return true;
 
   try {
     const { data: { session } } = await client.auth.getSession();
-    if (!session?.user) return false;
+    if (!session?.user) return true;
 
     const userId = session.user.id;
-    const scopedId = (txId && txId.startsWith(userId)) ? txId : `${userId}_${txId}`;
+    const queryIds: string[] = [];
+    idsArr.forEach(id => {
+      queryIds.push(id);
+      if (!id.startsWith(userId)) {
+        queryIds.push(`${userId}_${id}`);
+      }
+    });
 
     const { error } = await client
       .from('transactions')
       .delete()
-      .or(`id.eq.${txId},id.eq.${scopedId}`)
+      .in('id', queryIds)
       .eq('user_id', userId);
+
     if (error) {
       console.error('Error deleting transaction from Supabase:', error);
       return false;
     }
+
+    removeDeletedTxIds(idsArr);
     return true;
   } catch (e) {
     console.error('Exception deleting transaction from Supabase:', e);

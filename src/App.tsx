@@ -609,9 +609,19 @@ export default function App() {
     }
   };
 
-  const handleDeleteTransaction = (id: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
-    deleteTransactionFromSupabase(id);
+  const handleDeleteTransaction = (idOrIds: string | string[]) => {
+    const idsToDelete = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+    if (idsToDelete.length === 0) return;
+
+    setTransactions(prev => {
+      const updated = prev.filter(t => !idsToDelete.includes(t.id));
+      try {
+        localStorage.setItem('finance_app_transactions', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    deleteTransactionFromSupabase(idsToDelete);
   };
 
   const handleAddTransaction = (newTx: Transaction | Transaction[]) => {
