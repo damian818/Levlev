@@ -65,6 +65,8 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
   const { data: { session } } = await client.auth.getSession();
   if (!session?.user) return null;
 
+  const userId = session.user.id;
+
   try {
     const [catRes, accRes, budRes, setRes] = await Promise.all([
       client.from('categories').select('*'),
@@ -130,27 +132,33 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
         const cleanId = rowId.includes('_') ? rowId.split('_').slice(1).join('_') : rowId;
         return !deletedIds.has(rowId) && !deletedIds.has(cleanId);
       })
-      .map((row: any) => ({
-        id: row.id || `tx-${Math.random().toString(36).substring(2)}`,
-      date: row.date || new Date().toISOString().substring(0, 10),
-      title: row.title || 'Untitled',
-      amount: Number(row.amount) || 0,
-      currency: row.currency || 'ARS',
-      category: row.category || 'General',
-      account: row.account || 'Main',
-      type: row.type || 'EXPENSE',
-      toAccount: row.to_account || undefined,
-      installments: row.installments ? String(row.installments) : undefined,
-      statementCloseDate: row.statement_close_date || undefined,
-      transferAmount: row.transfer_amount !== undefined && row.transfer_amount !== null ? Number(row.transfer_amount) : (row.type === 'TRANSFER' ? Number(row.amount) : undefined),
-      transferCurrency: row.transfer_currency || (row.type === 'TRANSFER' ? row.currency : undefined),
-      receiveAmount: row.receive_amount !== undefined && row.receive_amount !== null ? Number(row.receive_amount) : undefined,
-      receiveCurrency: row.receive_currency || undefined,
-      description: row.notes || undefined,
-    }));
+      .map((row: any) => {
+        const tAccount = row.user_id !== userId ? `${row.account || 'Main'} (Shared)` : (row.account || 'Main');
+        const tToAccount = row.to_account ? (row.user_id !== userId ? `${row.to_account} (Shared)` : row.to_account) : undefined;
+        return {
+          id: row.id || `tx-${Math.random().toString(36).substring(2)}`,
+          ownerId: row.user_id,
+          date: row.date || new Date().toISOString().substring(0, 10),
+          title: row.title || 'Untitled',
+          amount: Number(row.amount) || 0,
+          currency: row.currency || 'ARS',
+          category: row.category || 'General',
+          account: tAccount,
+          type: row.type || 'EXPENSE',
+          toAccount: tToAccount,
+          installments: row.installments ? String(row.installments) : undefined,
+          statementCloseDate: row.statement_close_date || undefined,
+          transferAmount: row.transfer_amount !== undefined && row.transfer_amount !== null ? Number(row.transfer_amount) : (row.type === 'TRANSFER' ? Number(row.amount) : undefined),
+          transferCurrency: row.transfer_currency || (row.type === 'TRANSFER' ? row.currency : undefined),
+          receiveAmount: row.receive_amount !== undefined && row.receive_amount !== null ? Number(row.receive_amount) : undefined,
+          receiveCurrency: row.receive_currency || undefined,
+          description: row.notes || undefined,
+        };
+      });
 
     const categories: CategoryItem[] = (catRes.data || []).map((row: any) => ({
       id: row.id || `cat-${Math.random().toString(36).substring(2)}`,
+      ownerId: row.user_id,
       name: row.name || 'Category',
       type: row.type || 'BOTH',
       description: row.color || '#64748b',
@@ -180,7 +188,8 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
 
       return {
         id: row.id || `acc-${Math.random().toString(36).substring(2)}`,
-        name: row.name || 'Account',
+        ownerId: row.user_id,
+        name: row.user_id !== userId ? `${row.name || 'Account'} (Shared)` : (row.name || 'Account'),
         type: accType,
         currency: row.currency || 'ARS',
         initialBalance: (row.initial_balance !== undefined && row.initial_balance !== null) ? Number(row.initial_balance) : 0,
@@ -191,6 +200,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     });
 
     const budgets: BudgetGoal[] = (budRes.data || []).map((row: any) => ({
+      ownerId: row.user_id,
       category: row.category || 'General',
       monthlyLimitARS: Number(row.monthly_limit) || 0,
     }));
@@ -268,6 +278,9 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
         const rawAmount = (t.amount !== undefined && t.amount !== null && t.amount > 0) ? t.amount : ((t.transferAmount && t.transferAmount > 0) ? t.transferAmount : (t.amount || 0));
         const cleanAmount = Math.round(rawAmount * 100) / 100;
 
+        const cleanAccount = t.account ? t.account.replace(' (Shared)', '') : 'Main';
+        const cleanToAccount = t.toAccount ? t.toAccount.replace(' (Shared)', '') : null;
+
         return {
           id: rowId,
           user_id: targetUserId,
@@ -276,9 +289,9 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           amount: cleanAmount,
           currency: t.currency || 'ARS',
           category: t.category || 'General',
-          account: t.account || 'Main',
+          account: cleanAccount,
           type: t.type,
-          to_account: t.toAccount || null,
+          to_account: cleanToAccount,
           installments: safeInstallments,
           statement_close_date: t.statementCloseDate || null,
           transfer_amount: t.transferAmount !== undefined && t.transferAmount !== null ? Math.round(t.transferAmount * 100) / 100 : null,
@@ -331,10 +344,11 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
     if (data.accounts && data.accounts.length > 0) {
       const accRows = data.accounts.map(a => {
         const { id: rowId, userId: targetUserId } = resolveSyncId(a.id, userId, firstForeignOwner);
+        const cleanName = a.name ? a.name.replace(' (Shared)', '') : 'Account';
         return {
           id: rowId,
           user_id: targetUserId,
-          name: a.name,
+          name: cleanName,
           type: a.type || 'CHECKING',
           currency: a.currency || 'ARS',
           initial_balance: a.initialBalance || 0,
@@ -480,10 +494,12 @@ export async function deleteCategoryFromSupabase(catName: string): Promise<boole
     const { data: { session } } = await client.auth.getSession();
     if (!session?.user) return false;
 
+    const cleanName = catName ? catName.replace(' (Shared)', '') : catName;
+
     const { error } = await client
       .from('categories')
       .delete()
-      .eq('name', catName);
+      .eq('name', cleanName);
     if (error) {
       console.error('Error deleting category from Supabase:', error);
       return false;
@@ -502,10 +518,12 @@ export async function deleteAccountFromSupabase(accName: string): Promise<boolea
     const { data: { session } } = await client.auth.getSession();
     if (!session?.user) return false;
 
+    const cleanName = accName ? accName.replace(' (Shared)', '') : accName;
+
     const { error } = await client
       .from('accounts')
       .delete()
-      .eq('name', accName);
+      .eq('name', cleanName);
     if (error) {
       console.error('Error deleting account from Supabase:', error);
       return false;

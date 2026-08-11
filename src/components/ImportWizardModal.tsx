@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, X, Download, AlertCircle, CheckCircle, FileText, ChevronRight } from 'lucide-react';
+import { Upload, X, Download, AlertCircle, CheckCircle, FileText, ChevronRight, Sparkles } from 'lucide-react';
 import Papa from 'papaparse';
 import { Transaction, AccountItem, CategoryItem, BudgetGoal } from '../types';
 
@@ -45,6 +45,100 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleIvyWalletChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(buffer);
+      
+      let content = '';
+      // Detect encoding
+      if (uint8[0] === 0xFF && uint8[1] === 0xFE) {
+        const decoder = new TextDecoder('utf-16le');
+        content = decoder.decode(buffer);
+      } else if (uint8[0] === 0xFE && uint8[1] === 0xFF) {
+        const decoder = new TextDecoder('utf-16be');
+        content = decoder.decode(buffer);
+      } else {
+        const decoder = new TextDecoder('utf-8');
+        content = decoder.decode(buffer);
+      }
+
+      Papa.parse(content, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (h) => h.trim(),
+        complete: (results) => {
+          const errors: ValidationError[] = [];
+          const txs: Transaction[] = [];
+
+          results.data.forEach((row: any, idx: number) => {
+            if (!row.Date || (!row.Account && !row.Title)) return;
+
+            const cleanAmount = (val: string) => {
+               if (!val) return 0;
+               // Remove thousands separators (commas) and parse
+               const sanitized = String(val).replace(/"/g, '').replace(/,/g, '');
+               return parseFloat(sanitized) || 0;
+            };
+
+            const type = (row.Type || 'EXPENSE').toUpperCase();
+            let amount = cleanAmount(row.Amount);
+            const transferAmount = cleanAmount(row['Transfer Amount']);
+            const receiveAmount = cleanAmount(row['Receive Amount']);
+
+            // Ivy specific: Transfers often have 0 amount but set Transfer Amount
+            if (type === 'TRANSFER' && amount === 0 && transferAmount !== 0) {
+              amount = transferAmount;
+            }
+
+            const desc = row.Description || '';
+            let installments = '';
+            // Ivy specific: "6/6" pattern in description for installments
+            if (/^\d+\/\d+$/.test(desc.trim())) {
+              installments = desc.trim();
+            }
+
+            txs.push({
+              id: row.ID || `tx-ivy-${Date.now()}-${idx}`,
+              date: (row.Date || '').substring(0, 10),
+              title: row.Title || 'Untitled',
+              category: row.Category || 'Uncategorized',
+              account: row.Account || 'Main',
+              amount: Math.abs(amount),
+              currency: row.Currency || 'ARS',
+              type: type as any,
+              description: installments ? '' : desc,
+              installments: installments,
+              toAccount: row['To Account'] || undefined,
+              receiveAmount: receiveAmount || undefined,
+              receiveCurrency: row['Receive Currency'] || undefined,
+              dueDate: row['Due Date'] || undefined,
+            });
+          });
+
+          setParsedData({ transactions: txs, categories: [], accounts: [], budgets: [] });
+          setValidationErrors(errors);
+          setStep('preview');
+          setIsLoading(false);
+        },
+        error: (err) => {
+          setValidationErrors([{ row: 0, message: `Ivy Wallet Parse Error: ${err.message}`, type: 'error' }]);
+          setStep('preview');
+          setIsLoading(false);
+        }
+      });
+    } catch (err: any) {
+      setValidationErrors([{ row: 0, message: `File read error: ${err.message}`, type: 'error' }]);
+      setStep('preview');
+      setIsLoading(false);
+    }
+    e.target.value = '';
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -256,19 +350,34 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
         <div className="flex-1 overflow-y-auto p-6">
           {step === 'upload' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-[#121620] border border-slate-800 rounded-xl p-5 hover:border-emerald-500/30 transition-colors">
                   <h3 className="font-bold text-slate-200 mb-2 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-emerald-400" />
                     CSV Transactions
                   </h3>
                   <p className="text-xs text-slate-400 mb-4 h-12">
-                    Import transactions from a spreadsheet. Perfect for migrating from another app or bank statements.
+                    Import transactions from a spreadsheet. Manual column mapping required.
                   </p>
-                  <button onClick={handleDownloadTemplate} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors">
-                    <Download className="w-4 h-4" />
-                    Download CSV Template
+                  <button onClick={handleDownloadTemplate} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors">
+                    <Download className="w-3 h-3" />
+                    Download Template
                   </button>
+                </div>
+
+                <div className="bg-[#121620] border border-slate-800 rounded-xl p-5 border-purple-500/30 hover:bg-purple-500/5 transition-colors">
+                  <h3 className="font-bold text-slate-200 mb-2 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    Ivy Wallet
+                  </h3>
+                  <p className="text-xs text-slate-400 mb-4 h-12">
+                    Direct import from Ivy Wallet CSV export. All fields mapped automatically.
+                  </p>
+                  <label className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm shadow-purple-900/20 uppercase tracking-wider">
+                    <Upload className="w-3 h-3" />
+                    Select Ivy Export
+                    <input type="file" accept=".csv" onChange={handleIvyWalletChange} className="hidden" />
+                  </label>
                 </div>
                 
                 <div className="bg-[#121620] border border-slate-800 rounded-xl p-5 hover:border-emerald-500/30 transition-colors">
@@ -279,8 +388,8 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
                   <p className="text-xs text-slate-400 mb-4 h-12">
                     Restore a complete backup including accounts, categories, budgets, and transactions.
                   </p>
-                  <div className="text-xs text-slate-500 flex items-center gap-2 h-8">
-                     Generated via Settings {'>'} Export JSON
+                  <div className="text-[10px] text-slate-500 flex items-center gap-2 h-8 font-medium">
+                     Settings {'>'} Export JSON
                   </div>
                 </div>
               </div>

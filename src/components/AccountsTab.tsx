@@ -24,6 +24,7 @@ interface AccountsTabProps {
   onUpdateAccountSharing?: (accName: string, isShared: boolean, sharedMembers: SharedMember[]) => void;
   onEditAccount?: (oldName: string, updatedAcc: AccountItem, updateTransactions: boolean) => void;
   onAddAccount?: (newAcc: AccountItem) => void;
+  currentUserId?: string;
 }
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
@@ -46,6 +47,7 @@ export function AccountsTab({
   onUpdateAccountSharing,
   onEditAccount,
   onAddAccount,
+  currentUserId,
 }: AccountsTabProps) {
   const [editingAccount, setEditingAccount] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -337,6 +339,9 @@ export function AccountsTab({
                             <Users className="w-2.5 h-2.5" /> Shared ({memberCount})
                           </span>
                         )}
+                        {matchedAccount?.ownerId && currentUserId && matchedAccount.ownerId !== currentUserId && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30 text-[9px] font-bold">Workspace</span>
+                        )}
                         <button
                           onClick={() => toggleAccountClassification(acc.accountName, true)}
                           className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700"
@@ -446,6 +451,9 @@ export function AccountsTab({
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
                             <Users className="w-2.5 h-2.5" /> Shared ({memberCount})
                           </span>
+                        )}
+                        {matchedAccount?.ownerId && currentUserId && matchedAccount.ownerId !== currentUserId && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30 text-[9px] font-bold">Workspace</span>
                         )}
                         {acc.hasCustom && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">

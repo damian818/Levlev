@@ -1,5 +1,6 @@
 export interface Transaction {
   id: string;
+  ownerId?: string;
   date: string;
   title: string;
   category: string;
@@ -61,6 +62,7 @@ export interface CreditCardAccountConfig {
 }
 
 export interface BudgetGoal {
+  ownerId?: string;
   category: string;
   monthlyLimitARS: number;
 }
@@ -84,6 +86,7 @@ export interface InflationPoint {
 
 export interface CategoryItem {
   id: string;
+  ownerId?: string;
   name: string;
   type: 'EXPENSE' | 'INCOME' | 'BOTH';
   description?: string;
@@ -100,6 +103,7 @@ export interface SharedMember {
 
 export interface AccountItem {
   id: string;
+  ownerId?: string;
   name: string;
   type: 'CHECKING' | 'SAVINGS' | 'CREDIT_CARD' | 'WALLET' | 'INVESTMENT' | 'OTHER';
   currency: string;

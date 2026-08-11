@@ -14,6 +14,7 @@ interface TransactionsTabProps {
   onOpenDeleteModal?: () => void;
   activeFilter?: TransactionFilter;
   onClearFilter?: () => void;
+  currentUserId?: string;
 }
 
 type SortField = 'date' | 'title' | 'category' | 'account' | 'type' | 'amount' | 'converted';
@@ -29,6 +30,7 @@ export function TransactionsTab({
   onOpenDeleteModal,
   activeFilter,
   onClearFilter,
+  currentUserId,
 }: TransactionsTabProps) {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState(activeFilter?.search || '');
@@ -504,7 +506,12 @@ export function TransactionsTab({
                         </div>
                       </td>
                       <td className="p-3 font-medium text-slate-200">
-                        <div>{tx.title}</div>
+                        <div className="flex items-center space-x-1.5">
+                          <span>{tx.title}</span>
+                          {tx.ownerId && currentUserId && tx.ownerId !== currentUserId && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[9px] font-bold" title="Shared by another workspace member">Shared</span>
+                          )}
+                        </div>
                         {tx.description && <div className="text-[10px] text-slate-500">{tx.description}</div>}
                       </td>
                       <td className="p-3 text-slate-300">

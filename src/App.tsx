@@ -695,6 +695,7 @@ export default function App() {
             onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
             activeFilter={activeFilter}
             onClearFilter={() => setActiveFilter(undefined)}
+            currentUserId={authUser?.id}
           />
         )}
         {currentTab === 'accounts' && (
@@ -716,6 +717,7 @@ export default function App() {
             onUpdateAccountSharing={handleUpdateAccountSharing}
             onEditAccount={handleEditAccount}
             onAddAccount={handleAddAccount}
+            currentUserId={authUser?.id}
           />
         )}
         {currentTab === 'reports' && (
