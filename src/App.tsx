@@ -619,6 +619,11 @@ export default function App() {
     }
   };
 
+  const handleUpdateTransaction = (idOrIds: string | string[], updates: Partial<Transaction>) => {
+    const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, ...updates } : t));
+  };
+
   const handleDeleteTransaction = (idOrIds: string | string[]) => {
     const idsToDelete = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
     if (idsToDelete.length === 0) return;
@@ -703,6 +708,9 @@ export default function App() {
             usdArsRate={usdArsRate}
             historyData={historyData}
             onDeleteTransaction={handleDeleteTransaction}
+            onUpdateTransaction={handleUpdateTransaction}
+            categoriesList={categories}
+            accountsList={accounts}
             onOpenAddModal={() => setIsAddModalOpen(true)}
             onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
             activeFilter={activeFilter}

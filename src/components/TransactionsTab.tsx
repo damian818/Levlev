@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint } from '../types';
+import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint, CategoryItem, AccountItem } from '../types';
 import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString, normalizeCleanTitle, isInstallmentTx, detectRecurringItems } from '../utils/financeUtils';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2 } from 'lucide-react';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -10,6 +10,9 @@ interface TransactionsTabProps {
   usdArsRate: number;
   historyData?: InflationPoint[];
   onDeleteTransaction: (id: string | string[]) => void;
+  onUpdateTransaction: (id: string | string[], updates: Partial<Transaction>) => void;
+  categoriesList: CategoryItem[];
+  accountsList: AccountItem[];
   onOpenAddModal: () => void;
   onOpenDeleteModal?: () => void;
   activeFilter?: TransactionFilter;
@@ -27,6 +30,9 @@ export function TransactionsTab({
   usdArsRate,
   historyData,
   onDeleteTransaction,
+  onUpdateTransaction,
+  categoriesList,
+  accountsList,
   onOpenAddModal,
   onOpenDeleteModal,
   activeFilter,
@@ -43,6 +49,63 @@ export function TransactionsTab({
   const [recurringFilter, setRecurringFilter] = useState<'ALL' | 'ONE_TIME' | 'RECURRING'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  // Bulk Edit Mode state
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActionTarget, setBulkActionTarget] = useState<'CATEGORY' | 'ACCOUNT' | 'DELETE' | null>(null);
+
+  const toggleBulkMode = () => {
+    setIsBulkMode(!isBulkMode);
+    setSelectedIds(new Set());
+  };
+
+  const handleSelectTx = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAllOnPage = (ids: string[]) => {
+    const allSelected = ids.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        ids.forEach(id => next.delete(id));
+      } else {
+        ids.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`Are you sure you want to delete ${selectedIds.size} selected transactions?`)) {
+      onDeleteTransaction(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      setIsBulkMode(false);
+    }
+  };
+
+  const handleBulkUpdateCategory = (category: string) => {
+    if (selectedIds.size === 0) return;
+    onUpdateTransaction(Array.from(selectedIds), { category });
+    setSelectedIds(new Set());
+    setBulkActionTarget(null);
+    setIsBulkMode(false);
+  };
+
+  const handleBulkUpdateAccount = (account: string) => {
+    if (selectedIds.size === 0) return;
+    onUpdateTransaction(Array.from(selectedIds), { account });
+    setSelectedIds(new Set());
+    setBulkActionTarget(null);
+    setIsBulkMode(false);
+  };
 
   // Installment deletion options modal
   const [installmentTxToDelete, setInstallmentTxToDelete] = useState<Transaction | null>(null);
@@ -381,6 +444,18 @@ export function TransactionsTab({
             <span>{t('overview.quick_add')}</span>
           </button>
 
+          <button
+            onClick={toggleBulkMode}
+            className={`inline-flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors border shadow-xs ${
+              isBulkMode 
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
+            <span>{isBulkMode ? 'Exit Bulk Edit' : 'Bulk Edit'}</span>
+          </button>
+
           {onOpenDeleteModal && (
             <button
               onClick={onOpenDeleteModal}
@@ -394,12 +469,71 @@ export function TransactionsTab({
         </div>
       </div>
 
+      {/* Bulk Action Toolbar - Shows when items are selected */}
+      {isBulkMode && selectedIds.size > 0 && (
+        <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-[10px] font-bold border border-emerald-500/30 flex items-center gap-1.5">
+              <CheckSquare className="w-3 h-3" />
+              {selectedIds.size} Selected
+            </div>
+            <p className="text-xs text-emerald-200 font-medium hidden sm:block">Perform batch actions on selected records</p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setBulkActionTarget('CATEGORY')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold border border-slate-700 transition-all"
+            >
+              <Layers className="w-3.5 h-3.5 text-blue-400" />
+              Change Category
+            </button>
+            <button
+              onClick={() => setBulkActionTarget('ACCOUNT')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold border border-slate-700 transition-all"
+            >
+              <Wallet2 className="w-3.5 h-3.5 text-emerald-400" />
+              Change Account
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-[11px] font-bold border border-rose-500/20 transition-all"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              Delete All
+            </button>
+            <div className="w-px h-6 bg-slate-800 mx-1"></div>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="p-1.5 text-slate-400 hover:text-slate-200 transition-colors"
+              title="Clear selection"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Transactions Table */}
       <div className="bg-[#161b22] rounded-xl border border-slate-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-[#121620] border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                {isBulkMode && (
+                  <th className="p-3 w-10 text-center">
+                    <button 
+                      onClick={() => handleSelectAllOnPage(paginated.map(t => t.id))}
+                      className="p-1 rounded hover:bg-slate-800 transition-colors"
+                    >
+                      {paginated.every(t => selectedIds.has(t.id)) && paginated.length > 0 ? (
+                        <CheckSquare className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-600" />
+                      )}
+                    </button>
+                  </th>
+                )}
                 <th 
                   onClick={() => handleSort('date')}
                   className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
@@ -483,7 +617,7 @@ export function TransactionsTab({
             <tbody className="divide-y divide-slate-800/60">
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500">
+                  <td colSpan={isBulkMode ? 9 : 8} className="p-8 text-center text-slate-500">
                     No transactions match your filters.
                   </td>
                 </tr>
@@ -497,8 +631,28 @@ export function TransactionsTab({
                   const effectiveRate = getHistoricalFxRate(tx.date, usdArsRate, transactions, historyData);
                   const isCrossCurrency = (tx.currency?.toUpperCase().includes('USD') && displayCurrency === 'ARS') || (!tx.currency?.toUpperCase().includes('USD') && displayCurrency === 'USD');
 
+                  const isSelected = selectedIds.has(tx.id);
+
                   return (
-                    <tr key={tx.id} className={`hover:bg-slate-800/40 transition-colors ${isFuture ? 'bg-amber-950/15 border-l-2 border-l-amber-500/70' : ''}`}>
+                    <tr 
+                      key={tx.id} 
+                      className={`hover:bg-slate-800/40 transition-colors cursor-pointer ${isSelected ? 'bg-emerald-500/10' : ''} ${isFuture ? 'bg-amber-950/15 border-l-2 border-l-amber-500/70' : ''}`}
+                      onClick={() => isBulkMode ? handleSelectTx(tx.id) : null}
+                    >
+                      {isBulkMode && (
+                        <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            onClick={() => handleSelectTx(tx.id)}
+                            className="p-1 rounded hover:bg-slate-800 transition-colors"
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-500" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-700" />
+                            )}
+                          </button>
+                        </td>
+                      )}
                       <td className="p-3 text-slate-400 whitespace-nowrap">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1">
                           <span>{tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}</span>
@@ -675,6 +829,90 @@ export function TransactionsTab({
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Category Modal */}
+      {bulkActionTarget === 'CATEGORY' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+          <div className="bg-[#161b22] border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                <Layers className="w-5 h-5 text-blue-400" />
+                Move to Category
+              </h3>
+              <button onClick={() => setBulkActionTarget(null)} className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-400">Select a target category for {selectedIds.size} items:</p>
+            
+            <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+              {categoriesList.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => handleBulkUpdateCategory(cat.name)}
+                  className="w-full text-left px-4 py-2.5 rounded-xl bg-[#0d1117] border border-slate-800 hover:border-blue-500/50 hover:bg-blue-500/5 text-slate-200 text-xs font-medium transition-all flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span>{cat.name}</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-all" />
+                </button>
+              ))}
+            </div>
+            
+            <button
+              onClick={() => setBulkActionTarget(null)}
+              className="w-full py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Account Modal */}
+      {bulkActionTarget === 'ACCOUNT' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+          <div className="bg-[#161b22] border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                <Wallet2 className="w-5 h-5 text-emerald-400" />
+                Change Account
+              </h3>
+              <button onClick={() => setBulkActionTarget(null)} className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-400">Select target account for {selectedIds.size} items:</p>
+            
+            <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+              {accountsList.map(acc => (
+                <button
+                  key={acc.id}
+                  onClick={() => handleBulkUpdateAccount(acc.name)}
+                  className="w-full text-left px-4 py-2.5 rounded-xl bg-[#0d1117] border border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-500/5 text-slate-200 text-xs font-medium transition-all flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Wallet2 className="w-4 h-4 text-emerald-400" />
+                    <span>{acc.name}</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-all" />
+                </button>
+              ))}
+            </div>
+            
+            <button
+              onClick={() => setBulkActionTarget(null)}
+              className="w-full py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
