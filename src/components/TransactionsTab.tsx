@@ -709,7 +709,10 @@ export function TransactionsTab({
                             {tx.type === 'CC_PAYMENT' ? 'CC PAYMENT' : tx.type}
                           </span>
                           {tx.installments && (
-                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">
+                            <span 
+                              className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 cursor-help"
+                              title={tx.installmentStartDate && tx.installmentEndDate ? `Cycle: ${tx.installmentStartDate} to ${tx.installmentEndDate}` : undefined}
+                            >
                               {tx.installments}
                             </span>
                           )}

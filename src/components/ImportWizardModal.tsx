@@ -99,9 +99,32 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
 
             const desc = row.Description || '';
             let installments = '';
-            // Ivy specific: "6/6" pattern in description for installments
-            if (/^\d+\/\d+$/.test(desc.trim())) {
+            let installmentNumber: number | undefined;
+            let totalInstallments: number | undefined;
+            let installmentStartDate: string | undefined;
+            let installmentEndDate: string | undefined;
+
+            // Ivy specific: "x/total" pattern in description for installments
+            const instMatch = desc.trim().match(/^(\d+)\/(\d+)$/);
+            if (instMatch) {
               installments = desc.trim();
+              installmentNumber = parseInt(instMatch[1], 10);
+              totalInstallments = parseInt(instMatch[2], 10);
+
+              const txDate = row.Date ? new Date(row.Date) : new Date();
+              if (!isNaN(txDate.getTime())) {
+                // Derive Start Date
+                const startDt = new Date(txDate.getFullYear(), txDate.getMonth() - (installmentNumber - 1), 1);
+                const startY = startDt.getFullYear();
+                const startM = String(startDt.getMonth() + 1).padStart(2, '0');
+                installmentStartDate = `${startY}-${startM}`;
+
+                // Derive End Date
+                const endDt = new Date(txDate.getFullYear(), txDate.getMonth() + (totalInstallments - installmentNumber), 1);
+                const endY = endDt.getFullYear();
+                const endM = String(endDt.getMonth() + 1).padStart(2, '0');
+                installmentEndDate = `${endY}-${endM}`;
+              }
             }
 
             txs.push({
@@ -115,6 +138,10 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
               type: type as any,
               description: installments ? '' : desc,
               installments: installments,
+              installmentNumber,
+              totalInstallments,
+              installmentStartDate,
+              installmentEndDate,
               toAccount: row['To Account'] || undefined,
               receiveAmount: receiveAmount || undefined,
               receiveCurrency: row['Receive Currency'] || undefined,
