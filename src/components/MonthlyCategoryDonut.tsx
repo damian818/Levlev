@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, TransactionFilter } from '../types';
-import { formatCurrency, formatCurrencyCompact, convertCurrency, getCurrentMonthKey, getDefaultSelectedMonth } from '../utils/financeUtils';
+import { formatCurrency, formatCurrencyCompact, convertCurrency, getCurrentMonthKey, getDefaultSelectedMonth, detectRecurringItems, detectInstallmentPlans } from '../utils/financeUtils';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { PieChart as PieIcon, Calendar, ExternalLink } from 'lucide-react';
 
@@ -10,6 +11,7 @@ interface MonthlyCategoryDonutProps {
   usdArsRate: number;
   selectedMonth?: string;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
+  showForecasts?: boolean;
 }
 
 const CATEGORY_COLORS = [
@@ -31,7 +33,9 @@ export function MonthlyCategoryDonut({
   usdArsRate,
   selectedMonth: propMonth,
   onNavigateToTransactionsWithFilter,
+  showForecasts = false,
 }: MonthlyCategoryDonutProps) {
+  const { t } = useTranslation();
   const currentMonthKey = useMemo(() => getCurrentMonthKey(), []);
 
   // Extract all unique expense months
@@ -43,8 +47,18 @@ export function MonthlyCategoryDonut({
       }
     });
     monthSet.add(currentMonthKey);
+    
+    // Add future months if forecasts are enabled
+    if (showForecasts) {
+      const now = new Date();
+      for (let i = 1; i <= 6; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        monthSet.add(d.toISOString().substring(0, 7));
+      }
+    }
+    
     return Array.from(monthSet).sort().reverse();
-  }, [transactions, currentMonthKey]);
+  }, [transactions, currentMonthKey, showForecasts]);
 
   // Selected month state (defaults to current/default month or prop)
   const [localMonth, setLocalMonth] = useState<string>(() => propMonth || getDefaultSelectedMonth(transactions));
@@ -59,6 +73,7 @@ export function MonthlyCategoryDonut({
     const categoryTotals: Record<string, number> = {};
     let totalExpense = 0;
 
+    // 1. Actual transactions
     transactions.forEach((tx) => {
       if (tx.type !== 'EXPENSE') return;
       const txMonth = tx.date ? tx.date.substring(0, 7) : '';
@@ -71,6 +86,47 @@ export function MonthlyCategoryDonut({
       }
     });
 
+    // 2. Add Forecasts if enabled
+    if (showForecasts && (localMonth === currentMonthKey || localMonth > currentMonthKey)) {
+      const recurring = detectRecurringItems(transactions, displayCurrency, usdArsRate);
+      const installments = detectInstallmentPlans(transactions, displayCurrency, usdArsRate);
+      
+      const isCurrentMonth = localMonth === currentMonthKey;
+      
+      // Regular Recurring
+      recurring.forEach(item => {
+        if (item.type !== 'EXPENSE') return;
+        
+        // If current month, only add if not already paid this month
+        if (isCurrentMonth) {
+          const hasPaidThisMonth = item.history.some(h => h.month === currentMonthKey);
+          if (hasPaidThisMonth) return;
+        }
+        
+        const amount = convertCurrency(item.latestAmount, item.currency, displayCurrency, usdArsRate, undefined, transactions);
+        const cat = item.category || 'General';
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + amount;
+        totalExpense += amount;
+      });
+      
+      // Installments
+      installments.forEach(plan => {
+        if (plan.installmentStartDate && plan.installmentEndDate) {
+          if (localMonth >= plan.installmentStartDate && localMonth <= plan.installmentEndDate) {
+            // If current month, only add if not already paid this month
+            if (isCurrentMonth) {
+               const hasPaidThisMonth = plan.history.some(h => h.month === currentMonthKey);
+               if (hasPaidThisMonth) return;
+            }
+            const amount = convertCurrency(plan.latestAmount, plan.currency, displayCurrency, usdArsRate, undefined, transactions);
+            const cat = plan.category || 'General';
+            categoryTotals[cat] = (categoryTotals[cat] || 0) + amount;
+            totalExpense += amount;
+          }
+        }
+      });
+    }
+
     const items = Object.entries(categoryTotals)
       .map(([name, value]) => ({
         name,
@@ -80,7 +136,7 @@ export function MonthlyCategoryDonut({
       .sort((a, b) => b.value - a.value);
 
     return { items, totalExpense };
-  }, [transactions, localMonth, displayCurrency, usdArsRate]);
+  }, [transactions, localMonth, displayCurrency, usdArsRate, showForecasts, currentMonthKey]);
 
   const monthLabel = localMonth === 'ALL' ? 'All Time' : localMonth;
 
@@ -166,10 +222,15 @@ export function MonthlyCategoryDonut({
 
               {/* Center Donut Hole Content */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[9px] text-slate-400 uppercase tracking-tighter sm:tracking-wider font-semibold">Total</span>
+                <span className="text-[9px] text-slate-400 uppercase tracking-tighter sm:tracking-wider font-semibold">
+                  {showForecasts && (localMonth === currentMonthKey || localMonth > currentMonthKey) ? t('overview.forecast_total') : t('common.total')}
+                </span>
                 <span className="text-xs sm:text-sm font-bold text-slate-100">
                   {formatCurrencyCompact(categoryData.totalExpense, displayCurrency)}
                 </span>
+                {showForecasts && (localMonth === currentMonthKey || localMonth > currentMonthKey) && (
+                   <span className="text-[8px] bg-amber-500/10 text-amber-400 px-1 rounded border border-amber-500/20 mt-0.5 animate-pulse">{t('overview.estimated')}</span>
+                )}
               </div>
             </>
           )}

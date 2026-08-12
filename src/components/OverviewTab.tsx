@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
-import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth } from '../utils/financeUtils';
+import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon, Upload } from 'lucide-react';
 import { MonthlyCategoryDonut } from './MonthlyCategoryDonut';
@@ -41,6 +41,7 @@ export function OverviewTab({
   const { t } = useTranslation();
   const [velocityMultiplier, setVelocityMultiplier] = useState<number>(1.0);
   const [showCategoryTrend, setShowCategoryTrend] = useState<boolean>(false);
+  const [showForecasts, setShowForecasts] = useState<boolean>(false);
 
   // Filter transactions based on shared data preference
   const filteredTransactions = useMemo(() => {
@@ -90,8 +91,48 @@ export function OverviewTab({
   }, [availableMonths]);
 
   const spending = analyzeSpending(filteredTransactions, displayCurrency, usdArsRate, selectedMonth);
+
   const accounts = computeAccountBalances(filteredTransactions, usdArsRate, customBalances);
   const { trendData, metrics } = computePredictiveTrend(filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData);
+
+  // Apply forecasts if enabled
+  const isCurrentMonth = selectedMonth === currentMonthKey;
+  const isFutureMonth = selectedMonth > currentMonthKey;
+  
+  const displayedSpending = useMemo(() => {
+    if (!showForecasts) return spending;
+    
+    // For future or current month, add pending recurring items
+    // If it's a future month, we use the average/latest recurring items as the "forecast"
+    if (isFutureMonth) {
+      const projections = computeFutureRecurringProjections(filteredTransactions, displayCurrency, usdArsRate, 24);
+      const targetProj = projections.find(p => p.month === selectedMonth);
+      if (targetProj) {
+        return {
+          ...spending,
+          totalIncome: targetProj.income,
+          totalExpenses: targetProj.expense,
+          netSavings: targetProj.net,
+          savingsRate: targetProj.income > 0 ? (targetProj.net / targetProj.income) * 100 : 0,
+          isForecast: true
+        };
+      }
+    } else if (isCurrentMonth) {
+      // Add pending recurring to current actuals
+      return {
+        ...spending,
+        totalIncome: spending.totalIncome + metrics.pendingRecurringIncome,
+        totalExpenses: spending.totalExpenses + metrics.pendingRecurringExpense,
+        netSavings: (spending.totalIncome + metrics.pendingRecurringIncome) - (spending.totalExpenses + metrics.pendingRecurringExpense),
+        savingsRate: (spending.totalIncome + metrics.pendingRecurringIncome) > 0 
+          ? (((spending.totalIncome + metrics.pendingRecurringIncome) - (spending.totalExpenses + metrics.pendingRecurringExpense)) / (spending.totalIncome + metrics.pendingRecurringIncome)) * 100 
+          : 0,
+        isForecast: true
+      };
+    }
+    
+    return spending;
+  }, [spending, showForecasts, selectedMonth, currentMonthKey, filteredTransactions, displayCurrency, usdArsRate, metrics]);
 
   // Filter trend data based on date filters
   const filteredTrendData = useMemo(() => {
@@ -136,14 +177,14 @@ export function OverviewTab({
     ? accounts.reduce((acc, curr) => acc + curr.balanceUSD, 0)
     : accounts.reduce((acc, curr) => acc + curr.balanceARS, 0);
 
-  const pieData = spending.topCategories.slice(0, 6).map(c => ({
+  const pieData = displayedSpending.topCategories.slice(0, 6).map(c => ({
     name: c.category,
     value: c.amount
   }));
 
   // Risk detection
-  const topCategoryShare = spending.topCategories.length > 0 && spending.totalExpenses > 0
-    ? (spending.topCategories[0].amount / spending.totalExpenses) * 100
+  const topCategoryShare = displayedSpending.topCategories.length > 0 && displayedSpending.totalExpenses > 0
+    ? (displayedSpending.topCategories[0].amount / displayedSpending.totalExpenses) * 100
     : 0;
 
   return (
@@ -164,6 +205,18 @@ export function OverviewTab({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          <button
+            onClick={() => setShowForecasts(!showForecasts)}
+            className={`flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg text-[10px] sm:text-xs font-semibold transition-all border shadow-sm flex-1 sm:flex-none ${
+              showForecasts 
+                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' 
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${showForecasts ? 'animate-pulse' : ''}`} />
+            <span>{showForecasts ? t('overview.forecast_on') : t('overview.show_forecasts')}</span>
+          </button>
+
           <div className="flex items-center space-x-2 bg-[#121620] px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs flex-1 sm:flex-none">
             <span className="text-slate-400 font-medium hidden sm:inline">Select Month:</span>
             <select
@@ -223,8 +276,11 @@ export function OverviewTab({
               <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center">
                 {t('overview.monthly_income')}
                 <ChevronRight className="w-3 h-3 ml-1 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+                {(displayedSpending as any).isForecast && (
+                  <span className="ml-2 px-1.5 py-0.5 bg-amber-500/10 text-amber-400 text-[8px] font-bold rounded border border-amber-500/20 animate-pulse">FCST</span>
+                )}
               </p>
-              <h3 className="text-xl sm:text-2xl font-bold text-slate-100 mt-1">{formatCurrency(spending.totalIncome, displayCurrency)}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-100 mt-1">{formatCurrency(displayedSpending.totalIncome, displayCurrency)}</h3>
             </div>
             <div className="p-2 bg-emerald-950/60 border border-emerald-800/50 text-emerald-400 rounded-lg group-hover:bg-emerald-900/60 transition-colors">
               <ArrowUpRight className="w-4 h-4 sm:w-5 h-5" />
@@ -249,8 +305,11 @@ export function OverviewTab({
               <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center">
                 {t('overview.monthly_expenses')}
                 <ChevronRight className="w-3 h-3 ml-1 text-slate-500 group-hover:text-rose-400 transition-colors" />
+                {(displayedSpending as any).isForecast && (
+                  <span className="ml-2 px-1.5 py-0.5 bg-amber-500/10 text-amber-400 text-[8px] font-bold rounded border border-amber-500/20 animate-pulse">FCST</span>
+                )}
               </p>
-              <h3 className="text-xl sm:text-2xl font-bold text-slate-100 mt-1">{formatCurrency(spending.totalExpenses, displayCurrency)}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-100 mt-1">{formatCurrency(displayedSpending.totalExpenses, displayCurrency)}</h3>
             </div>
             <div className="p-2 bg-rose-950/60 border border-rose-800/50 text-rose-400 rounded-lg group-hover:bg-rose-900/60 transition-colors">
               <ArrowDownRight className="w-4 h-4 sm:w-5 h-5" />
@@ -274,9 +333,12 @@ export function OverviewTab({
               <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center">
                 {t('overview.net_savings')}
                 <ChevronRight className="w-3 h-3 ml-1 text-slate-500 group-hover:text-slate-300 transition-colors" />
+                {(displayedSpending as any).isForecast && (
+                  <span className="ml-2 px-1.5 py-0.5 bg-amber-500/10 text-amber-400 text-[8px] font-bold rounded border border-amber-500/20 animate-pulse">FCST</span>
+                )}
               </p>
-              <h3 className={`text-xl sm:text-2xl font-bold mt-1 ${spending.netSavings >= 0 ? 'text-slate-100' : 'text-rose-400'}`}>
-                {formatCurrency(spending.netSavings, displayCurrency)}
+              <h3 className={`text-xl sm:text-2xl font-bold mt-1 ${displayedSpending.netSavings >= 0 ? 'text-slate-100' : 'text-rose-400'}`}>
+                {formatCurrency(displayedSpending.netSavings, displayCurrency)}
               </h3>
             </div>
             <div className="p-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg group-hover:bg-slate-700 transition-colors">
@@ -284,7 +346,7 @@ export function OverviewTab({
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-[10px] sm:text-xs text-slate-400 font-medium">
-            <span>{t('nav.rate')} <strong className="text-slate-200">{spending.savingsRate.toFixed(1)}%</strong></span>
+            <span>{t('nav.rate')} <strong className="text-slate-200">{displayedSpending.savingsRate.toFixed(1)}%</strong></span>
             <span className="text-[9px] sm:text-[10px] text-slate-500 group-hover:text-slate-300 transition-colors">{t('overview.view_all')} →</span>
           </div>
         </div>
@@ -316,7 +378,7 @@ export function OverviewTab({
       {/* Risk & Insights Alert Banner */}
       <div className="bg-[#121620] text-slate-200 p-3 sm:p-4 rounded-xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-sm">
         <div 
-          onClick={() => spending.topCategories[0] && onNavigateToTransactionsWithFilter({ category: spending.topCategories[0].category })}
+          onClick={() => displayedSpending.topCategories[0] && onNavigateToTransactionsWithFilter({ category: displayedSpending.topCategories[0].category })}
           className="flex items-center space-x-3 cursor-pointer group w-full md:w-auto"
         >
           <div className="p-2 bg-slate-800 border border-slate-700 text-amber-400 rounded-lg group-hover:bg-slate-700 transition-colors shrink-0">
@@ -329,7 +391,7 @@ export function OverviewTab({
             </h4>
             <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">
               {t('overview.top_category_accounts_for', { 
-                category: spending.topCategories[0]?.category || 'N/A', 
+                category: displayedSpending.topCategories[0]?.category || 'N/A', 
                 percentage: topCategoryShare.toFixed(1) 
               })}
             </p>
@@ -565,6 +627,7 @@ export function OverviewTab({
           usdArsRate={usdArsRate}
           selectedMonth={selectedMonth}
           onNavigateToTransactionsWithFilter={onNavigateToTransactionsWithFilter}
+          showForecasts={showForecasts}
         />
       </div>
 
@@ -593,8 +656,8 @@ export function OverviewTab({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {spending.topMerchants.slice(0, 6).map((m, idx) => {
-                const percentage = spending.totalExpenses > 0 ? (m.amount / spending.totalExpenses) * 100 : 0;
+              {displayedSpending.topMerchants.slice(0, 6).map((m, idx) => {
+                const percentage = displayedSpending.totalExpenses > 0 ? (m.amount / displayedSpending.totalExpenses) * 100 : 0;
                 return (
                   <tr 
                     key={idx} 

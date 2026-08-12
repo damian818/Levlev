@@ -84,7 +84,7 @@ export function TransactionsTab({
 
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedIds.size} selected transactions?`)) {
+    if (confirm(t('transactions.bulk_delete_confirm', { count: selectedIds.size }))) {
       onDeleteTransaction(Array.from(selectedIds));
       setSelectedIds(new Set());
       setIsBulkMode(false);
@@ -453,7 +453,7 @@ export function TransactionsTab({
             }`}
           >
             <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
-            <span>{isBulkMode ? 'Exit Bulk Edit' : 'Bulk Edit'}</span>
+            <span>{isBulkMode ? t('transactions.exit_bulk_edit') : t('transactions.bulk_edit')}</span>
           </button>
 
           {onOpenDeleteModal && (
@@ -475,9 +475,9 @@ export function TransactionsTab({
           <div className="flex items-center gap-3">
             <div className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-[10px] font-bold border border-emerald-500/30 flex items-center gap-1.5">
               <CheckSquare className="w-3 h-3" />
-              {selectedIds.size} Selected
+              {selectedIds.size} {t('transactions.selected')}
             </div>
-            <p className="text-xs text-emerald-200 font-medium hidden sm:block">Perform batch actions on selected records</p>
+            <p className="text-xs text-emerald-200 font-medium hidden sm:block">{t('transactions.batch_actions')}</p>
           </div>
           
           <div className="flex items-center gap-2">
@@ -486,21 +486,21 @@ export function TransactionsTab({
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold border border-slate-700 transition-all"
             >
               <Layers className="w-3.5 h-3.5 text-blue-400" />
-              Change Category
+              {t('transactions.move_category')}
             </button>
             <button
               onClick={() => setBulkActionTarget('ACCOUNT')}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold border border-slate-700 transition-all"
             >
               <Wallet2 className="w-3.5 h-3.5 text-emerald-400" />
-              Change Account
+              {t('transactions.change_account')}
             </button>
             <button
               onClick={handleBulkDelete}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-[11px] font-bold border border-rose-500/20 transition-all"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-              Delete All
+              {t('common.delete')}
             </button>
             <div className="w-px h-6 bg-slate-800 mx-1"></div>
             <button
@@ -843,14 +843,14 @@ export function TransactionsTab({
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                 <Layers className="w-5 h-5 text-blue-400" />
-                Move to Category
+                {t('transactions.move_category')}
               </h3>
               <button onClick={() => setBulkActionTarget(null)} className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <p className="text-xs text-slate-400">Select a target category for {selectedIds.size} items:</p>
+            <p className="text-xs text-slate-400">{t('transactions.selected')}: {selectedIds.size} items</p>
             
             <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
               {categoriesList.map(cat => (
@@ -885,14 +885,14 @@ export function TransactionsTab({
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                 <Wallet2 className="w-5 h-5 text-emerald-400" />
-                Change Account
+                {t('transactions.change_account')}
               </h3>
               <button onClick={() => setBulkActionTarget(null)} className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <p className="text-xs text-slate-400">Select target account for {selectedIds.size} items:</p>
+            <p className="text-xs text-slate-400">{t('transactions.selected')}: {selectedIds.size} items</p>
             
             <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
               {accountsList.map(acc => (

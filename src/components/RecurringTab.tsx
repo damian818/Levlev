@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Transaction, RecurringRule, DisplayCurrency, IdentifiedRecurringItem, InflationPoint, RecurringOccurrence } from '../types';
-import { formatCurrency, formatCurrencyCompact, convertCurrency, detectRecurringItems, detectInstallmentPlans } from '../utils/financeUtils';
+import { formatCurrency, formatCurrencyCompact, convertCurrency, detectRecurringItems, detectInstallmentPlans, computeFutureRecurringProjections } from '../utils/financeUtils';
 import { RecurringTrendModal } from './RecurringTrendModal';
 import { RecurringCategoryTrendModal } from './RecurringCategoryTrendModal';
-import { Repeat, Calendar, Clock, Search, Filter, TrendingUp, Sparkles, ChevronRight, Layers, ArrowUpRight, ArrowDownRight, ShieldAlert, BarChart2, Ban, RotateCcw } from 'lucide-react';
+import { Repeat, Calendar, Clock, Search, Filter, TrendingUp, Sparkles, ChevronRight, Layers, ArrowUpRight, ArrowDownRight, ShieldAlert, BarChart2, Ban, RotateCcw, LineChart } from 'lucide-react';
+import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, Area } from 'recharts';
 
 interface RecurringTabProps {
   transactions: Transaction[];
@@ -14,6 +16,7 @@ interface RecurringTabProps {
 }
 
 export function RecurringTab({ transactions, recurringRules, displayCurrency, usdArsRate, historyData }: RecurringTabProps) {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'EXPENSE' | 'INCOME' | 'INSTALLMENT' | 'NON_RECURRING'>('ALL');
   const [selectedItem, setSelectedItem] = useState<IdentifiedRecurringItem | null>(null);
@@ -21,6 +24,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [showCompletedInstallments, setShowCompletedInstallments] = useState(false);
   const [installmentsSort, setInstallmentsSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [showProjection, setShowProjection] = useState(true);
 
   const handleInstallmentsSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -386,6 +390,93 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Future Projection Section */}
+      <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-lg">
+              <LineChart className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-100">{t('recurring.projection_title')}</h3>
+              <p className="text-xs text-slate-400">
+                {t('recurring.projection_desc')}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowProjection(!showProjection)}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg transition-colors border border-slate-700"
+          >
+            {showProjection ? t('recurring.hide_projection') : t('recurring.show_projection')}
+          </button>
+        </div>
+
+        {showProjection && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="h-64 sm:h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={computeFutureRecurringProjections(transactions, displayCurrency, usdArsRate, 12)} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#21262d" vertical={false} />
+                  <XAxis 
+                    dataKey="month" 
+                    stroke="#8b949e" 
+                    fontSize={10} 
+                    tickFormatter={(val) => {
+                      const [y, m] = val.split('-');
+                      const monthsNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                      return `${monthsNames[parseInt(m)-1]} ${y.substring(2)}`;
+                    }}
+                  />
+                  <YAxis stroke="#8b949e" fontSize={10} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-[#161b22] border border-slate-700 p-3 rounded-lg shadow-xl text-xs space-y-1.5">
+                            <p className="font-bold text-slate-200">{label}</p>
+                            {payload.map((entry: any, index: number) => (
+                              <p key={index} className="flex justify-between gap-4" style={{ color: entry.color }}>
+                                <span>{entry.name}:</span>
+                                <span className="font-bold">{formatCurrency(entry.value, displayCurrency)}</span>
+                              </p>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                  <Bar dataKey="expense" name="Proj. Expense" fill="#fb7185" radius={[4, 4, 0, 0]} barSize={20} />
+                  <Bar dataKey="income" name="Proj. Income" fill="#34d399" radius={[4, 4, 0, 0]} barSize={20} />
+                  <Area type="monotone" dataKey="net" name="Net Forecast" fill="#38bdf8" stroke="#38bdf8" fillOpacity={0.1} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-[#121620] border border-slate-800">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">{t('recurring.avg_bill')}</p>
+                <p className="text-sm font-bold text-slate-200 mt-1">{formatCurrency(totalMonthlyExpense, displayCurrency)}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-[#121620] border border-slate-800">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">{t('recurring.avg_income')}</p>
+                <p className="text-sm font-bold text-emerald-400 mt-1">{formatCurrency(totalMonthlyIncome, displayCurrency)}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-[#121620] border border-slate-800">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">{t('recurring.active_plans')}</p>
+                <p className="text-sm font-bold text-amber-400 mt-1">{activeInstallmentPlans.length}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-[#121620] border border-slate-800">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">{t('recurring.commitment_12m')}</p>
+                <p className="text-sm font-bold text-slate-200 mt-1">{formatCurrency(totalMonthlyExpense * 12, displayCurrency)}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Grid of Clickable Recurring Cards */}

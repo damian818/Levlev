@@ -1486,10 +1486,29 @@ export function detectInstallmentPlans(
     
     let installmentStartDate: string | undefined;
     let installmentEndDate: string | undefined;
-    if (sorted.length > 0) {
-      installmentStartDate = sorted[0].date?.substring(0, 7);
+    
+    // Prioritize explicit dates found on transactions (e.g. from Ivy import)
+    const txWithStart = sorted.find(t => t.installmentStartDate);
+    const txWithEnd = sorted.find(t => t.installmentEndDate);
+    if (txWithStart) installmentStartDate = txWithStart.installmentStartDate;
+    if (txWithEnd) installmentEndDate = txWithEnd.installmentEndDate;
+
+    if (!installmentStartDate && sorted.length > 0) {
+      const firstTx = sorted[0];
+      if (installmentCurrent && firstTx.date) {
+        // Derive start date backwards from the first transaction we have
+        const d = new Date(firstTx.date);
+        d.setMonth(d.getMonth() - (installmentCurrent - 1));
+        installmentStartDate = d.toISOString().substring(0, 7);
+      } else {
+        installmentStartDate = firstTx.date?.substring(0, 7);
+      }
+    }
+
+    if (!installmentEndDate && sorted.length > 0) {
       const lastTx = sorted[sorted.length - 1];
       if (installmentCurrent && installmentTotal && lastTx.date) {
+        // Derive end date forwards from the last transaction we have
         const remaining = installmentTotal - installmentCurrent;
         const d = new Date(lastTx.date);
         d.setMonth(d.getMonth() + remaining);
@@ -1565,6 +1584,66 @@ export function detectInstallmentPlans(
     const aConverted = convertCurrency(a.latestAmount, a.currency, displayCurrency, usdArsRate);
     return bConverted - aConverted || b.distinctMonthsCount - a.distinctMonthsCount || a.title.localeCompare(b.title);
   });
+}
+
+/**
+ * Projects future recurring expenses and incomes for a given number of months.
+ */
+export function computeFutureRecurringProjections(
+  transactions: Transaction[],
+  displayCurrency: DisplayCurrency,
+  usdArsRate: number,
+  months: number = 12
+): { month: string; expense: number; income: number; net: number }[] {
+  const recurring = detectRecurringItems(transactions, displayCurrency, usdArsRate);
+  const installments = detectInstallmentPlans(transactions, displayCurrency, usdArsRate);
+  
+  const projections: { month: string; expense: number; income: number; net: number }[] = [];
+  const now = new Date();
+  
+  for (let i = 0; i < months; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const mKey = d.toISOString().substring(0, 7);
+    
+    let monthlyExpense = 0;
+    let monthlyIncome = 0;
+    
+    // 1. Regular Recurring
+    recurring.forEach(item => {
+      // Logic: If it's a regular recurring item, we assume it continues.
+      // We use the latest amount as the baseline.
+      const amount = convertCurrency(item.latestAmount, item.currency, displayCurrency, usdArsRate, undefined, transactions);
+      if (item.type === 'EXPENSE') {
+        monthlyExpense += amount;
+      } else {
+        monthlyIncome += amount;
+      }
+    });
+    
+    // 2. Installment Plans
+    installments.forEach(plan => {
+      // Logic: Only include if the month is within the start and end dates.
+      if (plan.installmentStartDate && plan.installmentEndDate) {
+        if (mKey >= plan.installmentStartDate && mKey <= plan.installmentEndDate) {
+          const amount = convertCurrency(plan.latestAmount, plan.currency, displayCurrency, usdArsRate, undefined, transactions);
+          monthlyExpense += amount;
+        }
+      } else if (plan.installmentCurrent !== undefined && plan.installmentTotal !== undefined) {
+        // Fallback for plans without explicit dates: check if it's still active
+        // But for projection, we really need dates or we assume it's current.
+        // Actually detectInstallmentPlans derivesEndDate if current/total exists.
+      }
+    });
+    
+    projections.push({
+      month: mKey,
+      expense: Math.round(monthlyExpense),
+      income: Math.round(monthlyIncome),
+      net: Math.round(monthlyIncome - monthlyExpense)
+    });
+  }
+  
+  return projections;
 }
 
 /**

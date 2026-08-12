@@ -98,28 +98,32 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
             }
 
             const desc = row.Description || '';
+            const title = row.Title || '';
             let installments = '';
             let installmentNumber: number | undefined;
             let totalInstallments: number | undefined;
             let installmentStartDate: string | undefined;
             let installmentEndDate: string | undefined;
 
-            // Ivy specific: "x/total" pattern in description for installments
-            const instMatch = desc.trim().match(/^(\d+)\/(\d+)$/);
+            // Ivy specific: "x/total" pattern in description or title for installments
+            // Search in both description and title as Ivy users often put it in either
+            const combinedText = `${title} ${desc}`;
+            const instMatch = combinedText.match(/(\d+)\s*(?:\/|de)\s*(\d+)/i);
+            
             if (instMatch) {
-              installments = desc.trim();
+              installments = instMatch[0];
               installmentNumber = parseInt(instMatch[1], 10);
               totalInstallments = parseInt(instMatch[2], 10);
 
               const txDate = row.Date ? new Date(row.Date) : new Date();
               if (!isNaN(txDate.getTime())) {
-                // Derive Start Date
+                // Derive Start Date: if it's 3/6, start is 2 months before current tx month
                 const startDt = new Date(txDate.getFullYear(), txDate.getMonth() - (installmentNumber - 1), 1);
                 const startY = startDt.getFullYear();
                 const startM = String(startDt.getMonth() + 1).padStart(2, '0');
                 installmentStartDate = `${startY}-${startM}`;
 
-                // Derive End Date
+                // Derive End Date: if it's 3/6, end is 3 months after current tx month
                 const endDt = new Date(txDate.getFullYear(), txDate.getMonth() + (totalInstallments - installmentNumber), 1);
                 const endY = endDt.getFullYear();
                 const endM = String(endDt.getMonth() + 1).padStart(2, '0');
@@ -130,13 +134,13 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
             txs.push({
               id: row.ID || `tx-ivy-${Date.now()}-${idx}`,
               date: (row.Date || '').substring(0, 10),
-              title: row.Title || 'Untitled',
+              title: title || 'Untitled',
               category: row.Category || 'Uncategorized',
               account: row.Account || 'Main',
               amount: Math.abs(amount),
               currency: row.Currency || 'ARS',
               type: type as any,
-              description: installments ? '' : desc,
+              description: installments ? desc.replace(installments, '').replace(/^[\s\-\:]+/, '').trim() : desc,
               installments: installments,
               installmentNumber,
               totalInstallments,
