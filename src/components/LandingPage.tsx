@@ -90,15 +90,34 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <LevLevLogo badgeText={t('landing.badge_intelligence')} size="md" />
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Language Switcher */}
-            <button
-              onClick={toggleLanguage}
-              className="px-2.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all border border-slate-700/80 flex items-center gap-1.5"
-              title="Switch Language / Cambiar Idioma"
-            >
-              <Globe className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{currentLang === 'es' ? 'ES' : 'EN'}</span>
-            </button>
+            {/* Language Switcher Segmented Control */}
+            <div className="flex items-center bg-[#161b22] p-1 rounded-xl border border-slate-700/80 shrink-0">
+              <Globe className="w-3.5 h-3.5 text-emerald-400 ml-2 mr-1" />
+              <button
+                type="button"
+                onClick={() => i18n.changeLanguage('en')}
+                className={`px-2 py-1 text-xs font-bold rounded-lg transition-all ${
+                  currentLang === 'en'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Switch to English"
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => i18n.changeLanguage('es')}
+                className={`px-2 py-1 text-xs font-bold rounded-lg transition-all ${
+                  currentLang === 'es'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Cambiar a Español"
+              >
+                ES
+              </button>
+            </div>
 
             <button
               onClick={onEnterGuestMode}

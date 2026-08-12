@@ -156,18 +156,40 @@ export function Navbar({
             {/* Right Controls Container */}
             <div className="flex items-center gap-1.5 sm:gap-3">
               
-              {/* Language Switcher Pill - Desktop Only */}
-              <button
-                onClick={() => {
-                  triggerHaptic(10);
-                  toggleLanguage();
-                }}
-                className="hidden lg:flex items-center gap-1.5 px-3 py-2 bg-[#161b22] hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all min-h-[44px]"
-                title="Switch Language / Cambiar Idioma"
-              >
-                <Globe className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{currentLang === 'es' ? 'ES' : 'EN'}</span>
-              </button>
+              {/* Language Switcher Segmented Control - Desktop Only */}
+              <div className="hidden lg:flex items-center bg-[#161b22] p-1 rounded-xl border border-slate-700/80 shrink-0 min-h-[44px]">
+                <Globe className="w-3.5 h-3.5 text-emerald-400 ml-2 mr-1" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    i18n.changeLanguage('en');
+                  }}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                    currentLang === 'en'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Switch to English"
+                >
+                  EN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    i18n.changeLanguage('es');
+                  }}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                    currentLang === 'es'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Cambiar a Español"
+                >
+                  ES
+                </button>
+              </div>
 
               {/* DESKTOP "ADD TRANSACTION" BUTTON */}
               <button
@@ -432,17 +454,43 @@ export function Navbar({
                   <span>Import CSV</span>
                 </button>
 
-                {/* Language Switcher */}
-                <button
-                  onClick={() => {
-                    triggerHaptic(10);
-                    toggleLanguage();
-                  }}
-                  className="flex items-center justify-center gap-2 p-2.5 rounded-xl font-bold bg-[#161b22] border border-slate-800 text-slate-300 hover:text-white min-h-[44px]"
-                >
-                  <Globe className="w-4 h-4 text-emerald-400" />
-                  <span>{currentLang === 'es' ? 'English (EN)' : 'Español (ES)'}</span>
-                </button>
+                {/* Language Switcher Segmented Control (Mobile) */}
+                <div className="flex items-center justify-between bg-[#161b22] px-3 py-2 rounded-xl border border-slate-800 min-h-[44px]">
+                  <span className="text-slate-400 font-medium text-xs flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Language / Idioma:</span>
+                  </span>
+                  <div className="flex items-center bg-[#0d1117] p-1 rounded-lg border border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic(10);
+                        i18n.changeLanguage('en');
+                      }}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+                        currentLang === 'en'
+                          ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      EN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic(10);
+                        i18n.changeLanguage('es');
+                      }}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
+                        currentLang === 'es'
+                          ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      ES
+                    </button>
+                  </div>
+                </div>
 
                 {/* Google SSO Login / Account */}
                 <button

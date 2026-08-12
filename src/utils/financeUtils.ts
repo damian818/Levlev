@@ -1282,7 +1282,7 @@ export function normalizeCleanTitle(rawTitle: string): string {
  * Detects true recurring expenses and incomes.
  * Rules:
  * 1. Excludes installment/cuota transactions.
- * 2. Requires at least 6 occurrences/months.
+ * 2. If an expense/income has not happened in the last 3 months AND has not happened more than 9 times in the last 12 months, then it is NOT recurring.
  * 3. Consolidates expenses and incomes with the same title across accounts.
  */
 export function detectRecurringItems(
@@ -1309,19 +1309,58 @@ export function detectRecurringItems(
     groups.get(groupKey)!.push(t);
   });
 
+  // Determine reference window for 3-month and 12-month checks
+  let latestDateStr = new Date().toISOString().substring(0, 10);
+  transactions.forEach(t => {
+    if (t.date && t.date > latestDateStr) {
+      latestDateStr = t.date;
+    }
+  });
+
+  const refDate = new Date(latestDateStr);
+  const refYear = refDate.getFullYear();
+  const refMonth = refDate.getMonth() + 1; // 1 to 12
+
+  const last3Months = new Set<string>();
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(refYear, refMonth - 1 - i, 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    last3Months.add(`${yyyy}-${mm}`);
+  }
+
+  const last12Months = new Set<string>();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(refYear, refMonth - 1 - i, 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    last12Months.add(`${yyyy}-${mm}`);
+  }
+
   const result: IdentifiedRecurringItem[] = [];
 
   groups.forEach((txList, groupKey) => {
     const sorted = [...txList].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
-    // Count distinct months and occurrences
+    // Count distinct months, 3-month occurrences, and 12-month occurrences
     const distinctMonths = new Set<string>();
+    let occurrencesInLast3Months = 0;
+    let occurrencesInLast12Months = 0;
     let daySum = 0;
     const accountsSet = new Set<string>();
 
     sorted.forEach(t => {
       if (t.date) {
-        distinctMonths.add(t.date.substring(0, 7));
+        const m = t.date.substring(0, 7);
+        distinctMonths.add(m);
+
+        if (last3Months.has(m)) {
+          occurrencesInLast3Months++;
+        }
+        if (last12Months.has(m)) {
+          occurrencesInLast12Months++;
+        }
+
         const dt = new Date(t.date);
         if (!isNaN(dt.getDate())) {
           daySum += dt.getDate();
@@ -1332,8 +1371,16 @@ export function detectRecurringItems(
       }
     });
 
-    // Requirement: MUST have happened at least 6 times (distinct months >= 6 or sorted.length >= 6)
-    if (distinctMonths.size >= 6 || sorted.length >= 6) {
+    const happenedInLast3Months = occurrencesInLast3Months > 0;
+    const happenedMoreThan9TimesInLast12Months = occurrencesInLast12Months > 9;
+
+    // Rule: If an expense/income has not happened in the last 3 months, AND if it has not happened more than 9 times in the last 12 months, then it is NOT recurring.
+    if (!happenedInLast3Months && !happenedMoreThan9TimesInLast12Months) {
+      return;
+    }
+
+    // Must have at least 2 distinct occurrences or months overall
+    if (distinctMonths.size >= 2 || sorted.length >= 2) {
       const latest = sorted[sorted.length - 1];
       const cleanTitle = normalizeCleanTitle(latest.title || latest.category || 'Sin Titulo');
 
