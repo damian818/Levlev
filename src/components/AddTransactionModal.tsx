@@ -342,10 +342,10 @@ export function AddTransactionModal({
     setType(newType);
 
     if (newType === 'CC_PAYMENT') {
-      if (nonCcAccounts.length > 0 && (!account || isCreditCardAccount(nonCcAccounts[0]))) {
+      if (nonCcAccounts.length > 0 && (!account || isCreditCardAccount(nonCcAccounts[0].name))) {
         setAccount(nonCcAccounts[0].name);
       }
-      if (ccAccounts.length > 0 && (!toAccount || !isCreditCardAccount(ccAccounts[0]))) {
+      if (ccAccounts.length > 0 && (!toAccount || !isCreditCardAccount(ccAccounts[0].name))) {
         setToAccount(ccAccounts[0].name);
       }
       setCategory('Tarjetas de Crédito');

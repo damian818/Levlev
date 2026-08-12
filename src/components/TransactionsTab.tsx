@@ -51,6 +51,7 @@ export function TransactionsTab({
   const [selectedAccount, setSelectedAccount] = useState<string>(activeFilter?.account || 'ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
   const [recurringFilter, setRecurringFilter] = useState<'ALL' | 'ONE_TIME' | 'RECURRING'>('ALL');
+  const [showFutureTransactions, setShowFutureTransactions] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -262,6 +263,11 @@ export function TransactionsTab({
                              (recurringFilter === 'RECURRING' && recurringTxSet.has(t.id)) || 
                              (recurringFilter === 'ONE_TIME' && !recurringTxSet.has(t.id));
 
+      const todayStr = getTodayString();
+      const txDateStr = t.date ? t.date.substring(0, 10) : '';
+      const isFuture = Boolean(txDateStr && txDateStr > todayStr);
+      if (isFuture && !showFutureTransactions) return false;
+
       return matchSearch && matchType && matchCat && matchAcc && matchMonth && matchRecurring;
     });
 
@@ -396,6 +402,20 @@ export function TransactionsTab({
               <span>Recurring</span>
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => { setShowFutureTransactions(!showFutureTransactions); setCurrentPage(1); }}
+            className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 shadow-xs ${
+              showFutureTransactions
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                : 'bg-[#0f131a] text-slate-400 border-slate-700 hover:text-slate-200'
+            }`}
+            title="Future transactions are hidden from balances by default"
+          >
+            <Clock className={`w-3.5 h-3.5 ${showFutureTransactions ? 'text-amber-400' : 'text-slate-500'}`} />
+            <span>{showFutureTransactions ? 'Showing Future' : 'Future Hidden'}</span>
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">

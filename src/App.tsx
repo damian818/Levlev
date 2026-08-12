@@ -37,6 +37,14 @@ export default function App() {
     }
   });
 
+  const [userTimezone, setUserTimezone] = useState<string>(() => {
+    try {
+      return localStorage.getItem('finance_app_user_timezone') || 'America/Argentina/Buenos_Aires';
+    } catch (e) {
+      return 'America/Argentina/Buenos_Aires';
+    }
+  });
+
   const [showSharedData, setShowSharedData] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('finance_app_show_shared_data');
@@ -146,10 +154,11 @@ export default function App() {
       localStorage.setItem('finance_app_workspace_is_shared', String(isWorkspaceShared));
       localStorage.setItem('finance_app_workspace_members', JSON.stringify(workspaceMembers));
       localStorage.setItem('finance_app_show_shared_data', String(showSharedData));
+      localStorage.setItem('finance_app_user_timezone', userTimezone);
     } catch (e) {
       console.warn('Failed to save workspace sharing state to localStorage');
     }
-  }, [isWorkspaceShared, workspaceMembers, showSharedData]);
+  }, [isWorkspaceShared, workspaceMembers, showSharedData, userTimezone]);
 
   const handleUpdateWorkspaceSharing = (isShared: boolean, members: SharedMember[]) => {
     setIsWorkspaceShared(isShared);
@@ -852,6 +861,8 @@ export default function App() {
             transactions={transactions}
             budgets={budgets}
             usdArsRate={usdArsRate}
+            userTimezone={userTimezone}
+            onUpdateTimezone={setUserTimezone}
             privacyMode={privacyMode}
             isWorkspaceShared={isWorkspaceShared}
             showSharedData={showSharedData}
@@ -902,6 +913,7 @@ export default function App() {
         }}
         existingAccounts={accounts}
         existingCategories={categories}
+        userTimezone={userTimezone}
       />
 
       <ConfirmDeleteModal
