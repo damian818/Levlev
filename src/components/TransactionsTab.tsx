@@ -21,6 +21,7 @@ interface TransactionsTabProps {
   onClearFilter?: () => void;
   currentUserId?: string;
   showSharedData?: boolean;
+  userTimezone?: string;
 }
 
 type SortField = 'date' | 'title' | 'category' | 'account' | 'type' | 'amount' | 'converted';
@@ -43,6 +44,7 @@ export function TransactionsTab({
   onClearFilter,
   currentUserId,
   showSharedData = true,
+  userTimezone = 'America/Argentina/Buenos_Aires',
 }: TransactionsTabProps) {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState(activeFilter?.search || '');
@@ -682,8 +684,8 @@ export function TransactionsTab({
                           <span>
                             {tx.date
                               ? tx.date.includes('T')
-                                ? new Date(tx.date).toLocaleDateString()
-                                : new Date(`${tx.date.substring(0, 10)}T00:00:00`).toLocaleDateString()
+                                ? new Date(tx.date).toLocaleDateString('en-US', { timeZone: userTimezone })
+                                : new Date(`${tx.date.substring(0, 10)}T12:00:00`).toLocaleDateString()
                               : 'N/A'}
                           </span>
                           {isFuture && (

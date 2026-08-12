@@ -49,13 +49,20 @@ const DEFAULT_CATEGORIES = [
 ];
 
 function getTodayStr(): string {
-  return new Date().toISOString().substring(0, 10);
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function getYesterdayStr(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().substring(0, 10);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // Add months helper for installment date calculation
@@ -583,7 +590,7 @@ export function AddTransactionModal({
     if (editingTx && onUpdateTransaction && editingTx.id) {
       if (type === 'CC_PAYMENT') {
         onUpdateTransaction(editingTx.id, {
-          date: new Date(date).toISOString(),
+          date: new Date(date + 'T12:00:00').toISOString(),
           title: title || `Pago ${toAccount}`,
           category: 'Tarjetas de Crédito',
           account: account,
@@ -603,7 +610,7 @@ export function AddTransactionModal({
         // In the original, sourceCurrency and destCurrency are used. 
         // We will just use the current account currencies.
         onUpdateTransaction(editingTx.id, {
-          date: new Date(date).toISOString(),
+          date: new Date(date + 'T12:00:00').toISOString(),
           title: title || `Transferencia: ${account} → ${toAccount}`,
           category: category || 'Transferencias',
           account: account,
@@ -616,7 +623,7 @@ export function AddTransactionModal({
         });
       } else {
         onUpdateTransaction(editingTx.id, {
-          date: new Date(date).toISOString(),
+          date: new Date(date + 'T12:00:00').toISOString(),
           title: title || (type === 'INCOME' ? 'Income' : 'Expense'),
           category: category || 'General',
           account: account,
@@ -637,7 +644,7 @@ export function AddTransactionModal({
     if (type === 'CC_PAYMENT') {
       const paymentTx: Transaction = {
         id: `manual-ccpay-${Date.now()}`,
-        date: new Date(date).toISOString(),
+        date: new Date(date + 'T12:00:00').toISOString(),
         title: title || `Pago ${toAccount}`,
         category: 'Tarjetas de Crédito',
         account: account,
@@ -657,7 +664,7 @@ export function AddTransactionModal({
       const parsedReceiveAmt = parseFloat(receiveAmount) || parsedAmount;
       const transferTx: Transaction = {
         id: `manual-transfer-${Date.now()}`,
-        date: new Date(date).toISOString(),
+        date: new Date(date + 'T12:00:00').toISOString(),
         title: title || `Transferencia: ${account} → ${toAccount}`,
         category: category || 'Transferencias',
         account: account,
@@ -696,7 +703,7 @@ export function AddTransactionModal({
       } else {
         const newTx: Transaction = {
           id: `manual-${Date.now()}`,
-          date: new Date(date).toISOString(),
+          date: new Date(date + 'T12:00:00').toISOString(),
           title: title || (type === 'INCOME' ? 'Income' : 'Expense'),
           category: category || 'General',
           account: account,

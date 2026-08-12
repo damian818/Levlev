@@ -21,6 +21,7 @@ interface OverviewTabProps {
   onOpenImportModal?: () => void;
   currentUserId?: string;
   showSharedData?: boolean;
+  userTimezone?: string;
 }
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
@@ -37,6 +38,7 @@ export function OverviewTab({
   onOpenImportModal,
   currentUserId,
   showSharedData = true,
+  userTimezone = 'America/Argentina/Buenos_Aires',
 }: OverviewTabProps) {
   const { t } = useTranslation();
   const [velocityMultiplier, setVelocityMultiplier] = useState<number>(1.0);
