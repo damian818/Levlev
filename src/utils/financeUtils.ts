@@ -26,7 +26,7 @@ export function isCreditCardAccount(
   }
 
   // 3. Fallback keyword search
-  const keywords = ['visa', 'master', 'tarjeta', 'tc', 'credit', 'amex', 'naranja', 'comafi', 'caball', 'american express'];
+  const keywords = ['visa', 'master', 'tarjeta', 'tc', 'cc', 'credit', 'credito', 'crédito', 'amex', 'naranja', 'comafi', 'caball', 'american express'];
   return keywords.some(kw => normName.includes(kw));
 }
 

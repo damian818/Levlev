@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
-import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions } from './utils/financeUtils';
+import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount } from './utils/financeUtils';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
 import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase } from './services/supabaseSync';
 import { Navbar } from './components/Navbar';
@@ -269,7 +269,7 @@ export default function App() {
               merged.push({
                 id: `acc-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                 name: name,
-                type: 'CHECKING',
+                type: isCreditCardAccount(name) ? 'CREDIT_CARD' : 'CHECKING',
                 currency: sample?.currency || 'ARS'
               });
             }

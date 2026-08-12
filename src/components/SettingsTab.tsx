@@ -311,7 +311,7 @@ export function SettingsTab({
       } else if (accRuleTypeInput === 'NTH_WEEKDAY') {
         closingRule = { ruleType: 'NTH_WEEKDAY', weekday: accWeekdayInput, nth: accNthInput, dueDaysAfterClose: accDueDaysInput };
       } else {
-        closingRule = { ruleType: accRuleTypeInput, dueDaysAfterClose: accDueDaysInput };
+        closingRule = { ruleType: accRuleTypeInput, weekday: accWeekdayInput, dueDaysAfterClose: accDueDaysInput };
       }
     }
 
@@ -363,7 +363,7 @@ export function SettingsTab({
       } else if (accRuleTypeInput === 'NTH_WEEKDAY') {
         closingRule = { ruleType: 'NTH_WEEKDAY', weekday: accWeekdayInput, nth: accNthInput, dueDaysAfterClose: accDueDaysInput };
       } else {
-        closingRule = { ruleType: accRuleTypeInput, dueDaysAfterClose: accDueDaysInput };
+        closingRule = { ruleType: accRuleTypeInput, weekday: accWeekdayInput, dueDaysAfterClose: accDueDaysInput };
       }
     }
 
@@ -1353,7 +1353,7 @@ export function SettingsTab({
                     </select>
                   </div>
 
-                  {accRuleTypeInput === 'FIXED_DAY' && (
+                  {accRuleTypeInput === 'FIXED_DAY' ? (
                     <div>
                       <label className="block text-[11px] text-slate-400 mb-1">Closing Day (1-31)</label>
                       <input
@@ -1365,28 +1365,13 @@ export function SettingsTab({
                         className="w-full px-2.5 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
                       />
                     </div>
-                  )}
-
-                  {accRuleTypeInput === 'NTH_WEEKDAY' && (
+                  ) : (
                     <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Nth Occurrence</label>
-                        <select
-                          value={accNthInput}
-                          onChange={(e) => setAccNthInput(parseInt(e.target.value) || 1)}
-                          className="w-full max-w-full truncate px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
-                        >
-                          <option value={1}>1st</option>
-                          <option value={2}>2nd</option>
-                          <option value={3}>3rd</option>
-                          <option value={4}>4th</option>
-                        </select>
-                      </div>
                       <div>
                         <label className="block text-[11px] text-slate-400 mb-1">Weekday</label>
                         <select
                           value={accWeekdayInput}
-                          onChange={(e) => setAccWeekdayInput(parseInt(e.target.value) || 4)}
+                          onChange={(e) => setAccWeekdayInput(parseInt(e.target.value) ?? 4)}
                           className="w-full max-w-full truncate px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
                         >
                           <option value={1}>Monday</option>
@@ -1394,8 +1379,25 @@ export function SettingsTab({
                           <option value={3}>Wednesday</option>
                           <option value={4}>Thursday</option>
                           <option value={5}>Friday</option>
+                          <option value={6}>Saturday</option>
+                          <option value={0}>Sunday</option>
                         </select>
                       </div>
+                      {accRuleTypeInput === 'NTH_WEEKDAY' && (
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Nth Occurrence</label>
+                          <select
+                            value={accNthInput}
+                            onChange={(e) => setAccNthInput(parseInt(e.target.value) || 1)}
+                            className="w-full max-w-full truncate px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
+                          >
+                            <option value={1}>1st</option>
+                            <option value={2}>2nd</option>
+                            <option value={3}>3rd</option>
+                            <option value={4}>4th</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1509,7 +1511,7 @@ export function SettingsTab({
                     </select>
                   </div>
 
-                  {accRuleTypeInput === 'FIXED_DAY' && (
+                  {accRuleTypeInput === 'FIXED_DAY' ? (
                     <div>
                       <label className="block text-[11px] text-slate-400 mb-1">Closing Day (1-31)</label>
                       <input
@@ -1521,28 +1523,13 @@ export function SettingsTab({
                         className="w-full px-2.5 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
                       />
                     </div>
-                  )}
-
-                  {accRuleTypeInput === 'NTH_WEEKDAY' && (
+                  ) : (
                     <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Nth Occurrence</label>
-                        <select
-                          value={accNthInput}
-                          onChange={(e) => setAccNthInput(parseInt(e.target.value) || 1)}
-                          className="w-full max-w-full truncate px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
-                        >
-                          <option value={1}>1st</option>
-                          <option value={2}>2nd</option>
-                          <option value={3}>3rd</option>
-                          <option value={4}>4th</option>
-                        </select>
-                      </div>
                       <div>
                         <label className="block text-[11px] text-slate-400 mb-1">Weekday</label>
                         <select
                           value={accWeekdayInput}
-                          onChange={(e) => setAccWeekdayInput(parseInt(e.target.value) || 4)}
+                          onChange={(e) => setAccWeekdayInput(parseInt(e.target.value) ?? 4)}
                           className="w-full max-w-full truncate px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
                         >
                           <option value={1}>Monday</option>
@@ -1550,8 +1537,25 @@ export function SettingsTab({
                           <option value={3}>Wednesday</option>
                           <option value={4}>Thursday</option>
                           <option value={5}>Friday</option>
+                          <option value={6}>Saturday</option>
+                          <option value={0}>Sunday</option>
                         </select>
                       </div>
+                      {accRuleTypeInput === 'NTH_WEEKDAY' && (
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Nth Occurrence</label>
+                          <select
+                            value={accNthInput}
+                            onChange={(e) => setAccNthInput(parseInt(e.target.value) || 1)}
+                            className="w-full max-w-full truncate px-2 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
+                          >
+                            <option value={1}>1st</option>
+                            <option value={2}>2nd</option>
+                            <option value={3}>3rd</option>
+                            <option value={4}>4th</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
