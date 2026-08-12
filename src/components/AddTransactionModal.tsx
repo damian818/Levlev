@@ -256,28 +256,107 @@ export function AddTransactionModal({
   const [newAccType, setNewAccType] = useState<'CHECKING' | 'CREDIT_CARD' | 'WALLET' | 'SAVINGS'>('CHECKING');
   const [newAccCurrency, setNewAccCurrency] = useState<'ARS' | 'USD'>('ARS');
 
-  // Sync initial account when opened
+  // Sync form fields when modal opens or editingTx changes
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+
+    if (editingTx) {
+      // Populating from transaction being edited or duplicated
+      const txType = editingTx.type || 'EXPENSE';
+      setType(txType);
+      setTitle(editingTx.title || '');
+      setCategory(
+        editingTx.category || 
+        (txType === 'TRANSFER' ? 'Transferencias' : txType === 'CC_PAYMENT' ? 'Tarjetas de Crédito' : 'General')
+      );
+      
+      const acc = editingTx.account || initialAccount || accountNames[0] || 'BBVA';
+      setAccount(acc);
+      
+      const toAcc = editingTx.toAccount || accountNames.find(a => a !== acc) || 'Visa BBVA';
+      setToAccount(toAcc);
+      
+      setCurrency(editingTx.currency || lookupAccountCurrency(acc));
+
+      const rawAmount = editingTx.originalAmount !== undefined && editingTx.originalAmount !== null
+        ? editingTx.originalAmount
+        : editingTx.amount;
+      setAmount(rawAmount !== undefined && rawAmount !== null ? String(rawAmount) : '');
+
+      if (editingTx.date) {
+        const formattedDate = editingTx.date.includes('T') ? editingTx.date.split('T')[0] : editingTx.date.substring(0, 10);
+        setDate(formattedDate);
+      } else {
+        setDate(getTodayStr());
+      }
+
+      setStatementCloseDate(editingTx.statementCloseDate || '');
+      setDescription(editingTx.description || '');
+
+      let instCount = 1;
+      if (editingTx.totalInstallments && editingTx.totalInstallments > 1) {
+        instCount = editingTx.totalInstallments;
+      } else if (editingTx.installments && editingTx.installments.includes('/')) {
+        const parts = editingTx.installments.split('/');
+        const parsed = parseInt(parts[1], 10);
+        if (!isNaN(parsed) && parsed > 1) instCount = parsed;
+      }
+      setNumInstallments(instCount);
+
+      if (editingTx.receiveAmount !== undefined && editingTx.receiveAmount !== null) {
+        setReceiveAmount(String(editingTx.receiveAmount));
+      } else if (editingTx.transferAmount !== undefined && editingTx.transferAmount !== null) {
+        setReceiveAmount(String(editingTx.transferAmount));
+      } else {
+        setReceiveAmount('');
+      }
+
+      setCustomFxRate('');
+      setFxEditMode('AUTO');
+    } else {
+      // Reset form for creating a new transaction
+      setType('EXPENSE');
+      setTitle('');
+      setCategory('Alimentos y Bebidas');
+
       const defaultAcc = initialAccount || accountNames[0] || 'BBVA';
       setAccount(defaultAcc);
       setCurrency(lookupAccountCurrency(defaultAcc));
 
       const altAcc = accountNames.find(a => a !== defaultAcc) || 'Visa BBVA';
       setToAccount(altAcc);
-    }
-  }, [isOpen, initialAccount, accountNames]);
 
-  // Handle type change defaults
-  useEffect(() => {
-    if (type === 'CC_PAYMENT') {
-      if (nonCcAccounts.length > 0) setAccount(nonCcAccounts[0].name);
-      if (ccAccounts.length > 0) setToAccount(ccAccounts[0].name);
-      setCategory('Tarjetas de Crédito');
-    } else if (type === 'TRANSFER') {
-      setCategory('Transferencias');
+      setAmount('');
+      setReceiveAmount('');
+      setCustomFxRate('');
+      setFxEditMode('AUTO');
+      setDate(getTodayStr());
+      setStatementCloseDate('');
+      setDescription('');
+      setNumInstallments(1);
     }
-  }, [type, nonCcAccounts, ccAccounts]);
+  }, [isOpen, editingTx, initialAccount, accountNames]);
+
+  // Handle type change when clicking tab pills
+  const handleTypeChange = (newType: 'EXPENSE' | 'INCOME' | 'TRANSFER' | 'CC_PAYMENT') => {
+    setType(newType);
+
+    if (newType === 'CC_PAYMENT') {
+      if (nonCcAccounts.length > 0 && (!account || isCreditCardAccount(nonCcAccounts[0]))) {
+        setAccount(nonCcAccounts[0].name);
+      }
+      if (ccAccounts.length > 0 && (!toAccount || !isCreditCardAccount(ccAccounts[0]))) {
+        setToAccount(ccAccounts[0].name);
+      }
+      setCategory('Tarjetas de Crédito');
+    } else if (newType === 'TRANSFER') {
+      setCategory('Transferencias');
+    } else if (newType === 'INCOME' && category === 'Alimentos y Bebidas') {
+      setCategory('Sueldo');
+    } else if (newType === 'EXPENSE' && category === 'Sueldo') {
+      setCategory('Alimentos y Bebidas');
+    }
+  };
 
   // Account change handler
   const handleAccountChange = (newAcc: string) => {
@@ -688,7 +767,7 @@ export function AddTransactionModal({
         <div className="grid grid-cols-4 gap-1.5 p-1 bg-[#0a0c10] border border-slate-800 rounded-xl">
           <button
             type="button"
-            onClick={() => setType('EXPENSE')}
+            onClick={() => handleTypeChange('EXPENSE')}
             className={`py-2 px-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
               type === 'EXPENSE'
                 ? 'bg-rose-500/20 border border-rose-500/40 text-rose-300 shadow-sm'
@@ -701,7 +780,7 @@ export function AddTransactionModal({
 
           <button
             type="button"
-            onClick={() => setType('INCOME')}
+            onClick={() => handleTypeChange('INCOME')}
             className={`py-2 px-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
               type === 'INCOME'
                 ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-sm'
@@ -714,7 +793,7 @@ export function AddTransactionModal({
 
           <button
             type="button"
-            onClick={() => setType('TRANSFER')}
+            onClick={() => handleTypeChange('TRANSFER')}
             className={`py-2 px-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
               type === 'TRANSFER'
                 ? 'bg-sky-500/20 border border-sky-500/40 text-sky-300 shadow-sm'
@@ -727,7 +806,7 @@ export function AddTransactionModal({
 
           <button
             type="button"
-            onClick={() => setType('CC_PAYMENT')}
+            onClick={() => handleTypeChange('CC_PAYMENT')}
             className={`py-2 px-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
               type === 'CC_PAYMENT'
                 ? 'bg-purple-500/20 border border-purple-500/40 text-purple-300 shadow-sm'
