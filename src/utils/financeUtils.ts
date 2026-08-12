@@ -1309,24 +1309,17 @@ export function detectRecurringItems(
     groups.get(groupKey)!.push(t);
   });
 
-  // Determine reference window for 3-month and 12-month checks
-  let latestDateStr = new Date().toISOString().substring(0, 10);
-  transactions.forEach(t => {
-    if (t.date && t.date > latestDateStr) {
-      latestDateStr = t.date;
-    }
-  });
-
-  const refDate = new Date(latestDateStr);
+  // Use the actual current date as the reference point for evaluating recurrence
+  const refDate = new Date();
   const refYear = refDate.getFullYear();
   const refMonth = refDate.getMonth() + 1; // 1 to 12
 
-  const last3Months = new Set<string>();
-  for (let i = 0; i < 3; i++) {
+  const last4Months = new Set<string>(); // Current month + 3 previous months
+  for (let i = 0; i < 4; i++) {
     const d = new Date(refYear, refMonth - 1 - i, 1);
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
-    last3Months.add(`${yyyy}-${mm}`);
+    last4Months.add(`${yyyy}-${mm}`);
   }
 
   const last12Months = new Set<string>();
@@ -1342,9 +1335,9 @@ export function detectRecurringItems(
   groups.forEach((txList, groupKey) => {
     const sorted = [...txList].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
-    // Count distinct months, 3-month occurrences, and 12-month occurrences
+    // Count distinct months, 4-month occurrences, and 12-month occurrences
     const distinctMonths = new Set<string>();
-    let occurrencesInLast3Months = 0;
+    const distinctMonthsInLast4 = new Set<string>();
     let occurrencesInLast12Months = 0;
     let daySum = 0;
     const accountsSet = new Set<string>();
@@ -1354,8 +1347,8 @@ export function detectRecurringItems(
         const m = t.date.substring(0, 7);
         distinctMonths.add(m);
 
-        if (last3Months.has(m)) {
-          occurrencesInLast3Months++;
+        if (last4Months.has(m)) {
+          distinctMonthsInLast4.add(m);
         }
         if (last12Months.has(m)) {
           occurrencesInLast12Months++;
@@ -1371,11 +1364,12 @@ export function detectRecurringItems(
       }
     });
 
-    const happenedInLast3Months = occurrencesInLast3Months > 0;
-    const happenedMoreThan9TimesInLast12Months = occurrencesInLast12Months > 9;
+    const repeatedInLast4Months = distinctMonthsInLast4.size >= 2;
+    const happenedAtLeast9TimesInLast12Months = occurrencesInLast12Months >= 9;
 
-    // Rule: If an expense/income has not happened in the last 3 months, AND if it has not happened more than 9 times in the last 12 months, then it is NOT recurring.
-    if (!happenedInLast3Months && !happenedMoreThan9TimesInLast12Months) {
+    // Rule: It is considered recurring if it has repeated over the current and 3 previous periods (>= 2 distinct months in that window)
+    // OR it has happened at least 9 times over the last 12 months.
+    if (!repeatedInLast4Months && !happenedAtLeast9TimesInLast12Months) {
       return;
     }
 
