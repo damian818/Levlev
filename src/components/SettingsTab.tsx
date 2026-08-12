@@ -71,6 +71,8 @@ interface SettingsTabProps {
   usdArsRate: number;
   privacyMode?: boolean;
   isWorkspaceShared?: boolean;
+  showSharedData?: boolean;
+  onToggleShowSharedData?: () => void;
   workspaceMembersCount?: number;
   onOpenShareWorkspaceModal?: () => void;
   customBalances?: Record<string, AccountCustomBalance>;
@@ -98,6 +100,8 @@ export function SettingsTab({
   usdArsRate,
   privacyMode = false,
   isWorkspaceShared = false,
+  showSharedData = true,
+  onToggleShowSharedData,
   workspaceMembersCount = 0,
   onOpenShareWorkspaceModal,
   customBalances,
@@ -809,6 +813,54 @@ export function SettingsTab({
               <span className="font-mono font-bold text-amber-300 bg-amber-500/10 px-3 py-1 rounded border border-amber-500/20">
                 {privacyMode ? '••••••' : '$ 12,450.00 USD'}
               </span>
+            </div>
+          </div>
+
+          {/* Show/Hide Shared Data Box */}
+          <div className="bg-[#121720] border border-purple-500/30 rounded-2xl p-6 space-y-4 md:col-span-2 shadow-lg shadow-purple-950/10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-purple-400 shrink-0 mt-0.5">
+                  <Users className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-100">Visibility: Shared Data</h3>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                      showSharedData
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {showSharedData ? 'Visible' : 'Hidden'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed max-w-2xl">
+                    Control whether transactions and accounts shared by other household members are visible in your instance. When hidden, reports and charts will reflect only your personal (owned) data.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onToggleShowSharedData}
+                className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold transition-all shrink-0 active:scale-95 border ${
+                  showSharedData
+                    ? 'bg-purple-500 hover:bg-purple-400 text-slate-950 border-purple-400 shadow-md shadow-purple-950/50'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
+              >
+                {showSharedData ? (
+                  <>
+                    <EyeOff className="w-4 h-4 text-slate-950" />
+                    <span>Hide Shared Records</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4 text-purple-400" />
+                    <span>Show Shared Records</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 

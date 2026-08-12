@@ -25,6 +25,7 @@ interface AccountsTabProps {
   onEditAccount?: (oldName: string, updatedAcc: AccountItem, updateTransactions: boolean) => void;
   onAddAccount?: (newAcc: AccountItem) => void;
   currentUserId?: string;
+  showSharedData?: boolean;
 }
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
@@ -48,6 +49,7 @@ export function AccountsTab({
   onEditAccount,
   onAddAccount,
   currentUserId,
+  showSharedData = true,
 }: AccountsTabProps) {
   const [editingAccount, setEditingAccount] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -117,8 +119,26 @@ export function AccountsTab({
     }
   };
 
+  // Filter transactions based on shared data preference
+  const filteredTransactions = useMemo(() => {
+    if (showSharedData) return transactions;
+    return transactions.filter(t => {
+      const isShared = t.ownerId && currentUserId && t.ownerId !== currentUserId;
+      return !isShared;
+    });
+  }, [transactions, showSharedData, currentUserId]);
+
+  // Filter accounts based on shared data preference
+  const filteredAccountItems = useMemo(() => {
+    if (showSharedData) return accounts;
+    return accounts.filter(acc => {
+      const isShared = acc.ownerId && currentUserId && acc.ownerId !== currentUserId;
+      return !isShared;
+    });
+  }, [accounts, showSharedData, currentUserId]);
+
   // Calculate account summaries using central financeUtils helper
-  const computedSummaries = computeAccountBalances(transactions, usdArsRate, customBalances, accounts);
+  const computedSummaries = computeAccountBalances(filteredTransactions, usdArsRate, customBalances, filteredAccountItems);
 
   // Reconstructed summary list with Credit Card classification
   const reconstructedAccounts = computedSummaries.map(summary => {
@@ -133,7 +153,7 @@ export function AccountsTab({
     const accountRule = ccRulesMap[name] || { ruleType: 'FIXED_DAY', fixedDay: 25 };
 
     // If it's a credit card, compute statement summary based on current date & time
-    const statements = isCC ? getCreditCardStatements(transactions, name, accountRule, periodStatusOverrides) : [];
+    const statements = isCC ? getCreditCardStatements(filteredTransactions, name, accountRule, periodStatusOverrides) : [];
     const currentStatement = isCC ? getCurrentStatement(statements, accountRule) : undefined;
     const nextCloseDate = isCC ? getNextCloseDate(accountRule) : undefined;
 
@@ -664,7 +684,7 @@ export function AccountsTab({
           isOpen={!!selectedCardAccount}
           onClose={() => setSelectedCardAccount(null)}
           accountName={selectedCardAccount}
-          transactions={transactions}
+          transactions={filteredTransactions}
           displayCurrency={displayCurrency}
           usdArsRate={usdArsRate}
           closingRule={ccRulesMap[selectedCardAccount] || { ruleType: 'FIXED_DAY', fixedDay: 25 }}

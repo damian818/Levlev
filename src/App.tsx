@@ -37,6 +37,15 @@ export default function App() {
     }
   });
 
+  const [showSharedData, setShowSharedData] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_show_shared_data');
+      return saved !== null ? saved === 'true' : true;
+    } catch (e) {
+      return true;
+    }
+  });
+
   const [workspaceMembers, setWorkspaceMembers] = useState<SharedMember[]>(() => {
     try {
       const saved = localStorage.getItem('finance_app_workspace_members');
@@ -136,10 +145,11 @@ export default function App() {
     try {
       localStorage.setItem('finance_app_workspace_is_shared', String(isWorkspaceShared));
       localStorage.setItem('finance_app_workspace_members', JSON.stringify(workspaceMembers));
+      localStorage.setItem('finance_app_show_shared_data', String(showSharedData));
     } catch (e) {
       console.warn('Failed to save workspace sharing state to localStorage');
     }
-  }, [isWorkspaceShared, workspaceMembers]);
+  }, [isWorkspaceShared, workspaceMembers, showSharedData]);
 
   const handleUpdateWorkspaceSharing = (isShared: boolean, members: SharedMember[]) => {
     setIsWorkspaceShared(isShared);
@@ -682,6 +692,8 @@ export default function App() {
             customBalances={customBalances}
             onNavigateTab={setCurrentTab}
             onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
+            currentUserId={authUser?.id}
+            showSharedData={showSharedData}
           />
         )}
         {currentTab === 'transactions' && (
@@ -696,6 +708,7 @@ export default function App() {
             activeFilter={activeFilter}
             onClearFilter={() => setActiveFilter(undefined)}
             currentUserId={authUser?.id}
+            showSharedData={showSharedData}
           />
         )}
         {currentTab === 'accounts' && (
@@ -718,6 +731,7 @@ export default function App() {
             onEditAccount={handleEditAccount}
             onAddAccount={handleAddAccount}
             currentUserId={authUser?.id}
+            showSharedData={showSharedData}
           />
         )}
         {currentTab === 'reports' && (
@@ -725,6 +739,8 @@ export default function App() {
             transactions={transactions}
             displayCurrency={displayCurrency}
             usdArsRate={usdArsRate}
+            currentUserId={authUser?.id}
+            showSharedData={showSharedData}
           />
         )}
         {currentTab === 'budgets' && (
@@ -760,6 +776,8 @@ export default function App() {
             usdArsRate={usdArsRate}
             privacyMode={privacyMode}
             isWorkspaceShared={isWorkspaceShared}
+            showSharedData={showSharedData}
+            onToggleShowSharedData={() => setShowSharedData(prev => !prev)}
             workspaceMembersCount={workspaceMembers.length}
             onOpenShareWorkspaceModal={() => setIsShareWorkspaceModalOpen(true)}
             customBalances={customBalances}

@@ -15,12 +15,16 @@ interface ReportsTabProps {
   transactions: Transaction[];
   displayCurrency: DisplayCurrency;
   usdArsRate: number;
+  currentUserId?: string;
+  showSharedData?: boolean;
 }
 
 export function ReportsTab({
   transactions,
   displayCurrency,
   usdArsRate,
+  currentUserId,
+  showSharedData = true,
 }: ReportsTabProps) {
   // Time range state
   const [timeRange, setTimeRange] = useState<'6M' | '12M' | 'ALL'>('12M');
@@ -32,10 +36,16 @@ export function ReportsTab({
   const COLORS = {
     incomeARS: '#10b981', // Emerald 500
     incomeUSD: '#06b6d4', // Cyan 500
+    sharedIncomeARS: '#8b5cf6', // Violet 500
+    sharedIncomeUSD: '#a855f7', // Purple 500
     expenseARS: '#f43f5e', // Rose 500
     expenseUSD: '#f59e0b', // Amber 500
+    sharedExpenseARS: '#f97316', // Orange 500
+    sharedExpenseUSD: '#fbbf24', // Amber 400
     incomeTotal: '#34d399', // Emerald 400
     expenseTotal: '#fb7185', // Rose 400
+    sharedIncomeTotal: '#a78bfa', // Violet 400
+    sharedExpenseTotal: '#fb923c', // Orange 400
     netPositive: '#10b981',
     netNegative: '#ef4444',
   };
@@ -66,6 +76,10 @@ export function ReportsTab({
       incomeUSD: number;
       expenseARS: number;
       expenseUSD: number;
+      sharedIncomeARS: number;
+      sharedIncomeUSD: number;
+      sharedExpenseARS: number;
+      sharedExpenseUSD: number;
       scheduledIncomeARS: number;
       scheduledIncomeUSD: number;
       scheduledExpenseARS: number;
@@ -74,6 +88,8 @@ export function ReportsTab({
       expenseConverted: number;
       scheduledIncomeConverted: number;
       scheduledExpenseConverted: number;
+      sharedIncomeConverted: number;
+      sharedExpenseConverted: number;
       netConverted: number;
       txCount: number;
     }> = {};
@@ -88,6 +104,10 @@ export function ReportsTab({
           incomeUSD: 0,
           expenseARS: 0,
           expenseUSD: 0,
+          sharedIncomeARS: 0,
+          sharedIncomeUSD: 0,
+          sharedExpenseARS: 0,
+          sharedExpenseUSD: 0,
           scheduledIncomeARS: 0,
           scheduledIncomeUSD: 0,
           scheduledExpenseARS: 0,
@@ -96,6 +116,8 @@ export function ReportsTab({
           expenseConverted: 0,
           scheduledIncomeConverted: 0,
           scheduledExpenseConverted: 0,
+          sharedIncomeConverted: 0,
+          sharedExpenseConverted: 0,
           netConverted: 0,
           txCount: 0,
         };
@@ -106,6 +128,9 @@ export function ReportsTab({
     transactions.forEach(tx => {
       if (tx.type === 'TRANSFER') return; // Exclude internal transfers from income/expense metrics
       if (selectedCategoryFilter !== 'ALL' && tx.category !== selectedCategoryFilter) return;
+
+      const isShared = tx.ownerId && currentUserId && tx.ownerId !== currentUserId;
+      if (isShared && !showSharedData) return;
 
       const monthKey = tx.date ? tx.date.substring(0, 7) : 'Unknown';
       if (monthKey === 'Unknown') return;
@@ -123,6 +148,10 @@ export function ReportsTab({
           if (isUsd) item.scheduledIncomeUSD += amt;
           else item.scheduledIncomeARS += amt;
           item.scheduledIncomeConverted += converted;
+        } else if (isShared) {
+          if (isUsd) item.sharedIncomeUSD += amt;
+          else item.sharedIncomeARS += amt;
+          item.sharedIncomeConverted += converted;
         } else {
           if (isUsd) item.incomeUSD += amt;
           else item.incomeARS += amt;
@@ -133,6 +162,10 @@ export function ReportsTab({
           if (isUsd) item.scheduledExpenseUSD += amt;
           else item.scheduledExpenseARS += amt;
           item.scheduledExpenseConverted += converted;
+        } else if (isShared) {
+          if (isUsd) item.sharedExpenseUSD += amt;
+          else item.sharedExpenseARS += amt;
+          item.sharedExpenseConverted += converted;
         } else {
           if (isUsd) item.expenseUSD += amt;
           else item.expenseARS += amt;
@@ -175,12 +208,12 @@ export function ReportsTab({
     let totalExpenseConverted = 0;
 
     monthlyReportData.forEach(m => {
-      totalIncomeARS += m.incomeARS + m.scheduledIncomeARS;
-      totalIncomeUSD += m.incomeUSD + m.scheduledIncomeUSD;
-      totalExpenseARS += m.expenseARS + m.scheduledExpenseARS;
-      totalExpenseUSD += m.expenseUSD + m.scheduledExpenseUSD;
-      totalIncomeConverted += m.incomeConverted + m.scheduledIncomeConverted;
-      totalExpenseConverted += m.expenseConverted + m.scheduledExpenseConverted;
+      totalIncomeARS += m.incomeARS + m.scheduledIncomeARS + m.sharedIncomeARS;
+      totalIncomeUSD += m.incomeUSD + m.scheduledIncomeUSD + m.sharedIncomeUSD;
+      totalExpenseARS += m.expenseARS + m.scheduledExpenseARS + m.sharedExpenseARS;
+      totalExpenseUSD += m.expenseUSD + m.scheduledExpenseUSD + m.sharedExpenseUSD;
+      totalIncomeConverted += m.incomeConverted + m.scheduledIncomeConverted + m.sharedIncomeConverted;
+      totalExpenseConverted += m.expenseConverted + m.scheduledExpenseConverted + m.sharedExpenseConverted;
     });
 
     const netSavingsConverted = totalIncomeConverted - totalExpenseConverted;
@@ -191,14 +224,14 @@ export function ReportsTab({
     let highestExpenseMonth = monthlyReportData[0];
 
     monthlyReportData.forEach(m => {
-      const mIncome = m.incomeConverted + m.scheduledIncomeConverted;
-      const hIncome = highestIncomeMonth ? highestIncomeMonth.incomeConverted + highestIncomeMonth.scheduledIncomeConverted : 0;
+      const mIncome = m.incomeConverted + m.scheduledIncomeConverted + m.sharedIncomeConverted;
+      const hIncome = highestIncomeMonth ? highestIncomeMonth.incomeConverted + highestIncomeMonth.scheduledIncomeConverted + highestIncomeMonth.sharedIncomeConverted : 0;
       if (!highestIncomeMonth || mIncome > hIncome) {
         highestIncomeMonth = m;
       }
       
-      const mExpense = m.expenseConverted + m.scheduledExpenseConverted;
-      const hExpense = highestExpenseMonth ? highestExpenseMonth.expenseConverted + highestExpenseMonth.scheduledExpenseConverted : 0;
+      const mExpense = m.expenseConverted + m.scheduledExpenseConverted + m.sharedExpenseConverted;
+      const hExpense = highestExpenseMonth ? highestExpenseMonth.expenseConverted + highestExpenseMonth.scheduledExpenseConverted + highestExpenseMonth.sharedExpenseConverted : 0;
       if (!highestExpenseMonth || mExpense > hExpense) {
         highestExpenseMonth = m;
       }
@@ -678,23 +711,76 @@ export function ReportsTab({
         </div>
 
         {/* Currency Legend Badges */}
-        {chartMode === 'NATIVE_CURRENCY' && (
-          <div className="flex flex-wrap items-center justify-center gap-4 text-xs bg-[#0f131a] p-2.5 rounded-xl border border-slate-800/80">
+        {chartMode === 'CONVERTED' ? (
+          <div className="flex flex-wrap items-center justify-center gap-6 text-[10px] bg-[#0f131a] p-3 rounded-xl border border-slate-800/80">
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.incomeARS }}></span>
-              <span className="text-slate-300 font-medium">Income ARS</span>
+              <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.incomeTotal }}></span>
+              <span className="text-slate-300 font-medium">Owned Income ({displayCurrency})</span>
             </div>
+            {showSharedData && (
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedIncomeTotal }}></span>
+                <span className="text-purple-400 font-bold">Shared Income ({displayCurrency})</span>
+              </div>
+            )}
+            <div className="w-px h-3 bg-slate-800"></div>
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.incomeUSD }}></span>
-              <span className="text-slate-300 font-medium">Income USD</span>
+              <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.expenseTotal }}></span>
+              <span className="text-slate-300 font-medium">Owned Expense ({displayCurrency})</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.expenseARS }}></span>
-              <span className="text-slate-300 font-medium">Expense ARS</span>
+            {showSharedData && (
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedExpenseTotal }}></span>
+                <span className="text-amber-500 font-bold">Shared Expense ({displayCurrency})</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[10px] bg-[#0f131a] p-3 rounded-xl border border-slate-800/80">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.incomeARS }}></span>
+                <span className="text-slate-300 font-medium">Income ARS</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.incomeUSD }}></span>
+                <span className="text-slate-300 font-medium">Income USD</span>
+              </div>
+              {showSharedData && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedIncomeARS }}></span>
+                    <span className="text-purple-400 font-bold">Shared Income ARS</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedIncomeUSD }}></span>
+                    <span className="text-purple-400 font-bold">Shared Income USD</span>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.expenseUSD }}></span>
-              <span className="text-slate-300 font-medium">Expense USD</span>
+            <div className="w-px h-3 bg-slate-800 hidden sm:block"></div>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.expenseARS }}></span>
+                <span className="text-slate-300 font-medium">Expense ARS</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.expenseUSD }}></span>
+                <span className="text-slate-300 font-medium">Expense USD</span>
+              </div>
+              {showSharedData && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedExpenseARS }}></span>
+                    <span className="text-amber-500 font-bold">Shared Expense ARS</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedExpenseUSD }}></span>
+                    <span className="text-amber-500 font-bold">Shared Expense USD</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -754,11 +840,27 @@ export function ReportsTab({
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
                 />
+                {/* Shared Income ARS */}
+                <Bar 
+                  dataKey="sharedIncomeARS" 
+                  name="Shared Income ARS" 
+                  fill={COLORS.sharedIncomeARS} 
+                  stackId={barStyle === 'STACKED' ? 'income' : undefined} 
+                  radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
+                />
                 {/* Income USD */}
                 <Bar 
                   dataKey="incomeUSD" 
                   name="Income USD" 
                   fill={COLORS.incomeUSD} 
+                  stackId={barStyle === 'STACKED' ? 'income' : undefined} 
+                  radius={[4, 4, 0, 0]} 
+                />
+                {/* Shared Income USD */}
+                <Bar 
+                  dataKey="sharedIncomeUSD" 
+                  name="Shared Income USD" 
+                  fill={COLORS.sharedIncomeUSD} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={[4, 4, 0, 0]} 
                 />
@@ -792,11 +894,27 @@ export function ReportsTab({
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
                 />
+                {/* Shared Expense ARS */}
+                <Bar 
+                  dataKey="sharedExpenseARS" 
+                  name="Shared Expense ARS" 
+                  fill={COLORS.sharedExpenseARS} 
+                  stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
+                  radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
+                />
                 {/* Expense USD */}
                 <Bar 
                   dataKey="expenseUSD" 
                   name="Expense USD" 
                   fill={COLORS.expenseUSD} 
+                  stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
+                  radius={[4, 4, 0, 0]} 
+                />
+                {/* Shared Expense USD */}
+                <Bar 
+                  dataKey="sharedExpenseUSD" 
+                  name="Shared Expense USD" 
+                  fill={COLORS.sharedExpenseUSD} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={[4, 4, 0, 0]} 
                 />
@@ -842,6 +960,13 @@ export function ReportsTab({
                   radius={[4, 4, 0, 0]} 
                 />
                 <Bar 
+                  dataKey="sharedIncomeConverted" 
+                  name={`Shared Income (${displayCurrency})`} 
+                  fill={COLORS.sharedIncomeTotal} 
+                  stackId="income"
+                  radius={[4, 4, 0, 0]} 
+                />
+                <Bar 
                   dataKey="scheduledExpenseConverted" 
                   name={`Scheduled Expense (${displayCurrency})`} 
                   fill={COLORS.expenseTotal} 
@@ -855,6 +980,13 @@ export function ReportsTab({
                   dataKey="expenseConverted" 
                   name={`Actual Expense (${displayCurrency})`} 
                   fill={COLORS.expenseTotal} 
+                  stackId="expense"
+                  radius={[4, 4, 0, 0]} 
+                />
+                <Bar 
+                  dataKey="sharedExpenseConverted" 
+                  name={`Shared Expense (${displayCurrency})`} 
+                  fill={COLORS.sharedExpenseTotal} 
                   stackId="expense"
                   radius={[4, 4, 0, 0]} 
                 />

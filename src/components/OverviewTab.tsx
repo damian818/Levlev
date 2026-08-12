@@ -19,6 +19,8 @@ interface OverviewTabProps {
   onNavigateTab: (tab: ViewTab) => void;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
   onOpenImportModal?: () => void;
+  currentUserId?: string;
+  showSharedData?: boolean;
 }
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
@@ -32,18 +34,29 @@ export function OverviewTab({
   customBalances,
   onNavigateTab,
   onNavigateToTransactionsWithFilter,
-  onOpenImportModal
+  onOpenImportModal,
+  currentUserId,
+  showSharedData = true,
 }: OverviewTabProps) {
   const { t } = useTranslation();
   const [velocityMultiplier, setVelocityMultiplier] = useState<number>(1.0);
   const [showCategoryTrend, setShowCategoryTrend] = useState<boolean>(false);
+
+  // Filter transactions based on shared data preference
+  const filteredTransactions = useMemo(() => {
+    if (showSharedData) return transactions;
+    return transactions.filter(t => {
+      const isShared = t.ownerId && currentUserId && t.ownerId !== currentUserId;
+      return !isShared;
+    });
+  }, [transactions, showSharedData, currentUserId]);
 
   const currentMonthKey = useMemo(() => getCurrentMonthKey(), []);
 
   // Available months from transactions
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
-    transactions.forEach(t => {
+    filteredTransactions.forEach(t => {
       if (t.date) set.add(t.date.substring(0, 7));
     });
     set.add(currentMonthKey);
@@ -56,9 +69,9 @@ export function OverviewTab({
     set.add(`${nextY}-${nextM}`);
     
     return Array.from(set).sort().reverse();
-  }, [transactions, currentMonthKey]);
+  }, [filteredTransactions, currentMonthKey]);
 
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => getDefaultSelectedMonth(transactions));
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => getDefaultSelectedMonth(filteredTransactions));
   const [chartStartMonth, setChartStartMonth] = useState<string>(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 12);
@@ -72,13 +85,13 @@ export function OverviewTab({
 
   useEffect(() => {
     if (availableMonths.length > 0 && !availableMonths.includes(selectedMonth) && selectedMonth !== 'ALL') {
-      setSelectedMonth(getDefaultSelectedMonth(transactions));
+      setSelectedMonth(getDefaultSelectedMonth(filteredTransactions));
     }
   }, [availableMonths]);
 
-  const spending = analyzeSpending(transactions, displayCurrency, usdArsRate, selectedMonth);
-  const accounts = computeAccountBalances(transactions, usdArsRate, customBalances);
-  const { trendData, metrics } = computePredictiveTrend(transactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData);
+  const spending = analyzeSpending(filteredTransactions, displayCurrency, usdArsRate, selectedMonth);
+  const accounts = computeAccountBalances(filteredTransactions, usdArsRate, customBalances);
+  const { trendData, metrics } = computePredictiveTrend(filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData);
 
   // Filter trend data based on date filters
   const filteredTrendData = useMemo(() => {
@@ -182,7 +195,7 @@ export function OverviewTab({
             onClick={() =>
               generateMonthlyPdfReport({
                 selectedMonth,
-                transactions,
+                transactions: filteredTransactions,
                 displayCurrency,
                 usdArsRate,
               })
@@ -547,7 +560,7 @@ export function OverviewTab({
 
         {/* Monthly Breakdown of Spending by Category Donut Chart Component */}
         <MonthlyCategoryDonut
-          transactions={transactions}
+          transactions={filteredTransactions}
           displayCurrency={displayCurrency}
           usdArsRate={usdArsRate}
           selectedMonth={selectedMonth}
@@ -559,7 +572,12 @@ export function OverviewTab({
       <div className="bg-[#11141c] p-5 rounded-xl border border-slate-800 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">Biggest Expenses (Top Merchants)</h3>
+            <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+              <span>Biggest Expenses (Top Merchants)</span>
+              {!showSharedData && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">OWNED DATA ONLY</span>
+              )}
+            </h3>
             <p className="text-xs text-slate-400">Click any merchant row to filter its individual transactions.</p>
           </div>
         </div>
@@ -620,7 +638,7 @@ export function OverviewTab({
       {/* Daily Spending & Scheduled Bills Dashlet */}
       <div>
         <MonthlyHeatmap
-          transactions={transactions}
+          transactions={filteredTransactions}
           selectedMonth={selectedMonth}
           displayCurrency={displayCurrency}
           usdArsRate={usdArsRate}
@@ -631,7 +649,7 @@ export function OverviewTab({
       <CategoryTrendModal
         isOpen={showCategoryTrend}
         onClose={() => setShowCategoryTrend(false)}
-        transactions={transactions}
+        transactions={filteredTransactions}
         displayCurrency={displayCurrency}
         usdArsRate={usdArsRate}
         historyData={historyData}

@@ -15,6 +15,7 @@ interface TransactionsTabProps {
   activeFilter?: TransactionFilter;
   onClearFilter?: () => void;
   currentUserId?: string;
+  showSharedData?: boolean;
 }
 
 type SortField = 'date' | 'title' | 'category' | 'account' | 'type' | 'amount' | 'converted';
@@ -31,6 +32,7 @@ export function TransactionsTab({
   activeFilter,
   onClearFilter,
   currentUserId,
+  showSharedData = true,
 }: TransactionsTabProps) {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState(activeFilter?.search || '');
@@ -175,6 +177,9 @@ export function TransactionsTab({
 
   const filtered = useMemo(() => {
     const list = transactions.filter(t => {
+      const isShared = t.ownerId && currentUserId && t.ownerId !== currentUserId;
+      if (isShared && !showSharedData) return false;
+
       const matchSearch = !searchTerm || 
                           (t.title && t.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
                           (t.category && t.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
