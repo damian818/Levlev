@@ -135,6 +135,12 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       .map((row: any) => {
         const tAccount = row.user_id !== userId ? `${row.account || 'Main'} (Shared)` : (row.account || 'Main');
         const tToAccount = row.to_account ? (row.user_id !== userId ? `${row.to_account} (Shared)` : row.to_account) : undefined;
+        
+        let finalInstallments = row.installments ? String(row.installments) : undefined;
+        if (row.installment_number && row.total_installments) {
+          finalInstallments = `${row.installment_number}/${row.total_installments}`;
+        }
+        
         return {
           id: row.id || `tx-${Math.random().toString(36).substring(2)}`,
           ownerId: row.user_id,
@@ -146,7 +152,9 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
           account: tAccount,
           type: row.type || 'EXPENSE',
           toAccount: tToAccount,
-          installments: row.installments ? String(row.installments) : undefined,
+          installments: finalInstallments,
+          installmentNumber: row.installment_number ? Number(row.installment_number) : undefined,
+          totalInstallments: row.total_installments ? Number(row.total_installments) : undefined,
           statementCloseDate: row.statement_close_date || undefined,
           transferAmount: row.transfer_amount !== undefined && row.transfer_amount !== null ? Number(row.transfer_amount) : (row.type === 'TRANSFER' ? Number(row.amount) : undefined),
           transferCurrency: row.transfer_currency || (row.type === 'TRANSFER' ? row.currency : undefined),
@@ -259,25 +267,32 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
         const ownerHint = (t.account ? accountOwnerMap[t.account] : undefined) || firstForeignOwner;
         const { id: rowId, userId: targetUserId } = resolveSyncId(t.id, userId, ownerHint);
         
+        let safeInstallmentNum: number | null = t.installmentNumber || null;
+        let safeTotalInstallments: number | null = t.totalInstallments || null;
         let safeInstallments: number | null = null;
-        if (t.totalInstallments && typeof t.totalInstallments === 'number') {
-          safeInstallments = t.totalInstallments;
-        } else if (typeof t.installments === 'number') {
-          safeInstallments = t.installments;
-        } else if (typeof t.installments === 'string') {
-          if (t.installments.includes('/')) {
-            const parts = t.installments.split('/');
-            const total = parseInt(parts[1], 10);
-            safeInstallments = !isNaN(total) ? total : (parseInt(parts[0], 10) || null);
-          } else {
-            const num = parseInt(t.installments, 10);
-            safeInstallments = !isNaN(num) ? num : null;
+
+        if (typeof t.installments === 'string' && t.installments.includes('/')) {
+          const parts = t.installments.split('/');
+          if (safeInstallmentNum === null) {
+            const n = parseInt(parts[0], 10);
+            if (!isNaN(n)) safeInstallmentNum = n;
           }
+          if (safeTotalInstallments === null) {
+            const total = parseInt(parts[1], 10);
+            if (!isNaN(total)) safeTotalInstallments = total;
+          }
+        } else if (typeof t.installments === 'string') {
+           const num = parseInt(t.installments, 10);
+           safeInstallments = !isNaN(num) ? num : null;
+        } else if (typeof t.installments === 'number') {
+           safeInstallments = t.installments;
         }
+        
+        // Use totalInstallments as the legacy "installments" column value for backwards compatibility
+        const finalLegacyInstallments = safeTotalInstallments !== null ? safeTotalInstallments : safeInstallments;
 
         const rawAmount = (t.amount !== undefined && t.amount !== null && t.amount > 0) ? t.amount : ((t.transferAmount && t.transferAmount > 0) ? t.transferAmount : (t.amount || 0));
         const cleanAmount = Math.round(rawAmount * 100) / 100;
-
         const cleanAccount = t.account ? t.account.replace(' (Shared)', '') : 'Main';
         const cleanToAccount = t.toAccount ? t.toAccount.replace(' (Shared)', '') : null;
 
@@ -292,7 +307,9 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           account: cleanAccount,
           type: t.type,
           to_account: cleanToAccount,
-          installments: safeInstallments,
+          installments: finalLegacyInstallments,
+          installment_number: safeInstallmentNum,
+          total_installments: safeTotalInstallments,
           statement_close_date: t.statementCloseDate || null,
           transfer_amount: t.transferAmount !== undefined && t.transferAmount !== null ? Math.round(t.transferAmount * 100) / 100 : null,
           transfer_currency: t.transferCurrency || null,
