@@ -150,19 +150,19 @@ export function Navbar({
               }} 
               className="text-left focus:outline-none cursor-pointer group shrink-0 min-h-[44px] flex items-center"
             >
-              <LevLevLogo badgeText="GLOBAL" size="md" />
+              <LevLevLogo badgeText="GLOBAL" size="md" hideSubtitleOnMobile={true} />
             </button>
 
             {/* Right Controls Container */}
             <div className="flex items-center gap-1.5 sm:gap-3">
               
-              {/* Language Switcher Pill */}
+              {/* Language Switcher Pill - Desktop Only */}
               <button
                 onClick={() => {
                   triggerHaptic(10);
                   toggleLanguage();
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-[#161b22] hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all min-h-[44px]"
+                className="hidden lg:flex items-center gap-1.5 px-3 py-2 bg-[#161b22] hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all min-h-[44px]"
                 title="Switch Language / Cambiar Idioma"
               >
                 <Globe className="w-3.5 h-3.5 text-emerald-400" />
@@ -181,8 +181,8 @@ export function Navbar({
                 <span className="font-extrabold tracking-tight">{t('nav.new_transaction')}</span>
               </button>
 
-              {/* Currency Selector Pill */}
-              <div className="flex bg-[#161b22] p-1 rounded-xl border border-slate-800 shrink-0 items-center min-h-[44px]">
+              {/* Currency Selector Pill - Desktop Only */}
+              <div className="hidden sm:flex bg-[#161b22] p-1 rounded-xl border border-slate-800 shrink-0 items-center min-h-[44px]">
                 <select
                   value={displayCurrency}
                   onChange={(e) => {
@@ -364,6 +364,28 @@ export function Navbar({
                   </div>
                 </div>
 
+                {/* Display Currency Selection (Mobile) */}
+                <div className="col-span-2 flex items-center justify-between bg-[#0a0c10] px-3 py-2 rounded-xl border border-slate-800 min-h-[44px]">
+                  <span className="text-slate-400 font-medium">Display Currency:</span>
+                  <select
+                    value={displayCurrency}
+                    onChange={(e) => {
+                      triggerHaptic(10);
+                      setDisplayCurrency(e.target.value as DisplayCurrency);
+                    }}
+                    className="bg-[#161b22] text-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none cursor-pointer"
+                  >
+                    <option value="ARS">ARS ($)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="BRL">BRL (R$)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="MXN">MXN ($)</option>
+                    <option value="CLP">CLP ($)</option>
+                    <option value="USDT">USDT (₮)</option>
+                  </select>
+                </div>
+
                 {/* Privacy Mode Toggle */}
                 <button
                   onClick={() => {
@@ -408,6 +430,18 @@ export function Navbar({
                 >
                   <Upload className="w-4 h-4 text-slate-400" />
                   <span>Import CSV</span>
+                </button>
+
+                {/* Language Switcher */}
+                <button
+                  onClick={() => {
+                    triggerHaptic(10);
+                    toggleLanguage();
+                  }}
+                  className="flex items-center justify-center gap-2 p-2.5 rounded-xl font-bold bg-[#161b22] border border-slate-800 text-slate-300 hover:text-white min-h-[44px]"
+                >
+                  <Globe className="w-4 h-4 text-emerald-400" />
+                  <span>{currentLang === 'es' ? 'English (EN)' : 'Español (ES)'}</span>
                 </button>
 
                 {/* Google SSO Login / Account */}

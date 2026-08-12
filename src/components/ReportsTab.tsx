@@ -186,9 +186,13 @@ export function ReportsTab({
 
     // Filter by time range
     if (timeRange === '6M') {
-      allMonths = allMonths.slice(-6);
+      // For 6M/12M, we strictly show the current month and the specified number of months into the past.
+      // We filter out any months beyond the current one.
+      const pastAndCurrent = allMonths.filter(m => m <= currentMonthKey);
+      allMonths = pastAndCurrent.slice(-6);
     } else if (timeRange === '12M') {
-      allMonths = allMonths.slice(-12);
+      const pastAndCurrent = allMonths.filter(m => m <= currentMonthKey);
+      allMonths = pastAndCurrent.slice(-12);
     }
 
     return allMonths.map(m => {

@@ -67,10 +67,11 @@ export const LevLevIcon: React.FC<LevLevIconProps> = ({
 
 export const LevLevLogo: React.FC<{
   showSubtitle?: boolean;
+  hideSubtitleOnMobile?: boolean;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   badgeText?: string;
-}> = ({ showSubtitle = true, size = 'md', className = '', badgeText }) => {
+}> = ({ showSubtitle = true, hideSubtitleOnMobile = false, size = 'md', className = '', badgeText }) => {
   const iconSizes = {
     sm: 'w-7 h-7',
     md: 'w-9 h-9',
@@ -99,7 +100,7 @@ export const LevLevLogo: React.FC<{
           )}
         </div>
         {showSubtitle && (
-          <p className="text-[10px] text-slate-400 font-medium tracking-wide mt-1">
+          <p className={`text-[10px] text-slate-400 font-medium tracking-wide mt-1 ${hideSubtitleOnMobile ? 'hidden sm:block' : ''}`}>
             Personal Finance, with Heart
           </p>
         )}
