@@ -61,6 +61,8 @@ import {
 } from '../lib/supabase';
 import ImportWizardModal from './ImportWizardModal';
 
+import { TIMEZONE_OPTIONS } from '../utils/timezoneUtils';
+
 interface SettingsTabProps {
   authUser: any;
   authLoading: boolean;
@@ -69,6 +71,8 @@ interface SettingsTabProps {
   transactions: Transaction[];
   budgets: BudgetGoal[];
   usdArsRate: number;
+  userTimezone?: string;
+  onUpdateTimezone?: (tz: string) => void;
   privacyMode?: boolean;
   isWorkspaceShared?: boolean;
   showSharedData?: boolean;
@@ -98,6 +102,8 @@ export function SettingsTab({
   transactions,
   budgets,
   usdArsRate,
+  userTimezone = 'America/Argentina/Buenos_Aires',
+  onUpdateTimezone,
   privacyMode = false,
   isWorkspaceShared = false,
   showSharedData = true,
@@ -675,8 +681,8 @@ export function SettingsTab({
                 <p className="text-xs text-slate-400">{t('settings.auto_detect')}</p>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4 pt-2">
-              <div className="flex-1 space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-300">{t('settings.language')}</label>
                 <div className="flex items-center bg-[#161b22] p-1 rounded-xl border border-slate-800">
                   <button
@@ -696,6 +702,36 @@ export function SettingsTab({
                     Español (ES)
                   </button>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300">Timezone Configuration</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                      if (detected && onUpdateTimezone) onUpdateTimezone(detected);
+                    }}
+                    className="text-[10px] text-indigo-400 hover:text-indigo-300 underline font-semibold cursor-pointer"
+                  >
+                    Detect Auto
+                  </button>
+                </div>
+                <select
+                  value={userTimezone}
+                  onChange={(e) => onUpdateTimezone && onUpdateTimezone(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#161b22] border border-slate-800 rounded-xl text-xs font-semibold text-slate-100 focus:outline-none focus:border-indigo-500"
+                >
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  Transaction imports (Ivy CSV & backup) adjust raw timestamps to this selected timezone.
+                </p>
               </div>
             </div>
           </div>

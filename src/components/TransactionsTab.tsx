@@ -659,7 +659,13 @@ export function TransactionsTab({
                       )}
                       <td className="p-3 text-slate-400 whitespace-nowrap">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                          <span>{tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}</span>
+                          <span>
+                            {tx.date
+                              ? tx.date.includes('T')
+                                ? new Date(tx.date).toLocaleDateString()
+                                : new Date(`${tx.date.substring(0, 10)}T00:00:00`).toLocaleDateString()
+                              : 'N/A'}
+                          </span>
                           {isFuture && (
                             <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold inline-flex items-center w-fit" title="Future date - transaction is pending and excluded from current live balances">
                               <Clock className="w-2.5 h-2.5 mr-0.5 shrink-0" />

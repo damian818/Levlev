@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Upload, X, Download, AlertCircle, CheckCircle, FileText, ChevronRight, Sparkles } from 'lucide-react';
 import Papa from 'papaparse';
 import { Transaction, AccountItem, CategoryItem, BudgetGoal } from '../types';
+import { adjustDateToTimezone } from '../utils/timezoneUtils';
 
 interface ImportWizardModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface ImportWizardModalProps {
   onImport: (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[]; isFullBackup?: boolean }) => void;
   existingAccounts: AccountItem[];
   existingCategories: CategoryItem[];
+  userTimezone?: string;
 }
 
 interface ParsedData {
@@ -25,7 +27,7 @@ interface ValidationError {
   type: 'error' | 'warning';
 }
 
-export default function ImportWizardModal({ isOpen, onClose, onImport, existingAccounts, existingCategories }: ImportWizardModalProps) {
+export default function ImportWizardModal({ isOpen, onClose, onImport, existingAccounts, existingCategories, userTimezone = 'America/Argentina/Buenos_Aires' }: ImportWizardModalProps) {
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
@@ -123,31 +125,29 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
             const combinedText = `${title} ${desc}`;
             const instMatch = combinedText.match(/(?:cuota\s*)?(\d+)\s*(?:\/|de)\s*(\d+)/i);
             
+            // Formatted date YYYY-MM-DD adjusted for selected user timezone
+            const formattedDate = adjustDateToTimezone(rawDate, userTimezone);
+
             if (instMatch) {
               installments = instMatch[0];
               installmentNumber = parseInt(instMatch[1], 10);
               totalInstallments = parseInt(instMatch[2], 10);
 
-              const parsedTxDate = rawDate ? new Date(rawDate) : new Date();
-              const validTxDate = !isNaN(parsedTxDate.getTime()) ? parsedTxDate : new Date();
+              const [txY, txM] = formattedDate.split('-').map(Number);
+              const baseYear = txY || new Date().getFullYear();
+              const baseMonth0 = txM ? txM - 1 : new Date().getMonth();
 
               // Derive Start Date: if it's 3/6, start is 2 months before current tx month
-              const startDt = new Date(validTxDate.getFullYear(), validTxDate.getMonth() - (installmentNumber - 1), 1);
+              const startDt = new Date(baseYear, baseMonth0 - (installmentNumber - 1), 1);
               const startY = startDt.getFullYear();
               const startM = String(startDt.getMonth() + 1).padStart(2, '0');
               installmentStartDate = `${startY}-${startM}`;
 
               // Derive End Date: if it's 3/6, end is 3 months after current tx month
-              const endDt = new Date(validTxDate.getFullYear(), validTxDate.getMonth() + (totalInstallments - installmentNumber), 1);
+              const endDt = new Date(baseYear, baseMonth0 + (totalInstallments - installmentNumber), 1);
               const endY = endDt.getFullYear();
               const endM = String(endDt.getMonth() + 1).padStart(2, '0');
               installmentEndDate = `${endY}-${endM}`;
-            }
-
-            // Formatted date YYYY-MM-DD
-            let formattedDate = rawDate.substring(0, 10);
-            if (!formattedDate || !formattedDate.match(/^\d{4}-\d{2}-\d{2}/)) {
-              formattedDate = new Date().toISOString().substring(0, 10);
             }
 
             // Category logic: default to 'Transfer' for transfers if empty
@@ -374,7 +374,7 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
 
       txs.push({
         id: mappedRow.id || `tx-${Date.now()}-${Math.random().toString(36).substring(2)}`,
-        date: mappedRow.date,
+        date: adjustDateToTimezone(mappedRow.date, userTimezone),
         title: mappedRow.title,
         category: mappedRow.category || 'Uncategorized',
         account: mappedRow.account,
