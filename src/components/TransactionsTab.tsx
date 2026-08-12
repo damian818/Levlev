@@ -304,7 +304,7 @@ export function TransactionsTab({
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [transactions, searchTerm, selectedType, selectedCategory, selectedAccount, selectedMonth, recurringFilter, recurringTxSet, sortField, sortOrder, displayCurrency, usdArsRate, historyData]);
+  }, [transactions, searchTerm, selectedType, selectedCategory, selectedAccount, selectedMonth, recurringFilter, recurringTxSet, sortField, sortOrder, displayCurrency, usdArsRate, historyData, showFutureTransactions, currentUserId, showSharedData]);
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
