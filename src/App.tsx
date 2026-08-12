@@ -245,11 +245,58 @@ export default function App() {
     });
   };
 
-  const handleImportBackup = (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[] }) => {
-    if (data.transactions) setTransactions(data.transactions);
-    if (data.categories) setCategories(data.categories);
-    if (data.accounts) setAccounts(data.accounts);
-    if (data.budgets) setBudgets(data.budgets);
+  const handleImportBackup = (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[]; isFullBackup?: boolean }) => {
+    if (data.isFullBackup) {
+      if (data.transactions) setTransactions(data.transactions);
+      if (data.categories) setCategories(data.categories);
+      if (data.accounts) setAccounts(data.accounts);
+      if (data.budgets) setBudgets(data.budgets);
+    } else {
+      if (data.transactions) {
+        setTransactions(data.transactions);
+        
+        // Auto-generate missing accounts and categories from imported transactions
+        setAccounts(prev => {
+          const merged = [...prev];
+          const newAccNames = new Set<string>();
+          data.transactions.forEach(t => {
+            if (t.account) newAccNames.add(t.account);
+            if (t.toAccount) newAccNames.add(t.toAccount);
+          });
+          newAccNames.forEach(name => {
+            if (name && !merged.find(a => a.name.toLowerCase() === name.toLowerCase())) {
+              const sample = data.transactions.find(t => t.account === name || t.toAccount === name);
+              merged.push({
+                id: `acc-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                name: name,
+                type: 'CHECKING',
+                currency: sample?.currency || 'ARS'
+              });
+            }
+          });
+          return merged;
+        });
+
+        setCategories(prev => {
+          const merged = [...prev];
+          const newCatNames = new Set<string>();
+          data.transactions.forEach(t => {
+            if (t.category) newCatNames.add(t.category);
+          });
+          newCatNames.forEach(name => {
+            if (name && !merged.find(c => c.name.toLowerCase() === name.toLowerCase())) {
+              merged.push({
+                id: `cat-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                name: name,
+                type: 'EXPENSE',
+                color: '#64748b'
+              });
+            }
+          });
+          return merged;
+        });
+      }
+    }
   };
 
   const [currentTab, setCurrentTab] = useState<ViewTab>('overview');

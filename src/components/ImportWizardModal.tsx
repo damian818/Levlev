@@ -6,7 +6,7 @@ import { Transaction, AccountItem, CategoryItem, BudgetGoal } from '../types';
 interface ImportWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[] }) => void;
+  onImport: (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[]; isFullBackup?: boolean }) => void;
   existingAccounts: AccountItem[];
   existingCategories: CategoryItem[];
 }
@@ -16,6 +16,7 @@ interface ParsedData {
   categories: CategoryItem[];
   accounts: AccountItem[];
   budgets: BudgetGoal[];
+  isFullBackup?: boolean;
 }
 
 interface ValidationError {
@@ -258,6 +259,7 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
         categories: Array.isArray(json.categories) ? json.categories : [],
         accounts: Array.isArray(json.accounts) ? json.accounts : [],
         budgets: Array.isArray(json.budgets) ? json.budgets : [],
+        isFullBackup: true,
       });
       setValidationErrors(errors);
       setStep('preview');
