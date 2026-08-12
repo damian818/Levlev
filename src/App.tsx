@@ -776,6 +776,7 @@ export default function App() {
             onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
             currentUserId={authUser?.id}
             showSharedData={showSharedData}
+            userTimezone={userTimezone}
           />
         )}
         {currentTab === 'transactions' && (
@@ -796,6 +797,7 @@ export default function App() {
             onClearFilter={() => setActiveFilter(undefined)}
             currentUserId={authUser?.id}
             showSharedData={showSharedData}
+            userTimezone={userTimezone}
           />
         )}
         {currentTab === 'accounts' && (
@@ -819,6 +821,7 @@ export default function App() {
             onAddAccount={handleAddAccount}
             currentUserId={authUser?.id}
             showSharedData={showSharedData}
+            userTimezone={userTimezone}
           />
         )}
         {currentTab === 'reports' && (
