@@ -84,6 +84,19 @@ export function ReportsTab({
       scheduledIncomeUSD: number;
       scheduledExpenseARS: number;
       scheduledExpenseUSD: number;
+      // Converted values per currency slice (normalized to displayCurrency)
+      incomeARS_Converted: number;
+      incomeUSD_Converted: number;
+      expenseARS_Converted: number;
+      expenseUSD_Converted: number;
+      sharedIncomeARS_Converted: number;
+      sharedIncomeUSD_Converted: number;
+      sharedExpenseARS_Converted: number;
+      sharedExpenseUSD_Converted: number;
+      scheduledIncomeARS_Converted: number;
+      scheduledIncomeUSD_Converted: number;
+      scheduledExpenseARS_Converted: number;
+      scheduledExpenseUSD_Converted: number;
       incomeConverted: number;
       expenseConverted: number;
       scheduledIncomeConverted: number;
@@ -112,6 +125,18 @@ export function ReportsTab({
           scheduledIncomeUSD: 0,
           scheduledExpenseARS: 0,
           scheduledExpenseUSD: 0,
+          incomeARS_Converted: 0,
+          incomeUSD_Converted: 0,
+          expenseARS_Converted: 0,
+          expenseUSD_Converted: 0,
+          sharedIncomeARS_Converted: 0,
+          sharedIncomeUSD_Converted: 0,
+          sharedExpenseARS_Converted: 0,
+          sharedExpenseUSD_Converted: 0,
+          scheduledIncomeARS_Converted: 0,
+          scheduledIncomeUSD_Converted: 0,
+          scheduledExpenseARS_Converted: 0,
+          scheduledExpenseUSD_Converted: 0,
           incomeConverted: 0,
           expenseConverted: 0,
           scheduledIncomeConverted: 0,
@@ -145,30 +170,60 @@ export function ReportsTab({
 
       if (tx.type === 'INCOME') {
         if (isTxFuture) {
-          if (isUsd) item.scheduledIncomeUSD += amt;
-          else item.scheduledIncomeARS += amt;
+          if (isUsd) {
+            item.scheduledIncomeUSD += amt;
+            item.scheduledIncomeUSD_Converted += converted;
+          } else {
+            item.scheduledIncomeARS += amt;
+            item.scheduledIncomeARS_Converted += converted;
+          }
           item.scheduledIncomeConverted += converted;
         } else if (isShared) {
-          if (isUsd) item.sharedIncomeUSD += amt;
-          else item.sharedIncomeARS += amt;
+          if (isUsd) {
+            item.sharedIncomeUSD += amt;
+            item.sharedIncomeUSD_Converted += converted;
+          } else {
+            item.sharedIncomeARS += amt;
+            item.sharedIncomeARS_Converted += converted;
+          }
           item.sharedIncomeConverted += converted;
         } else {
-          if (isUsd) item.incomeUSD += amt;
-          else item.incomeARS += amt;
+          if (isUsd) {
+            item.incomeUSD += amt;
+            item.incomeUSD_Converted += converted;
+          } else {
+            item.incomeARS += amt;
+            item.incomeARS_Converted += converted;
+          }
           item.incomeConverted += converted;
         }
       } else if (tx.type === 'EXPENSE') {
         if (isTxFuture) {
-          if (isUsd) item.scheduledExpenseUSD += amt;
-          else item.scheduledExpenseARS += amt;
+          if (isUsd) {
+            item.scheduledExpenseUSD += amt;
+            item.scheduledExpenseUSD_Converted += converted;
+          } else {
+            item.scheduledExpenseARS += amt;
+            item.scheduledExpenseARS_Converted += converted;
+          }
           item.scheduledExpenseConverted += converted;
         } else if (isShared) {
-          if (isUsd) item.sharedExpenseUSD += amt;
-          else item.sharedExpenseARS += amt;
+          if (isUsd) {
+            item.sharedExpenseUSD += amt;
+            item.sharedExpenseUSD_Converted += converted;
+          } else {
+            item.sharedExpenseARS += amt;
+            item.sharedExpenseARS_Converted += converted;
+          }
           item.sharedExpenseConverted += converted;
         } else {
-          if (isUsd) item.expenseUSD += amt;
-          else item.expenseARS += amt;
+          if (isUsd) {
+            item.expenseUSD += amt;
+            item.expenseUSD_Converted += converted;
+          } else {
+            item.expenseARS += amt;
+            item.expenseARS_Converted += converted;
+          }
           item.expenseConverted += converted;
         }
       }
@@ -468,28 +523,58 @@ export function ReportsTab({
   // Custom Recharts Tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const getNativeInfo = (entry: any) => {
+        const key = entry.dataKey as string;
+        const p = entry.payload;
+        if (!p || !key) return null;
+
+        if (key.includes('scheduledIncomeARS')) return { amt: p.scheduledIncomeARS, curr: 'ARS' };
+        if (key.includes('scheduledIncomeUSD')) return { amt: p.scheduledIncomeUSD, curr: 'USD' };
+        if (key.includes('incomeARS')) return { amt: p.incomeARS, curr: 'ARS' };
+        if (key.includes('incomeUSD')) return { amt: p.incomeUSD, curr: 'USD' };
+        if (key.includes('sharedIncomeARS')) return { amt: p.sharedIncomeARS, curr: 'ARS' };
+        if (key.includes('sharedIncomeUSD')) return { amt: p.sharedIncomeUSD, curr: 'USD' };
+
+        if (key.includes('scheduledExpenseARS')) return { amt: p.scheduledExpenseARS, curr: 'ARS' };
+        if (key.includes('scheduledExpenseUSD')) return { amt: p.scheduledExpenseUSD, curr: 'USD' };
+        if (key.includes('expenseARS')) return { amt: p.expenseARS, curr: 'ARS' };
+        if (key.includes('expenseUSD')) return { amt: p.expenseUSD, curr: 'USD' };
+        if (key.includes('sharedExpenseARS')) return { amt: p.sharedExpenseARS, curr: 'ARS' };
+        if (key.includes('sharedExpenseUSD')) return { amt: p.sharedExpenseUSD, curr: 'USD' };
+
+        return null;
+      };
+
       return (
-        <div className="bg-[#161b22] border border-slate-700 p-3.5 rounded-xl shadow-xl text-xs space-y-2">
-          <p className="font-bold text-slate-200 border-b border-slate-700/80 pb-1 flex justify-between items-center gap-4">
-            <span>Period: {label}</span>
-          </p>
+        <div className="bg-[#161b22] border border-slate-700 p-3.5 rounded-xl shadow-xl text-xs space-y-2 min-w-[240px]">
+          <div className="border-b border-slate-700/80 pb-1 flex justify-between items-center gap-4">
+            <span className="font-bold text-slate-200">Period: {label}</span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              $1 USD = ${usdArsRate} ARS
+            </span>
+          </div>
           <div className="space-y-1.5">
-            {payload.filter((e: any) => e.value > 0).map((entry: any, index: number) => (
-              <div key={`item-${index}`} className="flex justify-between items-center gap-4">
-                <span className="flex items-center gap-1.5 font-medium" style={{ color: entry.color }}>
-                  <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: entry.color }}></span>
-                  {entry.name}:
-                </span>
-                <span className="font-mono font-bold text-slate-100">
-                  {chartMode === 'NATIVE_CURRENCY'
-                    ? entry.name.includes('USD') 
-                      ? `$${entry.value.toLocaleString()} USD` 
-                      : `$${entry.value.toLocaleString()} ARS`
-                    : formatCurrency(entry.value, displayCurrency)
-                  }
-                </span>
-              </div>
-            ))}
+            {payload.filter((e: any) => e.value > 0).map((entry: any, index: number) => {
+              const native = getNativeInfo(entry);
+              return (
+                <div key={`item-${index}`} className="flex justify-between items-center gap-4">
+                  <span className="flex items-center gap-1.5 font-medium" style={{ color: entry.color }}>
+                    <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: entry.color }}></span>
+                    {entry.name}:
+                  </span>
+                  <div className="text-right font-mono">
+                    <span className="font-bold text-slate-100 block">
+                      {formatCurrency(entry.value, displayCurrency)}
+                    </span>
+                    {native && native.amt > 0 && (
+                      <span className="text-[10px] text-slate-400 font-normal block">
+                        ({native.curr === 'USD' ? `$${native.amt.toLocaleString()} USD` : `$${Math.round(native.amt).toLocaleString()} ARS`})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       );
@@ -810,13 +895,13 @@ export function ReportsTab({
                   fontSize={10} 
                   tickLine={false}
                   axisLine={{ stroke: '#374151' }}
-                  tickFormatter={(val) => `$${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
+                  tickFormatter={(val) => formatCurrencyCompact(val, displayCurrency)}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 
                 {/* Scheduled Income ARS */}
                 <Bar 
-                  dataKey="scheduledIncomeARS" 
+                  dataKey="scheduledIncomeARS_Converted" 
                   name="Scheduled Income ARS" 
                   fill={COLORS.incomeARS}
                   fillOpacity={0.4}
@@ -827,7 +912,7 @@ export function ReportsTab({
                 />
                 {/* Scheduled Income USD */}
                 <Bar 
-                  dataKey="scheduledIncomeUSD" 
+                  dataKey="scheduledIncomeUSD_Converted" 
                   name="Scheduled Income USD" 
                   fill={COLORS.incomeUSD} 
                   fillOpacity={0.4}
@@ -838,7 +923,7 @@ export function ReportsTab({
                 />
                 {/* Income ARS */}
                 <Bar 
-                  dataKey="incomeARS" 
+                  dataKey="incomeARS_Converted" 
                   name="Income ARS" 
                   fill={COLORS.incomeARS} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
@@ -846,7 +931,7 @@ export function ReportsTab({
                 />
                 {/* Shared Income ARS */}
                 <Bar 
-                  dataKey="sharedIncomeARS" 
+                  dataKey="sharedIncomeARS_Converted" 
                   name="Shared Income ARS" 
                   fill={COLORS.sharedIncomeARS} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
@@ -854,7 +939,7 @@ export function ReportsTab({
                 />
                 {/* Income USD */}
                 <Bar 
-                  dataKey="incomeUSD" 
+                  dataKey="incomeUSD_Converted" 
                   name="Income USD" 
                   fill={COLORS.incomeUSD} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
@@ -862,7 +947,7 @@ export function ReportsTab({
                 />
                 {/* Shared Income USD */}
                 <Bar 
-                  dataKey="sharedIncomeUSD" 
+                  dataKey="sharedIncomeUSD_Converted" 
                   name="Shared Income USD" 
                   fill={COLORS.sharedIncomeUSD} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
@@ -870,7 +955,7 @@ export function ReportsTab({
                 />
                 {/* Scheduled Expense ARS */}
                 <Bar 
-                  dataKey="scheduledExpenseARS" 
+                  dataKey="scheduledExpenseARS_Converted" 
                   name="Scheduled Expense ARS" 
                   fill={COLORS.expenseARS} 
                   fillOpacity={0.4}
@@ -881,7 +966,7 @@ export function ReportsTab({
                 />
                 {/* Scheduled Expense USD */}
                 <Bar 
-                  dataKey="scheduledExpenseUSD" 
+                  dataKey="scheduledExpenseUSD_Converted" 
                   name="Scheduled Expense USD" 
                   fill={COLORS.expenseUSD} 
                   fillOpacity={0.4}
@@ -892,7 +977,7 @@ export function ReportsTab({
                 />
                 {/* Expense ARS */}
                 <Bar 
-                  dataKey="expenseARS" 
+                  dataKey="expenseARS_Converted" 
                   name="Expense ARS" 
                   fill={COLORS.expenseARS} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
@@ -900,7 +985,7 @@ export function ReportsTab({
                 />
                 {/* Shared Expense ARS */}
                 <Bar 
-                  dataKey="sharedExpenseARS" 
+                  dataKey="sharedExpenseARS_Converted" 
                   name="Shared Expense ARS" 
                   fill={COLORS.sharedExpenseARS} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
@@ -908,7 +993,7 @@ export function ReportsTab({
                 />
                 {/* Expense USD */}
                 <Bar 
-                  dataKey="expenseUSD" 
+                  dataKey="expenseUSD_Converted" 
                   name="Expense USD" 
                   fill={COLORS.expenseUSD} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
@@ -916,7 +1001,7 @@ export function ReportsTab({
                 />
                 {/* Shared Expense USD */}
                 <Bar 
-                  dataKey="sharedExpenseUSD" 
+                  dataKey="sharedExpenseUSD_Converted" 
                   name="Shared Expense USD" 
                   fill={COLORS.sharedExpenseUSD} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
@@ -941,7 +1026,7 @@ export function ReportsTab({
                   fontSize={10} 
                   tickLine={false}
                   axisLine={{ stroke: '#374151' }}
-                  tickFormatter={(val) => `$${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
+                  tickFormatter={(val) => formatCurrencyCompact(val, displayCurrency)}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
