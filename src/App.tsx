@@ -289,7 +289,6 @@ export default function App() {
                 id: `cat-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                 name: name,
                 type: 'EXPENSE',
-                color: '#64748b'
               });
             }
           });
@@ -303,6 +302,7 @@ export default function App() {
   const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>('ARS');
   const [usdArsRate, setUsdArsRate] = useState<number>(1521);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [historyData, setHistoryData] = useState<InflationPoint[]>(historicalInflationAndFX);
@@ -668,7 +668,28 @@ export default function App() {
 
   const handleUpdateTransaction = (idOrIds: string | string[], updates: Partial<Transaction>) => {
     const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
-    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, ...updates } : t));
+    setTransactions(prev => {
+      const updated = prev.map(t => ids.includes(t.id) ? { ...t, ...updates } : t);
+      try {
+        localStorage.setItem('finance_app_transactions', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleEditTransaction = (tx: Transaction) => {
+    setEditingTransaction(tx);
+    setIsAddModalOpen(true);
+  };
+
+  const handleDuplicateTransaction = (tx: Transaction) => {
+    const duplicatedTx = {
+      ...tx,
+      id: '', // Empty ID means it's a new transaction
+      title: `${tx.title} (Copy)`,
+    };
+    setEditingTransaction(duplicatedTx);
+    setIsAddModalOpen(true);
   };
 
   const handleDeleteTransaction = (idOrIds: string | string[]) => {
@@ -756,6 +777,8 @@ export default function App() {
             historyData={historyData}
             onDeleteTransaction={handleDeleteTransaction}
             onUpdateTransaction={handleUpdateTransaction}
+            onEditTransaction={handleEditTransaction}
+            onDuplicateTransaction={handleDuplicateTransaction}
             categoriesList={categories}
             accountsList={accounts}
             onOpenAddModal={() => setIsAddModalOpen(true)}
@@ -854,8 +877,13 @@ export default function App() {
 
       <AddTransactionModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingTransaction(null);
+        }}
         onAddTransaction={handleAddTransaction}
+        onUpdateTransaction={handleUpdateTransaction}
+        editingTx={editingTransaction}
         accountsList={accounts}
         existingAccounts={accounts.map(a => a.name)}
         existingCategories={categories.map(c => c.name)}

@@ -29,6 +29,8 @@ export interface AddTransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddTransaction: (tx: Transaction | Transaction[]) => void;
+  onUpdateTransaction?: (id: string, updates: Partial<Transaction>) => void;
+  editingTx?: Transaction | null;
   accountsList?: AccountItem[];
   existingAccounts?: string[];
   existingCategories?: string[];
@@ -80,6 +82,8 @@ export function AddTransactionModal({
   isOpen, 
   onClose, 
   onAddTransaction,
+  onUpdateTransaction,
+  editingTx,
   accountsList = [],
   existingAccounts = DEFAULT_ACCOUNTS,
   existingCategories = DEFAULT_CATEGORIES,
@@ -497,6 +501,60 @@ export function AddTransactionModal({
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) return;
 
+    if (editingTx && onUpdateTransaction && editingTx.id) {
+      if (type === 'CC_PAYMENT') {
+        onUpdateTransaction(editingTx.id, {
+          date: new Date(date).toISOString(),
+          title: title || `Pago ${toAccount}`,
+          category: 'Tarjetas de Crédito',
+          account: account,
+          toAccount: toAccount,
+          amount: parsedAmount,
+          transferAmount: parsedAmount,
+          receiveAmount: parsedAmount,
+          currency,
+          transferCurrency: currency,
+          receiveCurrency: currency,
+          type: 'CC_PAYMENT',
+          description: description || `Payment to ${toAccount}`,
+          statementCloseDate: statementCloseDate || undefined,
+        });
+      } else if (type === 'TRANSFER') {
+        const parsedReceiveAmt = parseFloat(receiveAmount) || parsedAmount;
+        // In the original, sourceCurrency and destCurrency are used. 
+        // We will just use the current account currencies.
+        onUpdateTransaction(editingTx.id, {
+          date: new Date(date).toISOString(),
+          title: title || `Transferencia: ${account} → ${toAccount}`,
+          category: category || 'Transferencias',
+          account: account,
+          toAccount: toAccount,
+          amount: parsedAmount,
+          transferAmount: parsedAmount,
+          receiveAmount: parsedReceiveAmt,
+          type: 'TRANSFER',
+          description: description || undefined,
+        });
+      } else {
+        onUpdateTransaction(editingTx.id, {
+          date: new Date(date).toISOString(),
+          title: title || (type === 'INCOME' ? 'Income' : 'Expense'),
+          category: category || 'General',
+          account: account,
+          amount: parsedAmount,
+          currency,
+          type,
+          description: description || undefined,
+          installments: numInstallments > 1 ? `1/${numInstallments}` : undefined,
+          installmentNumber: 1,
+          totalInstallments: numInstallments > 1 ? numInstallments : undefined,
+          statementCloseDate: isCC ? statementCloseDate : undefined,
+        });
+      }
+      onClose();
+      return;
+    }
+
     if (type === 'CC_PAYMENT') {
       const paymentTx: Transaction = {
         id: `manual-ccpay-${Date.now()}`,
@@ -607,9 +665,9 @@ export function AddTransactionModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-100">
-                {type === 'EXPENSE' && 'Record New Expense'}
-                {type === 'INCOME' && 'Record New Income'}
-                {type === 'TRANSFER' && 'Account Transfer'}
+                {type === 'EXPENSE' && (editingTx && editingTx.id ? 'Edit Expense' : 'Record New Expense')}
+                {type === 'INCOME' && (editingTx && editingTx.id ? 'Edit Income' : 'Record New Income')}
+                {type === 'TRANSFER' && (editingTx && editingTx.id ? 'Edit Transfer' : 'Account Transfer')}
                 {type === 'CC_PAYMENT' && 'Credit Card Settlement'}
               </h3>
               <p className="text-[11px] text-slate-400">
@@ -848,7 +906,7 @@ export function AddTransactionModal({
             <div className="p-3.5 bg-gradient-to-br from-[#0c1322] to-[#111827] border border-sky-500/30 rounded-2xl space-y-3 shadow-sm">
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <span className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
-                  <ArrowRightLeft className="w-4 h-4" /> Account Transfer & FX Conversion
+                  <ArrowRightLeft className="w-4 h-4" /> {editingTx && editingTx.id ? 'Edit Transfer' : 'Account Transfer'} & FX Conversion
                 </span>
                 <span className="text-[10px] bg-sky-500/10 text-sky-300 border border-sky-500/20 px-2 py-0.5 rounded-full font-medium">
                   {sourceCurrency} → {destCurrency}
