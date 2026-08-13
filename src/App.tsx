@@ -32,6 +32,7 @@ import { LandingPage } from './components/LandingPage';
 import { LevLevIcon, LevLevLogo } from './components/LevLevLogo';
 import i18n from './i18n';
 import { ReloadPrompt } from './components/ReloadPrompt';
+import { OnboardingTour } from './components/OnboardingTour';
 import { WifiOff } from 'lucide-react';
 
 export default function App() {
@@ -1031,6 +1032,7 @@ export default function App() {
           usdArsRate={usdArsRate}
         />
 
+        <OnboardingTour />
         <ReloadPrompt />
       </Suspense>
     </div>

@@ -2,8 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule, AccountItem, SharedMember } from '../types';
 import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString, getTransferOutflow, getTransferInflow } from '../utils/financeUtils';
-import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, Eye, EyeOff, MoreVertical, Trash2, Building2, Coins } from 'lucide-react';
+import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, Eye, EyeOff, MoreVertical, Trash2, Building2, Coins, GripVertical } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
+import { motion, Reorder } from 'motion/react';
 import { CreditCardDetailModal } from './CreditCardDetailModal';
 import { ShareAccountModal } from './ShareAccountModal';
 
@@ -106,6 +107,23 @@ export const AccountsTab = React.memo(function AccountsTab({
     const [moved] = newAccounts.splice(index, 1);
     newAccounts.splice(targetIndex, 0, moved);
     onReorderAccounts(newAccounts);
+  };
+
+  const handleReorderLiquidAccounts = (newOrder: typeof liquidAccounts) => {
+    if (!onReorderAccounts) return;
+    const ccItems = accounts.filter(a => a.type === 'CREDIT_CARD');
+    const reorderedItems = newOrder.map(re => accounts.find(a => a.name === re.accountName)).filter(Boolean) as AccountItem[];
+    // Find liquid items that might not be in the reordered list (unlikely)
+    const missingItems = accounts.filter(a => a.type !== 'CREDIT_CARD' && !reorderedItems.find(r => r.name === a.name));
+    onReorderAccounts([...ccItems, ...reorderedItems, ...missingItems]);
+  };
+
+  const handleReorderCreditCardAccounts = (newOrder: typeof creditCardAccounts) => {
+    if (!onReorderAccounts) return;
+    const liquidItems = accounts.filter(a => a.type !== 'CREDIT_CARD');
+    const reorderedItems = newOrder.map(re => accounts.find(a => a.name === re.accountName)).filter(Boolean) as AccountItem[];
+    const missingItems = accounts.filter(a => a.type === 'CREDIT_CARD' && !reorderedItems.find(r => r.name === a.name));
+    onReorderAccounts([...reorderedItems, ...missingItems, ...liquidItems]);
   };
 
   const handleToggleHideFromNewTx = (accName: string) => {
@@ -402,7 +420,12 @@ export const AccountsTab = React.memo(function AccountsTab({
             {t('accounts.no_cc_accounts')}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Reorder.Group 
+            axis="y" 
+            values={creditCardAccounts} 
+            onReorder={handleReorderCreditCardAccounts}
+            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
             {creditCardAccounts.map((acc) => {
               const stmt = acc.currentStatement;
               const netDue = stmt ? stmt.netDue : 0;
@@ -414,10 +437,16 @@ export const AccountsTab = React.memo(function AccountsTab({
               const menuId = `cc-${acc.accountName}`;
 
               return (
-                <div
+                <Reorder.Item
                   key={acc.accountName}
-                  className="p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all shadow-sm flex flex-col relative group"
+                  value={acc}
+                  className="p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all shadow-sm flex flex-col relative group cursor-grab active:cursor-grabbing"
                 >
+                  {/* Drag Handle Overlay */}
+                  <div className="absolute top-4 right-12 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-slate-600">
+                    <GripVertical className="w-4 h-4" />
+                  </div>
+
                   {/* Card Content */}
                   <div className="flex-1 space-y-4">
                     {/* Top Header */}
@@ -578,10 +607,10 @@ export const AccountsTab = React.memo(function AccountsTab({
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                </div>
+                </Reorder.Item>
               );
             })}
-          </div>
+          </Reorder.Group>
         )}
       </div>
 
@@ -598,7 +627,12 @@ export const AccountsTab = React.memo(function AccountsTab({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Reorder.Group 
+            axis="y" 
+            values={liquidAccounts} 
+            onReorder={handleReorderLiquidAccounts}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          >
             {liquidAccounts.map((acc) => {
               const isEditing = editingAccount === acc.accountName;
 
@@ -608,14 +642,20 @@ export const AccountsTab = React.memo(function AccountsTab({
               const menuId = `liquid-${acc.accountName}`;
 
               return (
-                <div 
+                <Reorder.Item 
                   key={acc.accountName} 
-                  className="p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm flex flex-col relative group"
+                  value={acc}
+                  className="p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm flex flex-col relative group cursor-grab active:cursor-grabbing"
                   onClick={(e) => {
                     if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
                     onNavigateToTransactionsWithFilter({ account: acc.accountName });
                   }}
                 >
+                  {/* Drag Handle Overlay */}
+                  <div className="absolute top-4 right-12 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-slate-600">
+                    <GripVertical className="w-4 h-4" />
+                  </div>
+
                   <div className="flex-1 space-y-4">
                     {/* Top Header */}
                     <div className="flex items-start justify-between">
@@ -808,10 +848,10 @@ export const AccountsTab = React.memo(function AccountsTab({
                       </button>
                     )}
                   </div>
-                </div>
+                </Reorder.Item>
               );
             })}
-          </div>
+          </Reorder.Group>
         </div>
 
         {/* Asset Distribution */}

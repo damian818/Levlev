@@ -305,6 +305,7 @@ export function Navbar({
 
                 {/* Import CSV */}
                 <button
+                  id="nav-import"
                   onClick={() => {
                     triggerHaptic(10);
                     onOpenImportModal();
@@ -566,6 +567,7 @@ export function Navbar({
               return (
                 <button
                   key={tab.id}
+                  id={`nav-${tab.id}`}
                   onClick={() => {
                     triggerHaptic(10);
                     setTab(tab.id);

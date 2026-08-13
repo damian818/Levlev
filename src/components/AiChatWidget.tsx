@@ -98,6 +98,7 @@ export function AiChatWidget({
     <>
       {/* Floating Chat Button */}
       <button
+        id="ai-chat-trigger"
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-40 bg-emerald-600 hover:bg-emerald-500 text-white p-3.5 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
         title={t('ai.ask_assistant')}
