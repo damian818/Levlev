@@ -72,7 +72,7 @@ export const OverviewTab = React.memo(function OverviewTab({
         <div className="bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden">
           <EmptyState
             icon={Sparkle}
-            title={t('overview.welcome_title', { defaultValue: 'Welcome to Finlev!' })}
+            title={t('overview.welcome_title', { defaultValue: 'Welcome to LevLev!' })}
             description={t('overview.welcome_desc', { defaultValue: 'Start tracking your personal finances by adding your first account and transaction. We\'ll help you visualize your spending and savings.' })}
             action={onOpenImportModal ? {
               label: t('overview.get_started', { defaultValue: 'Import Data' }),

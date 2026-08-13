@@ -41,8 +41,6 @@ export function ShareWorkspaceModal({
   onUpdateWorkspaceSharing,
   workspaceName = 'LevLev Household Workspace',
 }: ShareWorkspaceModalProps) {
-  if (!isOpen) return null;
-
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<'EDITOR' | 'VIEWER' | 'ADMIN'>('EDITOR');
@@ -50,6 +48,8 @@ export function ShareWorkspaceModal({
   const [copiedCode, setCopiedCode] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  if (!isOpen) return null;
 
   // Generate a unique workspace invite code
   const workspaceCode = `LEV-GENERAL-${Math.abs(workspaceName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 8999 + 1000)}`;

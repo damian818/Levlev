@@ -35,8 +35,6 @@ export function ShareAccountModal({
   account,
   onUpdateAccountSharing,
 }: ShareAccountModalProps) {
-  if (!isOpen || !account) return null;
-
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<'EDITOR' | 'VIEWER' | 'ADMIN'>('EDITOR');
@@ -44,6 +42,8 @@ export function ShareAccountModal({
   const [copiedCode, setCopiedCode] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  if (!isOpen || !account) return null;
 
   const members = account.sharedMembers || [];
   const isShared = account.isShared || members.length > 0;

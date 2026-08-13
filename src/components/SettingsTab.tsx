@@ -435,7 +435,7 @@ export function SettingsTab({
   // --- Export JSON Backup ---
   const handleExportData = () => {
     const exportObject = {
-      app: 'Finlev',
+      app: 'LevLev',
       exportDate: new Date().toISOString(),
       categories,
       accounts,
@@ -446,7 +446,7 @@ export function SettingsTab({
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `finlev_backup_${new Date().toISOString().substring(0, 10)}.json`);
+    downloadAnchor.setAttribute("download", `levlev_backup_${new Date().toISOString().substring(0, 10)}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();

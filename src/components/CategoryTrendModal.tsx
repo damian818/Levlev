@@ -21,6 +21,8 @@ export function CategoryTrendModal({
   usdArsRate,
   historyData,
 }: CategoryTrendModalProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string>('Alimentos y Bebidas');
+
   if (!isOpen) return null;
 
   // Extract all categories
@@ -32,7 +34,6 @@ export function CategoryTrendModal({
   });
 
   const allCategories = Array.from(categoriesSet).sort();
-  const [selectedCategory, setSelectedCategory] = useState<string>(allCategories[0] || 'Alimentos y Bebidas');
 
   // Build monthly trend for selected category (or all categories stacked)
   const monthlyMap: Record<string, number> = {};

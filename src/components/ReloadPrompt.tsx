@@ -34,7 +34,7 @@ export function ReloadPrompt() {
             {offlineReady ? 'App ready to work offline' : 'New version available!'}
           </span>
           <span className="text-xs text-slate-400">
-            {offlineReady ? 'You can use FinLev without internet' : 'Click reload to update the application'}
+            {offlineReady ? 'You can use LevLev without internet' : 'Click reload to update the application'}
           </span>
         </div>
       </div>

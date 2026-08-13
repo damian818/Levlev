@@ -21,6 +21,8 @@ export function RecurringCategoryTrendModal({
   usdArsRate,
   historyData,
 }: RecurringCategoryTrendModalProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string>('Hogar');
+
   if (!isOpen) return null;
 
   // Extract all categories (EXPENSES only for spending trend)
@@ -32,7 +34,6 @@ export function RecurringCategoryTrendModal({
   });
 
   const allCategories = Array.from(categoriesSet).sort();
-  const [selectedCategory, setSelectedCategory] = useState<string>(allCategories[0] || 'Hogar');
 
   // Build monthly trend
   const monthlyMap: Record<string, number> = {};

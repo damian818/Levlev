@@ -25,9 +25,9 @@ export function RecurringTrendModal({
   historyData,
   onMarkNonRecurring,
 }: RecurringTrendModalProps) {
-  if (!isOpen || !item) return null;
-
   const [useOriginalCurrency, setUseOriginalCurrency] = useState(false);
+
+  if (!isOpen || !item) return null;
 
   // Compute metrics
   const isIncome = item.type === 'INCOME';

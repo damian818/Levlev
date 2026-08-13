@@ -414,22 +414,20 @@ export default function App() {
         setTransactions(data.transactions || []);
         if (data.categories && data.categories.length > 0) setCategories(data.categories);
         if (data.accounts && data.accounts.length > 0) {
-          setAccounts(prev => {
-            const merged = [...prev];
-            data.accounts.forEach(newAcc => {
-              const idx = merged.findIndex(a => a.name.toLowerCase() === newAcc.name.toLowerCase());
-              if (idx >= 0) {
-                // Merge, but prefer newAcc properties (which include Supabase-synced configs)
-                merged[idx] = { ...merged[idx], ...newAcc };
-              } else {
-                merged.push(newAcc);
-              }
-            });
-            // Re-sort by order
-            return merged.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-          });
+          setAccounts(data.accounts);
+          try {
+            localStorage.setItem('finance_app_custom_accounts', JSON.stringify(data.accounts));
+          } catch (e) {}
         }
         setBudgets(data.budgets || []);
+
+        if (data.settings?.onboardingCompleted || (data.transactions && data.transactions.length > 0)) {
+          try {
+            localStorage.setItem('levlev_onboarding_completed', 'true');
+            localStorage.setItem('finlev_onboarding_completed', 'true');
+            localStorage.setItem('finance_app_onboarding_completed', 'true');
+          } catch (e) {}
+        }
 
         if (data.settings) {
           if (data.settings.ccPeriodStatuses) {
@@ -1032,7 +1030,9 @@ export default function App() {
           usdArsRate={usdArsRate}
         />
 
-        <OnboardingTour />
+        <OnboardingTour 
+          hasExistingData={transactions.length > 0 || accounts.some(a => (a.initialBalance || 0) > 0)}
+        />
         <ReloadPrompt />
       </Suspense>
     </div>

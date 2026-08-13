@@ -52,6 +52,8 @@ export interface SupabaseUserData {
     ccPeriodStatuses?: Record<string, 'PAID' | 'OPEN'>;
     customBalances?: Record<string, AccountCustomBalance>;
     accountConfigs?: Record<string, { order?: number; isHiddenFromNewTx?: boolean; icon?: any }>;
+    accountsList?: AccountItem[];
+    onboardingCompleted?: boolean;
     workspaceSharing?: {
       isShared?: boolean;
       members?: SharedMember[];
@@ -222,10 +224,33 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       };
     });
 
-    // Also include accounts that might only exist in accountConfigs (e.g. auto-detected from transactions)
+    // Also include accounts that might only exist in accountConfigs or accountsList
     const existingAccountNames = new Set(accounts.map(a => a.name.toLowerCase()));
     const existingCleanNames = new Set(accounts.map(a => a.name.replace(' (Shared)', '').toLowerCase()));
 
+    // 1. Merge high-fidelity accountsList from user_settings if present
+    if (Array.isArray(userSettings?.accountsList) && userSettings.accountsList.length > 0) {
+      userSettings.accountsList.forEach((savedAcc, idx) => {
+        const lowerName = savedAcc.name.toLowerCase();
+        const found = accounts.find(a => a.name.toLowerCase() === lowerName || a.name.replace(' (Shared)', '').toLowerCase() === lowerName);
+        if (found) {
+          if (savedAcc.order !== undefined) found.order = savedAcc.order;
+          if (savedAcc.isHiddenFromNewTx !== undefined) found.isHiddenFromNewTx = savedAcc.isHiddenFromNewTx;
+          if (savedAcc.icon) found.icon = savedAcc.icon;
+          if (savedAcc.type) found.type = savedAcc.type;
+          if (savedAcc.closingRule) found.closingRule = savedAcc.closingRule;
+          if (savedAcc.initialBalance !== undefined && found.initialBalance === 0) found.initialBalance = savedAcc.initialBalance;
+        } else {
+          accounts.push({
+            ...savedAcc,
+            order: savedAcc.order !== undefined ? savedAcc.order : idx,
+          });
+          existingAccountNames.add(lowerName);
+        }
+      });
+    }
+
+    // 2. Also include accounts that might only exist in accountConfigs (e.g. auto-detected from transactions)
     Object.entries(accountConfigs).forEach(([name, config]) => {
       const lowerName = name.toLowerCase();
       if (!existingAccountNames.has(lowerName) && !existingCleanNames.has(lowerName)) {
@@ -453,21 +478,28 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       ...(data.settings?.accountConfigs || {})
     };
 
-    (data.accounts || []).forEach(a => {
+    (data.accounts || []).forEach((a, idx) => {
       if (a.closingRule) {
         ccRulesMapFromAccs[a.name] = a.closingRule;
       }
       ccMapFromAccs[a.name] = a.type === 'CREDIT_CARD';
       
-      if (a.order !== undefined || a.isHiddenFromNewTx !== undefined || a.icon !== undefined) {
-        const cleanName = a.name.replace(' (Shared)', '');
-        accountConfigs[cleanName] = {
-          order: a.order,
-          isHiddenFromNewTx: a.isHiddenFromNewTx,
-          icon: a.icon
-        };
-      }
+      const cleanName = a.name.replace(' (Shared)', '');
+      accountConfigs[cleanName] = {
+        order: a.order !== undefined ? a.order : idx,
+        isHiddenFromNewTx: !!a.isHiddenFromNewTx,
+        icon: a.icon
+      };
     });
+
+    const isTourCompleted = data.settings?.onboardingCompleted ?? (
+      typeof window !== 'undefined' && (
+        localStorage.getItem('levlev_onboarding_completed') === 'true' ||
+        localStorage.getItem('finlev_onboarding_completed') === 'true' ||
+        localStorage.getItem('finance_app_onboarding_completed') === 'true' ||
+        (data.transactions && data.transactions.length > 0)
+      )
+    );
 
     const settingsObj = {
       ccRulesMap: { ...ccRulesMapFromAccs, ...(data.settings?.ccRulesMap || {}) },
@@ -476,6 +508,8 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       customBalances: data.settings?.customBalances || {},
       workspaceSharing: data.settings?.workspaceSharing || {},
       accountConfigs: accountConfigs,
+      accountsList: data.accounts || [],
+      onboardingCompleted: !!isTourCompleted,
     };
 
     try {
