@@ -540,12 +540,7 @@ export const AccountsTab = React.memo(function AccountsTab({
             </Reorder.Group>
           </div>
         ) : (
-          <Reorder.Group 
-            axis="y" 
-            values={allAccountMetrics} 
-            onReorder={handleReorderAllAccounts}
-            className="space-y-3"
-          >
+          <div className="space-y-3">
             {allAccountMetrics.map((acc, index) => {
               const isCC = acc.isCreditCard;
               const matchedAccount = accounts?.find(a => a.name === acc.accountName);
@@ -561,20 +556,14 @@ export const AccountsTab = React.memo(function AccountsTab({
               const nextClose = acc.nextCloseDate || stmt?.closeDate;
 
               return (
-                <Reorder.Item
+                <div
                   key={acc.accountName}
-                  value={acc}
-                  className="p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all shadow-sm flex flex-col relative group cursor-grab active:cursor-grabbing"
+                  className={`p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all shadow-sm flex flex-col relative group ${!isCC ? 'cursor-pointer' : ''}`}
                   onClick={(e) => {
                     if (isCC || (e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
                     onNavigateToTransactionsWithFilter({ account: acc.accountName });
                   }}
                 >
-                  {/* Drag Handle Overlay */}
-                  <div className="absolute top-4 right-12 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-slate-600">
-                    <GripVertical className="w-4 h-4" />
-                  </div>
-
                   {/* Card Content */}
                   <div className="flex-1 space-y-4">
                     {/* Top Header */}
@@ -816,10 +805,10 @@ export const AccountsTab = React.memo(function AccountsTab({
                       </>
                     )}
                   </div>
-                </Reorder.Item>
+                </div>
               );
             })}
-          </Reorder.Group>
+          </div>
         )}
       </div>
 
