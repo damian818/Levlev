@@ -27,6 +27,7 @@ import { AiChatWidget } from './components/AiChatWidget';
 import { LandingPage } from './components/LandingPage';
 import ImportWizardModal from './components/ImportWizardModal';
 import { LevLevIcon, LevLevLogo } from './components/LevLevLogo';
+import i18n from './i18n';
 
 export default function App() {
   const [isWorkspaceShared, setIsWorkspaceShared] = useState<boolean>(() => {
@@ -254,6 +255,14 @@ export default function App() {
     });
   };
 
+  const handleReorderAccounts = (reordered: AccountItem[]) => {
+    const withOrder = reordered.map((acc, index) => ({
+      ...acc,
+      order: index,
+    }));
+    setAccounts(withOrder);
+  };
+
   const handleImportBackup = (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[]; isFullBackup?: boolean }) => {
     if (data.isFullBackup) {
       if (data.transactions) setTransactions(data.transactions);
@@ -308,7 +317,36 @@ export default function App() {
   };
 
   const [currentTab, setCurrentTab] = useState<ViewTab>('overview');
-  const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>('ARS');
+  const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_display_currency');
+      if (saved) return saved as DisplayCurrency;
+    } catch (e) {}
+    return 'ARS';
+  });
+
+  // Sync display currency to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('finance_app_display_currency', displayCurrency);
+    } catch (e) {
+      console.warn('Failed to save display currency to localStorage');
+    }
+  }, [displayCurrency]);
+
+  // Restore persistent language preference on mount
+  useEffect(() => {
+    try {
+      const savedLang = localStorage.getItem('finance_app_language') || localStorage.getItem('i18nextLng');
+      if (savedLang && (savedLang.startsWith('es') || savedLang.startsWith('en'))) {
+        const targetLang = savedLang.startsWith('es') ? 'es' : 'en';
+        if (i18n.language !== targetLang) {
+          i18n.changeLanguage(targetLang);
+        }
+      }
+    } catch (e) {}
+  }, []);
+
   const [usdArsRate, setUsdArsRate] = useState<number>(1521);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -819,6 +857,7 @@ export default function App() {
             onUpdateAccountSharing={handleUpdateAccountSharing}
             onEditAccount={handleEditAccount}
             onAddAccount={handleAddAccount}
+            onReorderAccounts={handleReorderAccounts}
             currentUserId={authUser?.id}
             showSharedData={showSharedData}
             userTimezone={userTimezone}

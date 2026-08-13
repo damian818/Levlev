@@ -54,22 +54,22 @@ export function RecurringTrendModal({
     : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-      <div className="bg-[#161b22] border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-xs">
+      <div className="bg-[#161b22] border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto p-3.5 sm:p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
         
         {/* Modal Header */}
-        <div className="flex justify-between items-start pb-4 border-b border-slate-800">
-          <div className="flex items-center space-x-3">
-            <div className={`p-3 rounded-xl border ${
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-3 border-b border-slate-800 pb-4">
+          <div className="flex items-start space-x-3">
+            <div className={`p-2.5 sm:p-3 rounded-xl border shrink-0 ${
               isIncome 
                 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
                 : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
             }`}>
-              <Repeat className="w-6 h-6" />
+              <Repeat className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
-                <h3 className="text-lg font-bold text-slate-100">{item.title}</h3>
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <h3 className="text-base sm:text-lg font-bold text-slate-100">{item.title}</h3>
                 <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
                   isIncome 
                     ? 'bg-emerald-950/80 border-emerald-800/50 text-emerald-300' 
@@ -84,28 +84,28 @@ export function RecurringTrendModal({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+              <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <span>Category: <strong className="text-slate-300">{item.category}</strong></span>
                 <span>•</span>
                 <span>Account: <strong className="text-slate-300">{item.account}</strong></span>
                 <span>•</span>
-                <span>Day ~{item.dayOfMonth} of month</span>
+                <span>Day ~{item.dayOfMonth}</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-end sm:self-start shrink-0">
             {onMarkNonRecurring && (
               <button
                 onClick={() => {
                   onMarkNonRecurring(item);
                   onClose();
                 }}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold transition-colors"
+                className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold transition-colors"
                 title="Exclude this item from future recurring lists"
               >
                 <Ban className="w-3.5 h-3.5" />
-                <span>Mark Non-Recurring</span>
+                <span className="text-[11px] sm:text-xs">Mark Non-Recurring</span>
               </button>
             )}
             <button
@@ -118,10 +118,10 @@ export function RecurringTrendModal({
         </div>
 
         {/* Key Metrics Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-[#121620] p-3.5 rounded-xl border border-slate-800/80 space-y-1">
-            <span className="text-[11px] text-slate-400 font-medium">Latest Amount</span>
-            <div className="text-sm font-bold text-slate-100">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <div className="bg-[#121620] p-2.5 sm:p-3.5 rounded-xl border border-slate-800/80 space-y-0.5">
+            <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium">Latest Amount</span>
+            <div className="text-xs sm:text-sm font-bold text-slate-100">
               {formatCurrency(
                 convertCurrency(item.latestAmount, item.currency as DisplayCurrency, displayCurrency, usdArsRate, item.history[item.history.length-1]?.date, transactions, historyData),
                 displayCurrency
@@ -132,9 +132,9 @@ export function RecurringTrendModal({
             </div>
           </div>
 
-          <div className="bg-[#121620] p-3.5 rounded-xl border border-slate-800/80 space-y-1">
-            <span className="text-[11px] text-slate-400 font-medium">Monthly Average</span>
-            <div className="text-sm font-bold text-slate-100">
+          <div className="bg-[#121620] p-2.5 sm:p-3.5 rounded-xl border border-slate-800/80 space-y-0.5">
+            <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium">Monthly Average</span>
+            <div className="text-xs sm:text-sm font-bold text-slate-100">
               {formatCurrency(
                 convertCurrency(item.avgAmount, item.currency as DisplayCurrency, displayCurrency, usdArsRate, item.history[item.history.length-1]?.date, transactions, historyData),
                 displayCurrency
@@ -145,9 +145,9 @@ export function RecurringTrendModal({
             </div>
           </div>
 
-          <div className="bg-[#121620] p-3.5 rounded-xl border border-slate-800/80 space-y-1">
-            <span className="text-[11px] text-slate-400 font-medium">Total Lifetime</span>
-            <div className="text-sm font-bold text-slate-100">
+          <div className="bg-[#121620] p-2.5 sm:p-3.5 rounded-xl border border-slate-800/80 space-y-0.5">
+            <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium">Total Lifetime</span>
+            <div className="text-xs sm:text-sm font-bold text-slate-100">
               {formatCurrency(
                 convertCurrency(totalAmountNative, item.currency as DisplayCurrency, displayCurrency, usdArsRate, item.history[item.history.length-1]?.date, transactions, historyData),
                 displayCurrency
@@ -158,16 +158,16 @@ export function RecurringTrendModal({
             </div>
           </div>
 
-          <div className="bg-[#121620] p-3.5 rounded-xl border border-slate-800/80 space-y-1">
-            <span className="text-[11px] text-slate-400 font-medium">Trend Shift</span>
-            <div className={`text-sm font-bold flex items-center space-x-1 ${
+          <div className="bg-[#121620] p-2.5 sm:p-3.5 rounded-xl border border-slate-800/80 space-y-0.5">
+            <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium">Trend Shift</span>
+            <div className={`text-xs sm:text-sm font-bold flex items-center space-x-1 ${
               percentChange === 0 ? 'text-slate-400' : percentChange > 0 ? (isIncome ? 'text-emerald-400' : 'text-rose-400') : (isIncome ? 'text-rose-400' : 'text-emerald-400')
             }`}>
               {percentChange > 0 ? <ArrowUpRight className="w-4 h-4" /> : percentChange < 0 ? <ArrowDownRight className="w-4 h-4" /> : null}
               <span>{Math.abs(percentChange).toFixed(1)}%</span>
             </div>
             <div className="text-[10px] text-slate-500">
-              {percentChange > 0 ? 'Increase over time' : percentChange < 0 ? 'Decrease over time' : 'Stable amount'}
+              {percentChange > 0 ? 'Increase' : percentChange < 0 ? 'Decrease' : 'Stable'}
             </div>
           </div>
         </div>
@@ -286,8 +286,8 @@ export function RecurringTrendModal({
             <span className="text-slate-400 font-normal">Chronological History</span>
           </h4>
 
-          <div className="border border-slate-800 rounded-xl overflow-hidden bg-[#121620] max-h-48 overflow-y-auto">
-            <table className="w-full text-left text-xs">
+          <div className="border border-slate-800 rounded-xl overflow-x-auto bg-[#121620] max-h-52 overflow-y-auto">
+            <table className="w-full text-left text-xs min-w-[520px]">
               <thead className="bg-[#161b22] text-slate-400 sticky top-0 uppercase text-[10px] font-semibold border-b border-slate-800">
                 <tr>
                   <th className="p-2.5">Date</th>

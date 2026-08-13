@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule, AccountItem, SharedMember } from '../types';
 import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString, getTransferOutflow, getTransferInflow } from '../utils/financeUtils';
-import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus } from 'lucide-react';
+import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, Eye, EyeOff } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { CreditCardDetailModal } from './CreditCardDetailModal';
 import { ShareAccountModal } from './ShareAccountModal';
@@ -24,6 +24,7 @@ interface AccountsTabProps {
   onUpdateAccountSharing?: (accName: string, isShared: boolean, sharedMembers: SharedMember[]) => void;
   onEditAccount?: (oldName: string, updatedAcc: AccountItem, updateTransactions: boolean) => void;
   onAddAccount?: (newAcc: AccountItem) => void;
+  onReorderAccounts?: (accounts: AccountItem[]) => void;
   currentUserId?: string;
   showSharedData?: boolean;
   userTimezone?: string;
@@ -49,12 +50,43 @@ export function AccountsTab({
   onUpdateAccountSharing,
   onEditAccount,
   onAddAccount,
+  onReorderAccounts,
   currentUserId,
   showSharedData = true,
   userTimezone = 'America/Argentina/Buenos_Aires',
 }: AccountsTabProps) {
   const [editingAccount, setEditingAccount] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
+
+  const handleMoveAccount = (accName: string, direction: 'up' | 'down') => {
+    if (!onReorderAccounts || !accounts || accounts.length < 2) return;
+    const index = accounts.findIndex(a => a.name.toLowerCase() === accName.toLowerCase());
+    if (index === -1) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= accounts.length) return;
+
+    const newAccounts = [...accounts];
+    const [moved] = newAccounts.splice(index, 1);
+    newAccounts.splice(targetIndex, 0, moved);
+    onReorderAccounts(newAccounts);
+  };
+
+  const handleToggleHideFromNewTx = (accName: string) => {
+    const existingAcc = accounts?.find(a => a.name.toLowerCase() === accName.toLowerCase());
+    if (existingAcc) {
+      if (onEditAccount) {
+        onEditAccount(existingAcc.name, { ...existingAcc, isHiddenFromNewTx: !existingAcc.isHiddenFromNewTx }, false);
+      }
+    } else if (onAddAccount) {
+      onAddAccount({
+        id: `acc-${Date.now()}`,
+        name: accName,
+        type: 'CHECKING',
+        currency: accName.toLowerCase().includes('usd') ? 'USD' : 'ARS',
+        isHiddenFromNewTx: true,
+      });
+    }
+  };
 
   // Selected credit card for detail modal
   const [selectedCardAccount, setSelectedCardAccount] = useState<string | null>(null);
@@ -364,6 +396,11 @@ export function AccountsTab({
                         {matchedAccount?.ownerId && currentUserId && matchedAccount.ownerId !== currentUserId && (
                           <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30 text-[9px] font-bold">Workspace</span>
                         )}
+                        {matchedAccount?.isHiddenFromNewTx && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
+                            <EyeOff className="w-2.5 h-2.5" /> Hidden from New Tx
+                          </span>
+                        )}
                         <button
                           onClick={() => toggleAccountClassification(acc.accountName, true)}
                           className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700"
@@ -376,6 +413,40 @@ export function AccountsTab({
                     </div>
 
                     <div className="flex items-center space-x-1.5">
+                      {/* Reorder Up / Down */}
+                      <div className="flex items-center bg-[#161b22] border border-slate-700/80 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); }}
+                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+                          title="Move Up"
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); }}
+                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors border-l border-slate-700/80"
+                          title="Move Down"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Hide / Unhide from new transactions selection */}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); }}
+                        className={`p-1.5 rounded-lg border text-xs flex items-center transition-colors ${
+                          matchedAccount?.isHiddenFromNewTx
+                            ? 'bg-amber-950/70 border-amber-700/60 text-amber-300 hover:bg-amber-900/80'
+                            : 'bg-[#161b22] border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        }`}
+                        title={matchedAccount?.isHiddenFromNewTx ? "Hidden from new tx selection (Click to show)" : "Hide from new tx selection"}
+                      >
+                        {matchedAccount?.isHiddenFromNewTx ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+
                       <button
                         onClick={() => setSharingAccountName(acc.accountName)}
                         className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
@@ -482,6 +553,11 @@ export function AccountsTab({
                             Calibrated
                           </span>
                         )}
+                        {matchedAccount?.isHiddenFromNewTx && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
+                            <EyeOff className="w-2.5 h-2.5" /> Hidden from New Tx
+                          </span>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -500,6 +576,40 @@ export function AccountsTab({
                     </div>
                     
                     <div className="flex items-center space-x-1.5">
+                      {/* Reorder Up / Down */}
+                      <div className="flex items-center bg-[#161b22] border border-slate-700/80 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); }}
+                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+                          title="Move Up"
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); }}
+                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors border-l border-slate-700/80"
+                          title="Move Down"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Hide / Unhide from new transactions selection */}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); }}
+                        className={`p-1.5 rounded-lg border text-xs flex items-center transition-colors ${
+                          matchedAccount?.isHiddenFromNewTx
+                            ? 'bg-amber-950/70 border-amber-700/60 text-amber-300 hover:bg-amber-900/80'
+                            : 'bg-[#161b22] border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        }`}
+                        title={matchedAccount?.isHiddenFromNewTx ? "Hidden from new tx selection (Click to show)" : "Hide from new tx selection"}
+                      >
+                        {matchedAccount?.isHiddenFromNewTx ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

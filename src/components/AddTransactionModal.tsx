@@ -149,18 +149,27 @@ export function AddTransactionModal({
     return isCreditCardAccount(acc.name);
   };
 
-  const accountNames = useMemo(() => accountItems.map(a => a.name), [accountItems]);
+  // Visible accounts for selection (filtering out hidden accounts unless currently editing a tx that uses them)
+  const visibleAccountItems = useMemo(() => {
+    return accountItems.filter(a => {
+      if (!a.isHiddenFromNewTx) return true;
+      if (editingTx && (editingTx.account === a.name || editingTx.toAccount === a.name)) return true;
+      return false;
+    });
+  }, [accountItems, editingTx]);
+
+  const accountNames = useMemo(() => visibleAccountItems.map(a => a.name), [visibleAccountItems]);
 
   // Non-credit card accounts for "Paid From" in CC_PAYMENT mode
   const nonCcAccounts = useMemo(() => {
-    const filtered = accountItems.filter(a => !isAccountCreditCard(a));
-    return filtered.length > 0 ? filtered : accountItems;
-  }, [accountItems]);
+    const filtered = visibleAccountItems.filter(a => !isAccountCreditCard(a));
+    return filtered.length > 0 ? filtered : visibleAccountItems;
+  }, [visibleAccountItems]);
 
   // Credit card accounts for "Paid To" in CC_PAYMENT mode
   const ccAccounts = useMemo(() => {
-    return accountItems.filter(a => isAccountCreditCard(a));
-  }, [accountItems]);
+    return visibleAccountItems.filter(a => isAccountCreditCard(a));
+  }, [visibleAccountItems]);
 
   // Lookup currency for account
   const lookupAccountCurrency = (accName: string): string => {

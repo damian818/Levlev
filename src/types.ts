@@ -114,6 +114,8 @@ export interface AccountItem {
   description?: string;
   isShared?: boolean;
   sharedMembers?: SharedMember[];
+  order?: number;
+  isHiddenFromNewTx?: boolean;
 }
 
 export type ViewTab = 'overview' | 'transactions' | 'accounts' | 'budgets' | 'recurring' | 'inflation' | 'ai-advisor' | 'settings' | 'reports';

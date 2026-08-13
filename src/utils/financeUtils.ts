@@ -808,11 +808,25 @@ export function computeAccountBalances(
     }
   });
 
-  const allNames = Array.from(new Set([
+  const allNamesList = Array.from(new Set([
+    ...(accountsList ? accountsList.map(a => a.name) : []),
     ...Object.keys(accountDeltas),
-    ...(customBalances ? Object.keys(customBalances) : []),
-    ...(accountsList ? accountsList.map(a => a.name) : [])
-  ])).sort();
+    ...(customBalances ? Object.keys(customBalances) : [])
+  ]));
+
+  const accountOrderMap = new Map<string, number>();
+  if (accountsList) {
+    accountsList.forEach((acc, idx) => {
+      accountOrderMap.set(acc.name.toLowerCase(), idx);
+    });
+  }
+
+  const allNames = allNamesList.sort((a, b) => {
+    const idxA = accountOrderMap.has(a.toLowerCase()) ? accountOrderMap.get(a.toLowerCase())! : 999;
+    const idxB = accountOrderMap.has(b.toLowerCase()) ? accountOrderMap.get(b.toLowerCase())! : 999;
+    if (idxA !== idxB) return idxA - idxB;
+    return a.localeCompare(b);
+  });
 
   return allNames
     .map(accName => {

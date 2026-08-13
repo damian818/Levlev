@@ -117,9 +117,16 @@ export function Navbar({
   };
 
   const currentLang = (i18n.language || 'en').substring(0, 2);
+  const changeAndPersistLanguage = (lang: string) => {
+    i18n.changeLanguage(lang);
+    try {
+      localStorage.setItem('finance_app_language', lang);
+      localStorage.setItem('i18nextLng', lang);
+    } catch (e) {}
+  };
   const toggleLanguage = () => {
     const nextLang = currentLang === 'es' ? 'en' : 'es';
-    i18n.changeLanguage(nextLang);
+    changeAndPersistLanguage(nextLang);
   };
 
   const tabs: { id: ViewTab; label: string; shortLabel?: string; icon: React.ReactNode }[] = [
@@ -163,7 +170,7 @@ export function Navbar({
                   type="button"
                   onClick={() => {
                     triggerHaptic(10);
-                    i18n.changeLanguage('en');
+                    changeAndPersistLanguage('en');
                   }}
                   className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
                     currentLang === 'en'
@@ -178,7 +185,7 @@ export function Navbar({
                   type="button"
                   onClick={() => {
                     triggerHaptic(10);
-                    i18n.changeLanguage('es');
+                    changeAndPersistLanguage('es');
                   }}
                   className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
                     currentLang === 'es'
@@ -465,7 +472,7 @@ export function Navbar({
                       type="button"
                       onClick={() => {
                         triggerHaptic(10);
-                        i18n.changeLanguage('en');
+                        changeAndPersistLanguage('en');
                       }}
                       className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
                         currentLang === 'en'
@@ -479,7 +486,7 @@ export function Navbar({
                       type="button"
                       onClick={() => {
                         triggerHaptic(10);
-                        i18n.changeLanguage('es');
+                        changeAndPersistLanguage('es');
                       }}
                       className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
                         currentLang === 'es'

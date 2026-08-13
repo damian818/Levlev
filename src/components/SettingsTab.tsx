@@ -686,7 +686,13 @@ export function SettingsTab({
                 <label className="text-xs font-bold text-slate-300">{t('settings.language')}</label>
                 <div className="flex items-center bg-[#161b22] p-1 rounded-xl border border-slate-800">
                   <button
-                    onClick={() => i18n.changeLanguage('en')}
+                    onClick={() => {
+                      i18n.changeLanguage('en');
+                      try {
+                        localStorage.setItem('finance_app_language', 'en');
+                        localStorage.setItem('i18nextLng', 'en');
+                      } catch (e) {}
+                    }}
                     className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
                       i18n.language.startsWith('en') ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-400 hover:text-slate-200'
                     }`}
@@ -694,7 +700,13 @@ export function SettingsTab({
                     English (EN)
                   </button>
                   <button
-                    onClick={() => i18n.changeLanguage('es')}
+                    onClick={() => {
+                      i18n.changeLanguage('es');
+                      try {
+                        localStorage.setItem('finance_app_language', 'es');
+                        localStorage.setItem('i18nextLng', 'es');
+                      } catch (e) {}
+                    }}
                     className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
                       i18n.language.startsWith('es') ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-400 hover:text-slate-200'
                     }`}

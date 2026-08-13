@@ -617,7 +617,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-[#121620]">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs min-w-[620px]">
             <thead className="bg-[#161b22] text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
               <tr>
                 <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('title')}>
