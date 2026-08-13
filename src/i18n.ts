@@ -101,6 +101,7 @@ export const resources = {
         signed_in_as: 'Signed in as {{email}}',
       },
       common: {
+        add: 'Add',
         save: 'Save',
         cancel: 'Cancel',
         delete: 'Delete',
@@ -763,6 +764,7 @@ export const resources = {
         signed_in_as: 'Sesión iniciada como {{email}}',
       },
       common: {
+        add: 'Agregar',
         save: 'Guardar',
         cancel: 'Cancelar',
         delete: 'Eliminar',

@@ -1172,7 +1172,7 @@ export function AddTransactionModal({
                     onClick={() => setIsAddingCategory(true)}
                     className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-0.5"
                   >
-                    <Plus className="w-2.5 h-2.5" /> {t('common.add')}
+                    <Plus className="w-2.5 h-2.5" /> {t('common.add', { defaultValue: 'Add' })}
                   </button>
                 </div>
                 <select
@@ -1200,7 +1200,7 @@ export function AddTransactionModal({
                     onClick={() => setIsAddingAccount(true)}
                     className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-0.5"
                   >
-                    <Plus className="w-2.5 h-2.5" /> {t('common.add')}
+                    <Plus className="w-2.5 h-2.5" /> {t('common.add', { defaultValue: 'Add' })}
                   </button>
                 </div>
                 <select
@@ -1405,7 +1405,7 @@ export function AddTransactionModal({
                     type="submit"
                     className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold"
                   >
-                    {t('common.add')}
+                    {t('common.add', { defaultValue: 'Add' })}
                   </button>
                 </div>
               </form>
@@ -1490,7 +1490,7 @@ export function AddTransactionModal({
                     type="submit"
                     className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold"
                   >
-                    {t('common.add')}
+                    {t('common.add', { defaultValue: 'Add' })}
                   </button>
                 </div>
               </form>
