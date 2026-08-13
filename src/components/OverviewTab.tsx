@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
 import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
-import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon, Upload } from 'lucide-react';
+import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon, Upload, Sparkle } from 'lucide-react';
 import { MonthlyCategoryDonut } from './MonthlyCategoryDonut';
+import { EmptyState } from './EmptyState';
 import { generateMonthlyPdfReport } from '../utils/pdfReport';
 import { MonthlyHeatmap } from './MonthlyHeatmap';
 import { CategoryTrendModal } from './CategoryTrendModal';
@@ -55,6 +56,32 @@ export const OverviewTab = React.memo(function OverviewTab({
   }, [transactions, showSharedData, currentUserId]);
 
   const currentMonthKey = useMemo(() => getCurrentMonthKey(), []);
+
+  if (transactions.length === 0) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-100 tracking-tight flex items-center gap-3">
+            <div className="p-2 bg-emerald-500/10 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-emerald-500" />
+            </div>
+            {t('overview.title')}
+          </h2>
+        </div>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden">
+          <EmptyState
+            icon={Sparkle}
+            title={t('overview.welcome_title', { defaultValue: 'Welcome to Finlev!' })}
+            description={t('overview.welcome_desc', { defaultValue: 'Start tracking your personal finances by adding your first account and transaction. We\'ll help you visualize your spending and savings.' })}
+            action={onOpenImportModal ? {
+              label: t('overview.get_started', { defaultValue: 'Import Data' }),
+              onClick: onOpenImportModal
+            } : undefined}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // Available months from transactions
   const availableMonths = useMemo(() => {

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency } from '../types';
 import { analyzeSpending, formatCurrency } from '../utils/financeUtils';
-import { MessageSquare, Send, X, Bot, User, Sparkles, Loader2 } from 'lucide-react';
+import { MessageSquare, Send, X, Bot, User, Sparkles, Loader2, WifiOff } from 'lucide-react';
 import Markdown from 'react-markdown';
 
 interface AiChatWidgetProps {
@@ -177,20 +177,29 @@ export function AiChatWidget({
 
           {/* Input Form */}
           <form onSubmit={handleSend} className="p-3 bg-[#121620] border-t border-slate-800 flex items-center space-x-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={t('ai.chat_placeholder')}
-              className="flex-1 bg-[#161b22] border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="p-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl transition-all cursor-pointer"
-            >
-              <Send className="w-4 h-4" />
-            </button>
+            {!navigator.onLine ? (
+              <div className="flex-1 flex items-center justify-center gap-2 text-rose-400 text-[10px] font-bold bg-rose-500/10 border border-rose-500/20 py-2 rounded-xl">
+                <WifiOff className="w-3.5 h-3.5" />
+                <span>AI REQUIRES INTERNET CONNECTION</span>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={t('ai.chat_placeholder')}
+                  className="flex-1 bg-[#161b22] border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+                <button
+                  type="submit"
+                  disabled={loading || !input.trim()}
+                  className="p-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl transition-all cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </>
+            )}
           </form>
 
         </div>

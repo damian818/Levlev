@@ -4,8 +4,9 @@ import { Transaction, RecurringRule, DisplayCurrency, IdentifiedRecurringItem, I
 import { formatCurrency, formatCurrencyCompact, convertCurrency, detectRecurringItems, detectInstallmentPlans, computeFutureRecurringProjections } from '../utils/financeUtils';
 import { RecurringTrendModal } from './RecurringTrendModal';
 import { RecurringCategoryTrendModal } from './RecurringCategoryTrendModal';
-import { Repeat, Calendar, Clock, Search, Filter, TrendingUp, Sparkles, ChevronRight, Layers, ArrowUpRight, ArrowDownRight, ShieldAlert, BarChart2, Ban, RotateCcw, LineChart } from 'lucide-react';
+import { Repeat, Calendar, Clock, Search, Filter, TrendingUp, Sparkles, ChevronRight, Layers, ArrowUpRight, ArrowDownRight, ShieldAlert, BarChart2, Ban, RotateCcw, LineChart, RefreshCw } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, Area } from 'recharts';
+import { EmptyState } from './EmptyState';
 
 interface RecurringTabProps {
   transactions: Transaction[];
@@ -25,6 +26,28 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
   const [showCompletedInstallments, setShowCompletedInstallments] = useState(false);
   const [installmentsSort, setInstallmentsSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [showProjection, setShowProjection] = useState(true);
+
+  if (transactions.length === 0) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-100 tracking-tight flex items-center gap-3">
+            <div className="p-2 bg-emerald-500/10 rounded-lg">
+              <Repeat className="w-6 h-6 text-emerald-500" />
+            </div>
+            {t('recurring.title')}
+          </h2>
+        </div>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden">
+          <EmptyState
+            icon={RefreshCw}
+            title={t('recurring.no_data_title', { defaultValue: 'No Recurring Items Found' })}
+            description={t('recurring.no_data_desc', { defaultValue: 'The system automatically detects subscriptions, bills, and repeated income. Add some transactions to see your recurring patterns.' })}
+          />
+        </div>
+      </div>
+    );
+  }
 
   const handleInstallmentsSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';

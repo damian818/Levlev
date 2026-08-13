@@ -8,9 +8,11 @@ import {
 } from 'recharts';
 import { 
   BarChart3, Calendar, Download, TrendingUp, TrendingDown, DollarSign, 
-  Layers, Filter, PieChart as PieChartIcon, Award, ArrowUpRight, ArrowDownRight, RefreshCw
+  Layers, Filter, PieChart as PieChartIcon, Award, ArrowUpRight, ArrowDownRight, RefreshCw,
+  FileText, Plus
 } from 'lucide-react';
 import jsPDF from 'jspdf';
+import { EmptyState } from './EmptyState';
 
 interface ReportsTabProps {
   transactions: Transaction[];
@@ -33,6 +35,28 @@ export const ReportsTab = React.memo(function ReportsTab({
   const [chartMode, setChartMode] = useState<'NATIVE_CURRENCY' | 'CONVERTED'>('NATIVE_CURRENCY');
   const [barStyle, setBarStyle] = useState<'STACKED' | 'GROUPED'>('STACKED');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
+
+  if (transactions.length === 0) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-100 tracking-tight flex items-center gap-3">
+            <div className="p-2 bg-emerald-500/10 rounded-lg">
+              <BarChart3 className="w-6 h-6 text-emerald-500" />
+            </div>
+            {t('reports.title')}
+          </h2>
+        </div>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden">
+          <EmptyState
+            icon={FileText}
+            title={t('reports.no_data_title', { defaultValue: 'No Financial Reports Available' })}
+            description={t('reports.no_data_desc', { defaultValue: 'We need some transactions to generate your financial insights. Start by adding your first income or expense.' })}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // Colors for charts
   const COLORS = {

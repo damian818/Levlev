@@ -31,8 +31,23 @@ const ImportWizardModal = lazy(() => import('./components/ImportWizardModal'));
 import { LandingPage } from './components/LandingPage';
 import { LevLevIcon, LevLevLogo } from './components/LevLevLogo';
 import i18n from './i18n';
+import { ReloadPrompt } from './components/ReloadPrompt';
+import { WifiOff } from 'lucide-react';
 
 export default function App() {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const [isWorkspaceShared, setIsWorkspaceShared] = useState<boolean>(() => {
     try {
       return localStorage.getItem('finance_app_workspace_is_shared') === 'true';
@@ -820,6 +835,7 @@ export default function App() {
         onOpenImportModal={() => setIsImportModalOpen(true)}
         onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
         onLogout={handleLogout}
+        isOnline={isOnline}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 pb-28 lg:pb-8 max-w-full overflow-x-hidden">
@@ -1014,6 +1030,8 @@ export default function App() {
           displayCurrency={displayCurrency}
           usdArsRate={usdArsRate}
         />
+
+        <ReloadPrompt />
       </Suspense>
     </div>
   );

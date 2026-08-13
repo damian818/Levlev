@@ -23,7 +23,8 @@ import {
   X,
   Plus,
   Grid,
-  Globe
+  Globe,
+  WifiOff
 } from 'lucide-react';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from '../lib/supabase';
 import { LevLevLogo } from './LevLevLogo';
@@ -55,6 +56,7 @@ interface NavbarProps {
   onOpenImportModal: () => void;
   onOpenDeleteModal: () => void;
   onLogout?: () => void;
+  isOnline?: boolean;
 }
 
 export function Navbar({
@@ -73,6 +75,7 @@ export function Navbar({
   onOpenImportModal,
   onOpenDeleteModal,
   onLogout,
+  isOnline = true,
 }: NavbarProps) {
   const { t, i18n } = useTranslation();
   const [user, setUser] = useState<any>(null);
@@ -150,15 +153,24 @@ export function Navbar({
           <div className="flex justify-between items-center h-16 sm:h-20 gap-2">
             
             {/* Left: Brand Logo */}
-            <button 
-              onClick={() => {
-                triggerHaptic(10);
-                setTab('overview');
-              }} 
-              className="text-left focus:outline-none cursor-pointer group shrink-0 min-h-[44px] flex items-center"
-            >
-              <LevLevLogo badgeText="GLOBAL" size="md" hideSubtitleOnMobile={true} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => {
+                  triggerHaptic(10);
+                  setTab('overview');
+                }} 
+                className="text-left focus:outline-none cursor-pointer group shrink-0 min-h-[44px] flex items-center"
+              >
+                <LevLevLogo badgeText="GLOBAL" size="md" hideSubtitleOnMobile={true} />
+              </button>
+
+              {!isOnline && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-[10px] font-black animate-pulse">
+                  <WifiOff className="w-3 h-3" />
+                  <span className="hidden sm:inline tracking-widest uppercase">OFFLINE</span>
+                </div>
+              )}
+            </div>
 
             {/* Right Controls Container */}
             <div className="flex items-center gap-1.5 sm:gap-3">

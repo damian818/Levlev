@@ -392,6 +392,46 @@ export function SettingsTab({
     setDeletingAccName(null);
   };
 
+  // --- Export Ivy Wallet CSV ---
+  const handleExportIvyCSV = () => {
+    // Columns: Date, Title, Amount, Currency, Category, Account, Type, Description, To Account
+    const headers = ["Date", "Title", "Amount", "Currency", "Category", "Account", "Type", "Description", "To Account"];
+    
+    const rows = transactions.map(t => {
+      // Format date to YYYY-MM-DD HH:mm:ss
+      // If t.date is YYYY-MM-DD, we append 12:00:00
+      let dateTime = t.date;
+      if (dateTime.length === 10) {
+        dateTime += " 12:00:00";
+      }
+
+      // Map types to Ivy Wallet expected values
+      let type = t.type;
+      if (type === 'CC_PAYMENT') type = 'EXPENSE'; 
+
+      return [
+        `"${dateTime}"`,
+        `"${(t.title || "").replace(/"/g, '""')}"`,
+        t.amount,
+        `"${t.currency}"`,
+        `"${(t.category || "").replace(/"/g, '""')}"`,
+        `"${(t.account || "").replace(/"/g, '""')}"`,
+        `"${type}"`,
+        `"${(t.description || "").replace(/"/g, '""')}"`,
+        `"${(t.toAccount || "").replace(/"/g, '""')}"`
+      ].join(",");
+    });
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    const dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `ivy_wallet_export_${new Date().toISOString().substring(0, 10)}.csv`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
   // --- Export JSON Backup ---
   const handleExportData = () => {
     const exportObject = {
@@ -957,6 +997,14 @@ export function SettingsTab({
               >
                 <Download className="w-4 h-4" />
                 <span>Export JSON Backup</span>
+              </button>
+
+              <button
+                onClick={handleExportIvyCSV}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/20 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+              >
+                <Download className="w-4 h-4 text-indigo-400" />
+                <span>Ivy Wallet CSV</span>
               </button>
 
               {onOpenImportModal && (
