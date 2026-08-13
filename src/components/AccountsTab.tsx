@@ -380,56 +380,100 @@ export function AccountsTab({
               return (
                 <div
                   key={acc.accountName}
-                  className="p-4 rounded-xl border border-purple-500/20 bg-[#121620] hover:border-purple-500/50 transition-all space-y-3"
+                  className="p-4 rounded-xl border border-purple-500/20 bg-[#121620] hover:border-purple-500/50 transition-all space-y-3.5 flex flex-col justify-between"
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-md flex items-center gap-1">
-                          <CreditCard className="w-3 h-3" /> Credit Card ({acc.currency})
-                        </span>
-                        {isShared && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
-                            <Users className="w-2.5 h-2.5" /> Shared ({memberCount})
+                  <div className="space-y-3">
+                    {/* Header: Title + Primary Action */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <h4 className="text-base font-bold text-slate-100 truncate flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-purple-400 shrink-0" />
+                          <span className="truncate">{acc.accountName}</span>
+                        </h4>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-md">
+                            Credit Card ({acc.currency})
                           </span>
-                        )}
-                        {matchedAccount?.ownerId && currentUserId && matchedAccount.ownerId !== currentUserId && (
-                          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30 text-[9px] font-bold">Workspace</span>
-                        )}
-                        {matchedAccount?.isHiddenFromNewTx && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
-                            <EyeOff className="w-2.5 h-2.5" /> Hidden from New Tx
-                          </span>
-                        )}
-                        <button
-                          onClick={() => toggleAccountClassification(acc.accountName, true)}
-                          className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700"
-                          title="Switch to Bank Account"
-                        >
-                          Change type
-                        </button>
+                          {isShared && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
+                              <Users className="w-2.5 h-2.5" /> Shared ({memberCount})
+                            </span>
+                          )}
+                          {matchedAccount?.ownerId && currentUserId && matchedAccount.ownerId !== currentUserId && (
+                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30 text-[9px] font-bold">Workspace</span>
+                          )}
+                          {matchedAccount?.isHiddenFromNewTx && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
+                              <EyeOff className="w-2.5 h-2.5" /> Hidden
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <h4 className="text-sm font-bold text-slate-100 mt-1.5">{acc.accountName}</h4>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCardAccount(acc.accountName)}
+                        className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-600 border border-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shadow-sm shrink-0"
+                      >
+                        <span>Details</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
-                    <div className="flex items-center space-x-1.5">
+                    {/* Statement metrics box */}
+                    <div className="p-3 bg-[#161b22] rounded-xl border border-slate-800 grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-medium block">Current Statement Due:</span>
+                        <span className={`text-base font-bold ${netDue > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {formatCurrency(netDue, acc.originalCurrency as DisplayCurrency)}
+                        </span>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 font-medium block">Closing Schedule:</span>
+                        <span className="text-xs font-semibold text-purple-300">
+                          {getClosingRuleLabel(acc.closingRule)}
+                        </span>
+                        {nextClose && (
+                          <span className="text-[10px] text-slate-400 block font-mono mt-0.5">
+                            Next close: {nextClose}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[11px] text-slate-400 pt-0.5">
+                      <span>{acc.txCount} transactions</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCardAccount(acc.accountName)}
+                        className="text-purple-400 hover:text-purple-300 font-medium underline"
+                      >
+                        Record Payment
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card Utilities Footer Bar */}
+                  <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/80 text-xs gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5">
                       {/* Reorder Up / Down */}
-                      <div className="flex items-center bg-[#161b22] border border-slate-700/80 rounded-lg overflow-hidden">
+                      <div className="flex items-center bg-[#161b22] border border-slate-700/70 rounded-lg overflow-hidden">
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); }}
                           className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
                           title="Move Up"
                         >
-                          <ArrowUp className="w-3 h-3" />
+                          <ArrowUp className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); }}
-                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors border-l border-slate-700/80"
+                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors border-l border-slate-700/70"
                           title="Move Down"
                         >
-                          <ArrowDown className="w-3 h-3" />
+                          <ArrowDown className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
@@ -437,65 +481,42 @@ export function AccountsTab({
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); }}
-                        className={`p-1.5 rounded-lg border text-xs flex items-center transition-colors ${
+                        className={`px-2 py-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
                           matchedAccount?.isHiddenFromNewTx
-                            ? 'bg-amber-950/70 border-amber-700/60 text-amber-300 hover:bg-amber-900/80'
-                            : 'bg-[#161b22] border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                            ? 'bg-amber-950/70 border-amber-700/60 text-amber-300'
+                            : 'bg-[#161b22] border-slate-700/70 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                         }`}
                         title={matchedAccount?.isHiddenFromNewTx ? "Hidden from new tx selection (Click to show)" : "Hide from new tx selection"}
                       >
                         {matchedAccount?.isHiddenFromNewTx ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        <span className="text-[11px] font-medium">{matchedAccount?.isHiddenFromNewTx ? 'Hidden' : 'Visible'}</span>
                       </button>
+                    </div>
 
+                    <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => setSharingAccountName(acc.accountName)}
-                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
-                        title="Share account with another person"
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setSharingAccountName(acc.accountName); }}
+                        className="px-2.5 py-1.5 bg-[#161b22] hover:bg-purple-950/40 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                        title="Share account"
                       >
                         <Share2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Share</span>
+                        <span className="text-[11px]">Share</span>
                       </button>
 
                       <button
-                        onClick={() => setSelectedCardAccount(acc.accountName)}
-                        className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-600 border border-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shadow-sm"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleAccountClassification(acc.accountName, true);
+                        }}
+                        className="px-2.5 py-1.5 bg-[#161b22] hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/70 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                        title="Switch to Bank Account"
                       >
-                        <span>Details</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
+                        <Settings className="w-3.5 h-3.5" />
+                        <span className="text-[11px]">To Bank</span>
                       </button>
                     </div>
-                  </div>
-
-                  {/* Statement metrics box */}
-                  <div className="p-3 bg-[#161b22] rounded-xl border border-slate-800 grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-medium block">Current Statement Due:</span>
-                      <span className={`text-base font-bold ${netDue > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                        {formatCurrency(netDue, acc.originalCurrency as DisplayCurrency)}
-                      </span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 font-medium block">Closing Date Schedule:</span>
-                      <span className="text-xs font-semibold text-purple-300">
-                        {getClosingRuleLabel(acc.closingRule)}
-                      </span>
-                      {nextClose && (
-                        <span className="text-[10px] text-slate-400 block font-mono mt-0.5">
-                          Next close: {nextClose}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center text-[11px] text-slate-400 pt-1">
-                    <span>{acc.txCount} recorded card transactions</span>
-                    <button
-                      onClick={() => setSelectedCardAccount(acc.accountName)}
-                      className="text-purple-400 hover:text-purple-300 font-medium underline"
-                    >
-                      Record Statement Payment
-                    </button>
                   </div>
                 </div>
               );
@@ -528,71 +549,125 @@ export function AccountsTab({
               return (
                 <div 
                   key={acc.accountName} 
-                  className="p-4 rounded-xl border border-slate-800 bg-[#121620] hover:border-emerald-500/50 hover:bg-[#1a212d] transition-all cursor-pointer space-y-3 group"
+                  className="p-4 rounded-xl border border-slate-800 bg-[#121620] hover:border-emerald-500/50 hover:bg-[#1a212d] transition-all cursor-pointer space-y-3.5 flex flex-col justify-between group"
                   onClick={(e) => {
                     if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
                     onNavigateToTransactionsWithFilter({ account: acc.accountName });
                   }}
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 bg-slate-800 text-slate-300 border border-slate-700 rounded-md">
-                          {acc.currency}
-                        </span>
-                        {isShared && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
-                            <Users className="w-2.5 h-2.5" /> Shared ({memberCount})
+                  <div className="space-y-3">
+                    {/* Header: Title + Primary Action */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <h4 className="text-base font-bold text-slate-100 truncate flex items-center">
+                          <span>{acc.accountName}</span>
+                          <ExternalLink className="w-3.5 h-3.5 ml-1.5 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
+                        </h4>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-slate-800 text-slate-300 border border-slate-700/80 rounded-md">
+                            {acc.currency}
                           </span>
-                        )}
-                        {matchedAccount?.ownerId && currentUserId && matchedAccount.ownerId !== currentUserId && (
-                          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30 text-[9px] font-bold">Workspace</span>
-                        )}
-                        {acc.hasCustom && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                            Calibrated
-                          </span>
-                        )}
-                        {matchedAccount?.isHiddenFromNewTx && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
-                            <EyeOff className="w-2.5 h-2.5" /> Hidden from New Tx
-                          </span>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleAccountClassification(acc.accountName, false);
-                          }}
-                          className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 hover:text-slate-300 border border-slate-700"
-                          title="Classify as Credit Card"
-                        >
-                          Make Credit Card
-                        </button>
+                          {isShared && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
+                              <Users className="w-2.5 h-2.5" /> Shared ({memberCount})
+                            </span>
+                          )}
+                          {matchedAccount?.ownerId && currentUserId && matchedAccount.ownerId !== currentUserId && (
+                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30 text-[9px] font-bold">Workspace</span>
+                          )}
+                          {acc.hasCustom && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                              Calibrated
+                            </span>
+                          )}
+                          {matchedAccount?.isHiddenFromNewTx && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
+                              <EyeOff className="w-2.5 h-2.5" /> Hidden
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <h4 className="text-sm font-bold text-slate-100 mt-1.5 flex items-center">
-                        {acc.accountName}
-                        <ExternalLink className="w-3 h-3 ml-1.5 opacity-0 group-hover:opacity-60 transition-opacity" />
-                      </h4>
+
+                      {!isEditing ? (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleStartEdit(acc.accountName, acc.currentBalance); }}
+                          className="px-2.5 py-1.5 text-slate-300 hover:text-white bg-[#161b22] hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1 shrink-0"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Set Balance</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleSaveEdit(acc.accountName, acc.currency); }}
+                          className="px-3 py-1.5 text-emerald-400 hover:text-emerald-300 bg-emerald-950/80 border border-emerald-800 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1 shrink-0"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Save</span>
+                        </button>
+                      )}
                     </div>
-                    
-                    <div className="flex items-center space-x-1.5">
+
+                    {/* Live Balance Box */}
+                    <div className="bg-[#161b22] p-3 rounded-xl border border-slate-800/80 space-y-1.5">
+                      <div className="text-[11px] text-slate-400 font-medium flex justify-between items-center">
+                        <span>Live Balance</span>
+                        <span className="text-slate-500 text-[10px]">{acc.txCount} transactions</span>
+                      </div>
+
+                      {isEditing ? (
+                        <div className="flex items-center space-x-2 my-1" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-sm text-slate-400 font-bold">$</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-[#0f131a] border border-slate-600 rounded-lg text-sm font-bold text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            autoFocus
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <div className="text-xl font-bold text-slate-50 tracking-tight">
+                            {formatCurrency(acc.balanceOriginal, acc.originalCurrency as DisplayCurrency)}
+                          </div>
+                          <div className="flex items-center space-x-3 text-[10px] pt-0.5">
+                            <div className="flex items-center text-slate-400">
+                              <span className="font-medium mr-1 uppercase opacity-60">ARS:</span>
+                              <span className="font-mono text-slate-300">{formatCurrency(acc.currentARS, 'ARS')}</span>
+                            </div>
+                            <div className="flex items-center text-slate-400 border-l border-slate-800 pl-3">
+                              <span className="font-medium mr-1 uppercase opacity-60">USD:</span>
+                              <span className="font-mono text-slate-300">{formatCurrency(acc.currentUSD, 'USD')}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card Utilities Footer Bar */}
+                  <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/80 text-xs gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5">
                       {/* Reorder Up / Down */}
-                      <div className="flex items-center bg-[#161b22] border border-slate-700/80 rounded-lg overflow-hidden">
+                      <div className="flex items-center bg-[#161b22] border border-slate-700/70 rounded-lg overflow-hidden">
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); }}
                           className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
                           title="Move Up"
                         >
-                          <ArrowUp className="w-3 h-3" />
+                          <ArrowUp className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); }}
-                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors border-l border-slate-700/80"
+                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors border-l border-slate-700/70"
                           title="Move Down"
                         >
-                          <ArrowDown className="w-3 h-3" />
+                          <ArrowDown className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
@@ -600,83 +675,42 @@ export function AccountsTab({
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); }}
-                        className={`p-1.5 rounded-lg border text-xs flex items-center transition-colors ${
+                        className={`px-2 py-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
                           matchedAccount?.isHiddenFromNewTx
-                            ? 'bg-amber-950/70 border-amber-700/60 text-amber-300 hover:bg-amber-900/80'
-                            : 'bg-[#161b22] border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                            ? 'bg-amber-950/70 border-amber-700/60 text-amber-300'
+                            : 'bg-[#161b22] border-slate-700/70 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                         }`}
                         title={matchedAccount?.isHiddenFromNewTx ? "Hidden from new tx selection (Click to show)" : "Hide from new tx selection"}
                       >
                         {matchedAccount?.isHiddenFromNewTx ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        <span className="text-[11px] font-medium">{matchedAccount?.isHiddenFromNewTx ? 'Hidden' : 'Visible'}</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setSharingAccountName(acc.accountName); }}
+                        className="px-2.5 py-1.5 bg-[#161b22] hover:bg-purple-950/40 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                        title="Share account"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span className="text-[11px]">Share</span>
                       </button>
 
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSharingAccountName(acc.accountName);
+                          toggleAccountClassification(acc.accountName, false);
                         }}
-                        className="p-1.5 text-purple-300 hover:text-white bg-[#161b22] hover:bg-purple-900/40 border border-purple-500/30 rounded-lg transition-colors text-xs flex items-center"
-                        title="Share account with another person"
+                        className="px-2.5 py-1.5 bg-[#161b22] hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/70 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                        title="Switch to Credit Card"
                       >
-                        <Share2 className="w-3.5 h-3.5" />
+                        <Settings className="w-3.5 h-3.5" />
+                        <span className="text-[11px]">To Card</span>
                       </button>
-
-                      {!isEditing ? (
-                        <button
-                          onClick={() => handleStartEdit(acc.accountName, acc.currentBalance)}
-                          className="p-1.5 text-slate-400 hover:text-slate-100 bg-[#161b22] hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors text-xs flex items-center"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 mr-1" />
-                          <span className="text-[11px]">Set Balance</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleSaveEdit(acc.accountName, acc.currency)}
-                          className="p-1.5 text-emerald-400 hover:text-emerald-300 bg-emerald-950/80 border border-emerald-800 rounded-lg transition-colors text-xs flex items-center"
-                        >
-                          <Check className="w-3.5 h-3.5 mr-1" />
-                          <span className="text-[11px]">Save</span>
-                        </button>
-                      )}
                     </div>
-                  </div>
-
-                  {/* Balance Display or Input */}
-                  <div className="bg-[#161b22] p-3 rounded-lg border border-slate-800 space-y-1">
-                    <div className="text-[11px] text-slate-400 font-medium flex justify-between">
-                      <span>Current Live Balance:</span>
-                      <span className="text-slate-500">{acc.txCount} transactions</span>
-                    </div>
-
-                    {isEditing ? (
-                      <div className="flex items-center space-x-2 mt-1">
-                        <span className="text-xs text-slate-400 font-bold">$</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          className="w-full px-2 py-1 bg-[#0f131a] border border-slate-600 rounded text-sm font-bold text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                          autoFocus
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <div className="text-lg font-bold text-slate-50">
-                          {formatCurrency(acc.balanceOriginal, acc.originalCurrency as DisplayCurrency)}
-                        </div>
-                        <div className="flex items-center space-x-3 text-[10px]">
-                          <div className="flex items-center text-slate-400">
-                            <span className="font-medium mr-1 uppercase opacity-60">ARS:</span>
-                            <span className="font-mono text-slate-300">{formatCurrency(acc.currentARS, 'ARS')}</span>
-                          </div>
-                          <div className="flex items-center text-slate-400 border-l border-slate-800 pl-3">
-                            <span className="font-medium mr-1 uppercase opacity-60">USD:</span>
-                            <span className="font-mono text-slate-300">{formatCurrency(acc.currentUSD, 'USD')}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
