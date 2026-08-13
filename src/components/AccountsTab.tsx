@@ -109,21 +109,10 @@ export const AccountsTab = React.memo(function AccountsTab({
     onReorderAccounts(newAccounts);
   };
 
-  const handleReorderLiquidAccounts = (newOrder: typeof liquidAccounts) => {
+  const handleReorderAllAccounts = (newOrder: typeof allAccountMetrics) => {
     if (!onReorderAccounts) return;
-    const ccItems = accounts.filter(a => a.type === 'CREDIT_CARD');
     const reorderedItems = newOrder.map(re => accounts.find(a => a.name === re.accountName)).filter(Boolean) as AccountItem[];
-    // Find liquid items that might not be in the reordered list (unlikely)
-    const missingItems = accounts.filter(a => a.type !== 'CREDIT_CARD' && !reorderedItems.find(r => r.name === a.name));
-    onReorderAccounts([...ccItems, ...reorderedItems, ...missingItems]);
-  };
-
-  const handleReorderCreditCardAccounts = (newOrder: typeof creditCardAccounts) => {
-    if (!onReorderAccounts) return;
-    const liquidItems = accounts.filter(a => a.type !== 'CREDIT_CARD');
-    const reorderedItems = newOrder.map(re => accounts.find(a => a.name === re.accountName)).filter(Boolean) as AccountItem[];
-    const missingItems = accounts.filter(a => a.type === 'CREDIT_CARD' && !reorderedItems.find(r => r.name === a.name));
-    onReorderAccounts([...reorderedItems, ...missingItems, ...liquidItems]);
+    onReorderAccounts(reorderedItems);
   };
 
   const handleToggleHideFromNewTx = (accName: string) => {
@@ -239,6 +228,8 @@ export const AccountsTab = React.memo(function AccountsTab({
       };
     });
   }, [computedSummaries, filteredTransactions, accounts, periodStatusOverrides, customBalances]);
+
+  const allAccountMetrics = reconstructedAccounts;
 
   // Separate Liquid Accounts vs Credit Card Accounts
   const liquidAccounts = useMemo(() => reconstructedAccounts.filter(a => !a.isCreditCard), [reconstructedAccounts]);
@@ -401,46 +392,52 @@ export const AccountsTab = React.memo(function AccountsTab({
         </div>
       </div>
 
-      {/* Credit Card Accounts Section */}
+      {/* Unified Accounts List */}
       <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-800 pb-3">
           <div>
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-purple-400" />
-              <span>{t('accounts.credit_cards_cycles')}</span>
+              <Landmark className="w-4 h-4 text-emerald-400" />
+              <span>{t('accounts.your_accounts_title', { defaultValue: 'Your Accounts' })}</span>
             </h3>
             <p className="text-xs text-slate-400">
-              {t('accounts.credit_cards_sub')}
+              {t('accounts.your_accounts_sub', { defaultValue: 'Manage all your accounts and credit cards in one place. Drag to reorder.' })}
             </p>
           </div>
         </div>
 
-        {creditCardAccounts.length === 0 ? (
+        {allAccountMetrics.length === 0 ? (
           <div className="p-6 text-center text-slate-500 bg-[#121620] rounded-xl border border-slate-800 text-xs">
-            {t('accounts.no_cc_accounts')}
+            {t('accounts.no_accounts_yet')}
           </div>
         ) : (
           <Reorder.Group 
             axis="y" 
-            values={creditCardAccounts} 
-            onReorder={handleReorderCreditCardAccounts}
+            values={allAccountMetrics} 
+            onReorder={handleReorderAllAccounts}
             className="grid grid-cols-1 md:grid-cols-2 gap-4"
           >
-            {creditCardAccounts.map((acc) => {
-              const stmt = acc.currentStatement;
-              const netDue = stmt ? stmt.netDue : 0;
-              const nextClose = acc.nextCloseDate || stmt?.closeDate;
-
+            {allAccountMetrics.map((acc) => {
+              const isCC = acc.isCreditCard;
               const matchedAccount = accounts?.find(a => a.name === acc.accountName);
               const isShared = matchedAccount?.isShared || (matchedAccount?.sharedMembers && matchedAccount.sharedMembers.length > 0);
               const memberCount = matchedAccount?.sharedMembers?.length || 0;
-              const menuId = `cc-${acc.accountName}`;
+              const menuId = `acc-${acc.accountName}`;
+
+              // CC specific
+              const stmt = acc.currentStatement;
+              const netDue = stmt ? stmt.netDue : 0;
+              const nextClose = acc.nextCloseDate || stmt?.closeDate;
 
               return (
                 <Reorder.Item
                   key={acc.accountName}
                   value={acc}
                   className="p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all shadow-sm flex flex-col relative group cursor-grab active:cursor-grabbing"
+                  onClick={(e) => {
+                    if (isCC || (e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
+                    onNavigateToTransactionsWithFilter({ account: acc.accountName });
+                  }}
                 >
                   {/* Drag Handle Overlay */}
                   <div className="absolute top-4 right-12 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-slate-600">
@@ -452,21 +449,27 @@ export const AccountsTab = React.memo(function AccountsTab({
                     {/* Top Header */}
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
-                          {getAccountIcon('CREDIT_CARD', acc.icon)}
+                        <div className={`p-2 rounded-xl border ${isCC ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+                          {getAccountIcon(isCC ? 'CREDIT_CARD' : 'CHECKING', acc.icon)}
                         </div>
                         <div className="min-w-0">
-                          <h4 className="text-sm font-bold text-slate-100 truncate">{acc.accountName}</h4>
+                          <h4 className="text-sm font-bold text-slate-100 truncate flex items-center">
+                            <span>{acc.accountName}</span>
+                            {!isCC && <ExternalLink className="w-3 h-3 ml-1.5 opacity-0 group-hover:opacity-40 transition-opacity shrink-0" />}
+                          </h4>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[9px] font-bold uppercase text-purple-300/80">
+                            <span className={`text-[9px] font-bold uppercase ${isCC ? 'text-purple-300/80' : 'text-emerald-300/80'}`}>
                               {acc.currency}
                             </span>
-                            {isShared && (
-                              <span className="w-1 h-1 rounded-full bg-slate-700" />
-                            )}
+                            {isShared && <span className="w-1 h-1 rounded-full bg-slate-700" />}
                             {isShared && (
                               <span className="text-[9px] font-bold text-purple-400 flex items-center gap-1">
                                 <Users className="w-2.5 h-2.5" /> {memberCount}
+                              </span>
+                            )}
+                            {isCC && (
+                              <span className="ml-1.5 text-[8px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-black uppercase tracking-tighter">
+                                CC
                               </span>
                             )}
                           </div>
@@ -492,21 +495,6 @@ export const AccountsTab = React.memo(function AccountsTab({
                             <>
                               <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
                               <div className="absolute right-0 top-full mt-1 w-48 bg-[#1c2128] border border-slate-700 rounded-xl shadow-2xl z-20 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); setOpenMenuId(null); }}
-                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
-                                >
-                                  <ArrowUp className="w-3.5 h-3.5" /> {t('accounts.move_up')}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); setOpenMenuId(null); }}
-                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
-                                >
-                                  <ArrowDown className="w-3.5 h-3.5" /> {t('accounts.move_down')}
-                                </button>
-                                <div className="h-px bg-slate-800 my-1" />
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); setOpenMenuId(null); }}
@@ -541,7 +529,7 @@ export const AccountsTab = React.memo(function AccountsTab({
                                       onClick={(e) => { e.stopPropagation(); handleSetAccountIcon(acc.accountName, iconData.id as any); setOpenMenuId(null); }}
                                       className={`p-2 rounded-lg border transition-all hover:bg-slate-700 flex items-center justify-center ${
                                         acc.icon === iconData.id 
-                                          ? 'bg-purple-500/20 border-purple-500/50 text-purple-300' 
+                                          ? `${isCC ? 'bg-purple-500/20 border-purple-500/50 text-purple-300' : 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'}` 
                                           : 'bg-slate-800 border-slate-700 text-slate-400'
                                       }`}
                                       title={iconData.id}
@@ -553,10 +541,10 @@ export const AccountsTab = React.memo(function AccountsTab({
                                 <div className="h-px bg-slate-800 my-1" />
                                 <button
                                   type="button"
-                                  onClick={(e) => { e.stopPropagation(); toggleAccountClassification(acc.accountName, true); setOpenMenuId(null); }}
+                                  onClick={(e) => { e.stopPropagation(); toggleAccountClassification(acc.accountName, isCC); setOpenMenuId(null); }}
                                   className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
                                 >
-                                  <Settings className="w-3.5 h-3.5" /> {t('accounts.to_bank')}
+                                  <Settings className="w-3.5 h-3.5" /> {isCC ? t('accounts.to_bank') : t('accounts.to_card')}
                                 </button>
                               </div>
                             </>
@@ -567,45 +555,93 @@ export const AccountsTab = React.memo(function AccountsTab({
 
                     {/* Balance Display */}
                     <div>
-                      <div className="text-2xl font-bold text-slate-100 tracking-tight">
-                        {formatCurrency(netDue, acc.originalCurrency as DisplayCurrency)}
-                      </div>
+                      {editingAccount === acc.accountName ? (
+                        <div className="flex items-center space-x-2 my-1" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-xl text-slate-500 font-bold">$</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className={`w-full px-3 py-2 bg-[#0a0c10] border ${isCC ? 'border-purple-500/50' : 'border-emerald-500/50'} rounded-xl text-xl font-bold text-slate-100 focus:outline-none focus:ring-1 ${isCC ? 'focus:ring-purple-500' : 'focus:ring-emerald-500'}`}
+                            autoFocus
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-2xl font-bold text-slate-100 tracking-tight">
+                          {isCC 
+                            ? formatCurrency(netDue, acc.originalCurrency as DisplayCurrency)
+                            : formatCurrency(acc.balanceOriginal, acc.originalCurrency as DisplayCurrency)
+                          }
+                        </div>
+                      )}
                       <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">
-                        {t('accounts.current_statement_due')}
+                        {isCC ? t('accounts.current_statement_due') : t('accounts.live_balance')}
                       </p>
                     </div>
 
                     {/* Meta Grid */}
-                    <div className="grid grid-cols-2 gap-4 py-3 border-y border-slate-800/60">
-                      <div>
-                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">
-                          {t('accounts.closing_schedule')}
-                        </span>
-                        <span className="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3" /> {getClosingRuleLabel(acc.closingRule)}
-                        </span>
+                    {isCC ? (
+                      <div className="grid grid-cols-2 gap-4 py-3 border-y border-slate-800/60">
+                        <div>
+                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">{t('accounts.closing_schedule')}</span>
+                          <span className="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
+                            <Calendar className="w-3 h-3" /> {getClosingRuleLabel(acc.closingRule)}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">{t('accounts.next_close_label')}</span>
+                          <span className="text-xs font-mono font-bold text-slate-300">{nextClose || '-'}</span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">
-                          {t('accounts.next_close_label')}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-slate-300">
-                          {nextClose || '-'}
-                        </span>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4 py-3 border-t border-slate-800/40">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">ARS</span>
+                          <span className="text-xs font-mono font-bold text-slate-300">{formatCurrency(acc.currentARS, 'ARS')}</span>
+                        </div>
+                        <div className="flex flex-col text-right">
+                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">USD</span>
+                          <span className="text-xs font-mono font-bold text-slate-300">{formatCurrency(acc.currentUSD, 'USD')}</span>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Footer Actions */}
                   <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-800/40">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCardAccount(acc.accountName)}
-                      className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2"
-                    >
-                      <span>{t('accounts.details')}</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    {isCC ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCardAccount(acc.accountName)}
+                        className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2"
+                      >
+                        <span>{t('accounts.details')}</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <>
+                        {editingAccount !== acc.accountName ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleStartEdit(acc.accountName, acc.currentBalance); }}
+                            className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>{t('accounts.set_balance')}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSaveEdit(acc.accountName, acc.currency); }}
+                            className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>{t('common.save')}</span>
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </Reorder.Item>
               );
@@ -615,247 +651,8 @@ export const AccountsTab = React.memo(function AccountsTab({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Liquid Accounts List & Balance Editor */}
-        <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
-                <Landmark className="w-4 h-4 text-emerald-400" />
-                <span>{t('accounts.liquid_accounts_title')}</span>
-              </h3>
-              <p className="text-xs text-slate-400">{t('accounts.liquid_accounts_sub')}</p>
-            </div>
-          </div>
-
-          <Reorder.Group 
-            axis="y" 
-            values={liquidAccounts} 
-            onReorder={handleReorderLiquidAccounts}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-          >
-            {liquidAccounts.map((acc) => {
-              const isEditing = editingAccount === acc.accountName;
-
-              const matchedAccount = accounts?.find(a => a.name === acc.accountName);
-              const isShared = matchedAccount?.isShared || (matchedAccount?.sharedMembers && matchedAccount.sharedMembers.length > 0);
-              const memberCount = matchedAccount?.sharedMembers?.length || 0;
-              const menuId = `liquid-${acc.accountName}`;
-
-              return (
-                <Reorder.Item 
-                  key={acc.accountName} 
-                  value={acc}
-                  className="p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm flex flex-col relative group cursor-grab active:cursor-grabbing"
-                  onClick={(e) => {
-                    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
-                    onNavigateToTransactionsWithFilter({ account: acc.accountName });
-                  }}
-                >
-                  {/* Drag Handle Overlay */}
-                  <div className="absolute top-4 right-12 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-slate-600">
-                    <GripVertical className="w-4 h-4" />
-                  </div>
-
-                  <div className="flex-1 space-y-4">
-                    {/* Top Header */}
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                          {getAccountIcon('CHECKING', acc.icon)}
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-bold text-slate-100 truncate flex items-center">
-                            <span>{acc.accountName}</span>
-                            <ExternalLink className="w-3 h-3 ml-1.5 opacity-0 group-hover:opacity-40 transition-opacity shrink-0" />
-                          </h4>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[9px] font-bold uppercase text-emerald-300/80">
-                              {acc.currency}
-                            </span>
-                            {isShared && (
-                              <span className="w-1 h-1 rounded-full bg-slate-700" />
-                            )}
-                            {isShared && (
-                              <span className="text-[9px] font-bold text-purple-400 flex items-center gap-1">
-                                <Users className="w-2.5 h-2.5" /> {memberCount}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        {matchedAccount?.isHiddenFromNewTx && (
-                          <div className="p-1 rounded-lg bg-amber-500/10 text-amber-500/80" title={t('accounts.hidden')}>
-                            <EyeOff className="w-3.5 h-3.5" />
-                          </div>
-                        )}
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === menuId ? null : menuId); }}
-                            className="p-2 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-
-                          {openMenuId === menuId && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                              <div className="absolute right-0 top-full mt-1 w-48 bg-[#1c2128] border border-slate-700 rounded-xl shadow-2xl z-20 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); setOpenMenuId(null); }}
-                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
-                                >
-                                  <ArrowUp className="w-3.5 h-3.5" /> {t('accounts.move_up')}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); setOpenMenuId(null); }}
-                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
-                                >
-                                  <ArrowDown className="w-3.5 h-3.5" /> {t('accounts.move_down')}
-                                </button>
-                                <div className="h-px bg-slate-800 my-1" />
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); setOpenMenuId(null); }}
-                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
-                                >
-                                  {matchedAccount?.isHiddenFromNewTx ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                                  {matchedAccount?.isHiddenFromNewTx ? t('accounts.visible') : t('accounts.hidden')}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); setSharingAccountName(acc.accountName); setOpenMenuId(null); }}
-                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
-                                >
-                                  <Share2 className="w-3.5 h-3.5" /> {t('accounts.share')}
-                                </button>
-                                <div className="h-px bg-slate-800 my-1" />
-                                <div className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                  {t('accounts.select_icon', { defaultValue: 'Select Icon' })}
-                                </div>
-                                <div className="grid grid-cols-3 gap-1 px-2 pb-2">
-                                  {[
-                                    { id: 'bank', icon: Building2 },
-                                    { id: 'card', icon: CreditCard },
-                                    { id: 'cash', icon: Coins },
-                                    { id: 'wallet', icon: Wallet },
-                                    { id: 'landmark', icon: Landmark },
-                                    { id: 'other', icon: HelpCircle }
-                                  ].map((iconData) => (
-                                    <button
-                                      key={iconData.id}
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); handleSetAccountIcon(acc.accountName, iconData.id as any); setOpenMenuId(null); }}
-                                      className={`p-2 rounded-lg border transition-all hover:bg-slate-700 flex items-center justify-center ${
-                                        acc.icon === iconData.id 
-                                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' 
-                                          : 'bg-slate-800 border-slate-700 text-slate-400'
-                                      }`}
-                                      title={iconData.id}
-                                    >
-                                      <iconData.icon className="w-3.5 h-3.5" />
-                                    </button>
-                                  ))}
-                                </div>
-                                <div className="h-px bg-slate-800 my-1" />
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); toggleAccountClassification(acc.accountName, false); setOpenMenuId(null); }}
-                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
-                                >
-                                  <Settings className="w-3.5 h-3.5" /> {t('accounts.to_card')}
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Balance Display */}
-                    <div>
-                      {isEditing ? (
-                        <div className="flex items-center space-x-2 my-1" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-xl text-slate-500 font-bold">$</span>
-                          <input
-                            type="number"
-                            step="any"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="w-full px-3 py-2 bg-[#0a0c10] border border-emerald-500/50 rounded-xl text-xl font-bold text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            autoFocus
-                          />
-                        </div>
-                      ) : (
-                        <div className="text-2xl font-bold text-slate-100 tracking-tight">
-                          {formatCurrency(acc.balanceOriginal, acc.originalCurrency as DisplayCurrency)}
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between mt-1">
-                        <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-                          {t('accounts.live_balance')}
-                        </p>
-                        <span className="text-[10px] text-slate-500 font-mono">
-                          {t('accounts.transactions_count', { count: acc.txCount })}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Meta Grid (ARS/USD conversion) */}
-                    <div className="grid grid-cols-2 gap-4 py-3 border-t border-slate-800/40">
-                      <div className="flex flex-col">
-                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">
-                          ARS
-                        </span>
-                        <span className="text-xs font-mono font-bold text-slate-300">
-                          {formatCurrency(acc.currentARS, 'ARS')}
-                        </span>
-                      </div>
-                      <div className="flex flex-col text-right">
-                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">
-                          USD
-                        </span>
-                        <span className="text-xs font-mono font-bold text-slate-300">
-                          {formatCurrency(acc.currentUSD, 'USD')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Footer Actions */}
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-800/40">
-                    {!isEditing ? (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleStartEdit(acc.accountName, acc.currentBalance); }}
-                        className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span>{t('accounts.set_balance')}</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleSaveEdit(acc.accountName, acc.currency); }}
-                        className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>{t('common.save')}</span>
-                      </button>
-                    )}
-                  </div>
-                </Reorder.Item>
-              );
-            })}
-          </Reorder.Group>
-        </div>
-
         {/* Asset Distribution */}
-        <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm flex flex-col">
+        <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm flex flex-col lg:col-span-3">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-slate-100">{t('accounts.liquid_distribution')}</h3>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono uppercase">
