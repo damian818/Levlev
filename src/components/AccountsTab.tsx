@@ -75,38 +75,30 @@ export const AccountsTab = React.memo(function AccountsTab({
   const [editingAccount, setEditingAccount] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
-  const handleMoveAccount = (accName: string, direction: 'up' | 'down') => {
-    if (!onReorderAccounts || !accounts || accounts.length < 2) return;
-    let index = accounts.findIndex(a => a.name.toLowerCase() === accName.toLowerCase());
-    
-    // If account is not in the explicit accounts list (auto-detected), add it first
-    if (index === -1) {
-      const summary = liquidAccounts.find(a => a.accountName.toLowerCase() === accName.toLowerCase()) || 
-                      creditCardAccounts.find(a => a.accountName.toLowerCase() === accName.toLowerCase());
-      if (summary && onAddAccount) {
-        const newAcc: AccountItem = {
-          id: `acc-${Date.now()}`,
-          name: summary.accountName,
-          type: summary.isCreditCard ? 'CREDIT_CARD' : 'CHECKING',
-          currency: summary.currency,
-          order: accounts.length
-        };
-        onAddAccount(newAcc);
-        // We can't immediately reorder because the state update is async, 
-        // but adding it ensures the next reorder attempt will work.
-        // Actually, let's try to do it in one go if possible, but the parent handleReorderAccounts 
-        // expects the full list. For now, adding it is a good first step.
-        return;
-      }
-      return;
-    }
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= accounts.length) return;
+  const [isReorderMode, setIsReorderMode] = useState(false);
 
-    const newAccounts = [...accounts];
-    const [moved] = newAccounts.splice(index, 1);
-    newAccounts.splice(targetIndex, 0, moved);
-    onReorderAccounts(newAccounts);
+  const handleMoveAccount = (accName: string, direction: 'up' | 'down' | 'top' | 'bottom') => {
+    if (!onReorderAccounts) return;
+    const currentOrder = [...allAccountMetrics];
+    const idx = currentOrder.findIndex(a => a.accountName.toLowerCase() === accName.toLowerCase());
+    if (idx === -1) return;
+
+    const newOrder = [...currentOrder];
+    const [moved] = newOrder.splice(idx, 1);
+
+    if (direction === 'top') {
+      newOrder.unshift(moved);
+    } else if (direction === 'bottom') {
+      newOrder.push(moved);
+    } else if (direction === 'up') {
+      const target = Math.max(0, idx - 1);
+      newOrder.splice(target, 0, moved);
+    } else if (direction === 'down') {
+      const target = Math.min(newOrder.length, idx + 1);
+      newOrder.splice(target, 0, moved);
+    }
+
+    handleReorderAllAccounts(newOrder);
   };
 
   const handleReorderAllAccounts = (newOrder: typeof allAccountMetrics) => {
@@ -426,14 +418,126 @@ export const AccountsTab = React.memo(function AccountsTab({
               <span>{t('accounts.your_accounts_title', { defaultValue: 'Your Accounts' })}</span>
             </h3>
             <p className="text-xs text-slate-400">
-              {t('accounts.your_accounts_sub', { defaultValue: 'Manage all your accounts and credit cards in one place. Drag to reorder.' })}
+              {t('accounts.your_accounts_sub', { defaultValue: 'Manage all your accounts and credit cards in one place.' })}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsReorderMode(!isReorderMode)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              isReorderMode
+                ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-lg shadow-emerald-500/20'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+            }`}
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+            <span>{isReorderMode ? t('accounts.done_reordering', { defaultValue: 'Exit Reorder Mode' }) : t('accounts.reorder_mode', { defaultValue: 'Reorder Mode' })}</span>
+          </button>
         </div>
 
         {allAccountMetrics.length === 0 ? (
           <div className="p-6 text-center text-slate-500 bg-[#121620] rounded-xl border border-slate-800 text-xs">
             {t('accounts.no_accounts_yet')}
+          </div>
+        ) : isReorderMode ? (
+          /* Compact Reorder List Mode */
+          <div className="space-y-2">
+            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between text-xs text-slate-400">
+              <span>{t('accounts.drag_or_click', { defaultValue: 'Drag rows or use quick move buttons to easily reorder:' })}</span>
+              <span className="font-bold text-emerald-400">{allAccountMetrics.length} accounts</span>
+            </div>
+            <Reorder.Group 
+              axis="y" 
+              values={allAccountMetrics} 
+              onReorder={handleReorderAllAccounts}
+              className="space-y-2"
+            >
+              {allAccountMetrics.map((acc, index) => {
+                const isCC = acc.isCreditCard;
+                const isFirst = index === 0;
+                const isLast = index === allAccountMetrics.length - 1;
+
+                return (
+                  <Reorder.Item
+                    key={acc.accountName}
+                    value={acc}
+                    className="p-3 rounded-xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all flex items-center justify-between gap-3 cursor-grab active:cursor-grabbing select-none"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="text-slate-500 hover:text-emerald-400 transition-colors">
+                        <GripVertical className="w-4 h-4" />
+                      </div>
+                      <div className={`p-1.5 rounded-lg border text-xs ${isCC ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+                        {getAccountIcon(isCC ? 'CREDIT_CARD' : 'CHECKING', acc.icon)}
+                      </div>
+                      <div className="min-w-0 flex items-center gap-2">
+                        <span className="text-xs sm:text-sm font-bold text-slate-100 truncate">{acc.accountName}</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${isCC ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                          {acc.currency}
+                        </span>
+                        {isCC && (
+                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-200 border border-purple-700/50 uppercase">
+                            CC
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right hidden sm:block">
+                        <span className="text-xs font-mono font-bold text-slate-200">
+                          {isCC 
+                            ? formatCurrency(acc.currentStatement?.netDue || 0, acc.originalCurrency as DisplayCurrency)
+                            : formatCurrency(acc.currentBalance, acc.originalCurrency as DisplayCurrency)
+                          }
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1 bg-[#0a0c10] p-1 rounded-xl border border-slate-800">
+                        <button
+                          type="button"
+                          disabled={isFirst}
+                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'top'); }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-colors text-[10px] font-bold flex items-center gap-0.5"
+                          title="Move to Top"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span className="hidden md:inline">Top</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isFirst}
+                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                          title="Move Up"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isLast}
+                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
+                          title="Move Down"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isLast}
+                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'bottom'); }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-colors text-[10px] font-bold flex items-center gap-0.5"
+                          title="Move to Bottom"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span className="hidden md:inline">Bottom</span>
+                        </button>
+                      </div>
+                    </div>
+                  </Reorder.Item>
+                );
+              })}
+            </Reorder.Group>
           </div>
         ) : (
           <Reorder.Group 
@@ -442,12 +546,14 @@ export const AccountsTab = React.memo(function AccountsTab({
             onReorder={handleReorderAllAccounts}
             className="space-y-3"
           >
-            {allAccountMetrics.map((acc) => {
+            {allAccountMetrics.map((acc, index) => {
               const isCC = acc.isCreditCard;
               const matchedAccount = accounts?.find(a => a.name === acc.accountName);
               const isShared = matchedAccount?.isShared || (matchedAccount?.sharedMembers && matchedAccount.sharedMembers.length > 0);
               const memberCount = matchedAccount?.sharedMembers?.length || 0;
               const menuId = `acc-${acc.accountName}`;
+              const isFirst = index === 0;
+              const isLast = index === allAccountMetrics.length - 1;
 
               // CC specific
               const stmt = acc.currentStatement;
@@ -519,7 +625,49 @@ export const AccountsTab = React.memo(function AccountsTab({
                           {openMenuId === menuId && (
                             <>
                               <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                              <div className="absolute right-0 top-full mt-1 w-48 bg-[#1c2128] border border-slate-700 rounded-xl shadow-2xl z-20 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                              <div className="absolute right-0 top-full mt-1 w-52 bg-[#1c2128] border border-slate-700 rounded-xl shadow-2xl z-20 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                                <div className="px-3 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  {t('accounts.reorder', { defaultValue: 'Move Account' })}
+                                </div>
+                                <div className="grid grid-cols-4 gap-1 px-2 pb-1.5">
+                                  <button
+                                    type="button"
+                                    disabled={isFirst}
+                                    onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'top'); setOpenMenuId(null); }}
+                                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 text-[10px] font-bold flex items-center justify-center gap-0.5 border border-slate-700"
+                                    title="Move to Top"
+                                  >
+                                    <ArrowUp className="w-3 h-3 stroke-[2.5]" /> Top
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isFirst}
+                                    onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); setOpenMenuId(null); }}
+                                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 text-[10px] font-bold flex items-center justify-center border border-slate-700"
+                                    title="Move Up"
+                                  >
+                                    <ArrowUp className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isLast}
+                                    onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); setOpenMenuId(null); }}
+                                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 text-[10px] font-bold flex items-center justify-center border border-slate-700"
+                                    title="Move Down"
+                                  >
+                                    <ArrowDown className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isLast}
+                                    onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'bottom'); setOpenMenuId(null); }}
+                                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 text-[10px] font-bold flex items-center justify-center gap-0.5 border border-slate-700"
+                                    title="Move to Bottom"
+                                  >
+                                    <ArrowDown className="w-3 h-3 stroke-[2.5]" /> Btm
+                                  </button>
+                                </div>
+                                <div className="h-px bg-slate-800 my-1" />
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); setOpenMenuId(null); }}
