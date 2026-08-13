@@ -316,13 +316,13 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2 flex-wrap">
-                <span>Recurring & Income History</span>
+                <span>{t('recurring.title')}</span>
                 <span className="px-2 py-0.5 bg-emerald-950/80 border border-emerald-800/50 text-emerald-300 text-[10px] font-bold rounded-full">
-                  {regularRecurring.length} Identified
+                  {regularRecurring.length} {t('recurring.identified')}
                 </span>
               </h3>
               <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">
-                Subscriptions, salaries, and installments.
+                {t('recurring.sub_salary_cuotas')}
               </p>
             </div>
           </div>
@@ -333,18 +333,18 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
               className="flex items-center justify-center gap-2 px-3 py-1.5 bg-emerald-950/50 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 rounded-lg transition-colors font-semibold"
             >
               <BarChart2 className="w-4 h-4" />
-              <span>Category Trends</span>
+              <span>{t('recurring.category_trends')}</span>
             </button>
             <div className="hidden sm:block h-6 w-px bg-slate-800" />
             <div className="flex justify-between items-center sm:block">
-              <span className="text-slate-400 sm:block text-[9px] sm:text-[10px] font-medium mr-2">Monthly Commitments</span>
+              <span className="text-slate-400 sm:block text-[9px] sm:text-[10px] font-medium mr-2">{t('recurring.monthly_commitments')}</span>
               <span className="text-rose-400 font-bold">
                 {formatCurrencyCompact(totalMonthlyExpense, displayCurrency)}
               </span>
             </div>
             <div className="hidden sm:block h-6 w-px bg-slate-800" />
             <div className="flex justify-between items-center sm:block">
-              <span className="text-slate-400 sm:block text-[9px] sm:text-[10px] font-medium mr-2">Monthly Income</span>
+              <span className="text-slate-400 sm:block text-[9px] sm:text-[10px] font-medium mr-2">{t('recurring.avg_income')}</span>
               <span className="text-emerald-400 font-bold">
                 {formatCurrencyCompact(totalMonthlyIncome, displayCurrency)}
               </span>
@@ -358,7 +358,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder={`${t('common.search')}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-8 pr-3 py-1.5 bg-[#0f131a] border border-slate-700 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
@@ -376,14 +376,14 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                     : 'bg-[#121620] text-slate-400 border border-slate-800 hover:text-slate-200'
                 }`}
               >
-                {mode === 'ALL' && 'All'}
-                {mode === 'EXPENSE' && 'Expenses'}
-                {mode === 'INCOME' && 'Income'}
-                {mode === 'INSTALLMENT' && 'Cuotas'}
+                {mode === 'ALL' && t('common.all')}
+                {mode === 'EXPENSE' && t('recurring.expenses')}
+                {mode === 'INCOME' && t('common.income')}
+                {mode === 'INSTALLMENT' && t('recurring.cuotas')}
                 {mode === 'NON_RECURRING' && (
                   <>
                     <Ban className="w-3 h-3 text-rose-400" />
-                    <span>Excluded ({excludedRecurringItems.length})</span>
+                    <span>{t('recurring.excluded')} ({excludedRecurringItems.length})</span>
                   </>
                 )}
               </button>
@@ -450,9 +450,9 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                     }}
                   />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
-                  <Bar dataKey="expense" name="Proj. Expense" fill="#fb7185" radius={[4, 4, 0, 0]} barSize={20} />
-                  <Bar dataKey="income" name="Proj. Income" fill="#34d399" radius={[4, 4, 0, 0]} barSize={20} />
-                  <Area type="monotone" dataKey="net" name="Net Forecast" fill="#38bdf8" stroke="#38bdf8" fillOpacity={0.1} />
+                  <Bar dataKey="expense" name={t('recurring.proj_expense')} fill="#fb7185" radius={[4, 4, 0, 0]} barSize={20} />
+                  <Bar dataKey="income" name={t('recurring.proj_income')} fill="#34d399" radius={[4, 4, 0, 0]} barSize={20} />
+                  <Area type="monotone" dataKey="net" name={t('recurring.net_forecast')} fill="#38bdf8" stroke="#38bdf8" fillOpacity={0.1} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -482,18 +482,18 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
       {/* Main Grid of Clickable Recurring Cards */}
       <div className="space-y-3">
         <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between px-1">
-          <span>{typeFilter === 'NON_RECURRING' ? 'Excluded Non-Recurring Expenses' : 'Recurring Items'} ({filteredItems.length})</span>
-          <span className="text-[11px] text-emerald-400 font-normal">Click card to view details</span>
+          <span>{typeFilter === 'NON_RECURRING' ? t('recurring.excluded_non_recurring') : t('recurring.recurring_items')} ({filteredItems.length})</span>
+          <span className="text-[11px] text-emerald-400 font-normal">{t('recurring.click_details')}</span>
         </h4>
 
         {filteredItems.length === 0 ? (
           <div className="bg-[#161b22] p-8 rounded-xl border border-slate-800 text-center space-y-2">
             <Repeat className="w-8 h-8 text-slate-600 mx-auto" />
             <p className="text-sm font-semibold text-slate-300">
-              {typeFilter === 'NON_RECURRING' ? 'No items marked as non-recurring' : 'No recurring items matching search filters'}
+              {typeFilter === 'NON_RECURRING' ? t('recurring.no_excluded') : t('recurring.no_matches')}
             </p>
             <p className="text-xs text-slate-500">
-              {typeFilter === 'NON_RECURRING' ? 'To exclude an automatically identified recurring expense, click "Mark Non-Recurring".' : 'Try clearing your search term or selecting All.'}
+              {typeFilter === 'NON_RECURRING' ? t('recurring.exclude_instructions') : t('recurring.clear_search')}
             </p>
           </div>
         ) : (
@@ -518,16 +518,16 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                             ? 'bg-emerald-950/80 border-emerald-800/50 text-emerald-300' 
                             : 'bg-rose-950/80 border-rose-800/50 text-rose-300'
                         }`}>
-                          {item.type}
+                          {isIncome ? t('common.income') : t('common.expense')}
                         </span>
                         {item.isInstallment && (
                           <span className="px-1.5 py-0.5 bg-amber-950/80 border border-amber-800/50 text-amber-300 text-[10px] font-semibold rounded font-mono">
-                            {item.installmentInfo || 'Cuotas'}
+                            {item.installmentInfo || t('recurring.cuotas')}
                           </span>
                         )}
                         {isExcluded && (
                           <span className="px-1.5 py-0.5 bg-rose-950/80 border border-rose-800/50 text-rose-300 text-[9px] font-bold rounded">
-                            Non-recurring
+                            {t('recurring.non_recurring')}
                           </span>
                         )}
                       </div>
@@ -549,17 +549,17 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
 
                     <div className="pt-2.5 border-t border-slate-800/80 space-y-1">
                       <div className="flex justify-between items-baseline text-xs">
-                        <span className="text-slate-400 text-[11px]">Latest Charge:</span>
+                        <span className="text-slate-400 text-[11px]">{t('recurring.latest_charge')}:</span>
                         <span className="font-bold text-slate-100">
                           {formatCurrency(latestConverted, displayCurrency)}
                         </span>
                       </div>
 
                       <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono">
-                        <span>Native: {formatCurrency(item.latestAmount, item.currency as DisplayCurrency)}</span>
+                        <span>{t('recurring.native')}: {formatCurrency(item.latestAmount, item.currency as DisplayCurrency)}</span>
                         <span className="text-emerald-400 font-sans font-semibold flex items-center gap-0.5 group-hover:underline">
                           <TrendingUp className="w-3 h-3" />
-                          <span>View Trend ({item.distinctMonthsCount} mos)</span>
+                          <span>{t('recurring.view_trend')} ({item.distinctMonthsCount} mos)</span>
                         </span>
                       </div>
                     </div>
@@ -571,19 +571,19 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                       <button
                         onClick={() => handleRestoreRecurring(item.title.toLowerCase().trim())}
                         className="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-semibold flex items-center gap-1 transition-colors"
-                        title="Restore to recurring list"
+                        title={t('recurring.restore')}
                       >
                         <RotateCcw className="w-3 h-3" />
-                        <span>Restore Recurring</span>
+                        <span>{t('recurring.restore')}</span>
                       </button>
                     ) : (
                       <button
                         onClick={() => handleMarkNonRecurring(item)}
                         className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded text-[10px] font-semibold flex items-center gap-1 transition-colors"
-                        title="Exclude this item from recurring list"
+                        title={t('recurring.mark_non_recurring')}
                       >
                         <Ban className="w-3 h-3" />
-                        <span>Mark Non-Recurring</span>
+                        <span>{t('recurring.mark_non_recurring')}</span>
                       </button>
                     )}
                   </div>
@@ -602,9 +602,9 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
               <Clock className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-100">Credit Card Installment Plans (Cuotas)</h3>
+              <h3 className="text-base font-bold text-slate-100">{t('recurring.plans_title')}</h3>
               <p className="text-xs text-slate-400">
-                Purchases split across multiple monthly card billing cycles.
+                {t('recurring.plans_desc')}
               </p>
             </div>
           </div>
@@ -612,7 +612,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
             onClick={() => setShowCompletedInstallments(!showCompletedInstallments)}
             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg transition-colors border border-slate-700"
           >
-            {showCompletedInstallments ? 'Hide Completed' : 'Show Completed'}
+            {showCompletedInstallments ? t('recurring.hide_completed') : t('recurring.show_completed')}
           </button>
         </div>
 
@@ -621,30 +621,30 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
             <thead className="bg-[#161b22] text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
               <tr>
                 <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('title')}>
-                  Merchant / Item {installmentsSort?.key === 'title' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                  {t('recurring.merchant_item')} {installmentsSort?.key === 'title' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
                 </th>
                 <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('category')}>
-                  Category {installmentsSort?.key === 'category' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                  {t('common.category')} {installmentsSort?.key === 'category' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
                 </th>
                 <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('account')}>
-                  Card Account {installmentsSort?.key === 'account' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                  {t('recurring.card_account')} {installmentsSort?.key === 'account' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
                 </th>
                 <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('installmentCurrent')}>
-                  Current Installment {installmentsSort?.key === 'installmentCurrent' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                  {t('recurring.current_installment')} {installmentsSort?.key === 'installmentCurrent' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
                 </th>
                 <th className="p-3 cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('period')}>
-                  Period (Start - End) {installmentsSort?.key === 'period' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                  {t('recurring.period_start_end')} {installmentsSort?.key === 'period' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
                 </th>
                 <th className="p-3 text-right cursor-pointer hover:text-slate-200" onClick={() => handleInstallmentsSort('amount')}>
-                  Latest Amount ({displayCurrency}) {installmentsSort?.key === 'amount' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
+                  {t('recurring.latest_amount')} ({displayCurrency}) {installmentsSort?.key === 'amount' && (installmentsSort.direction === 'asc' ? '↑' : '↓')}
                 </th>
-                <th className="p-3 text-center">Actions</th>
+                <th className="p-3 text-center">{t('common.action')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {sortedActiveInstallmentPlans.length === 0 && (!showCompletedInstallments || sortedCompletedInstallmentPlans.length === 0) ? (
                 <tr>
-                  <td colSpan={7} className="p-4 text-center text-slate-500">No installment plans detected.</td>
+                  <td colSpan={7} className="p-4 text-center text-slate-500">{t('recurring.no_plans')}</td>
                 </tr>
               ) : (
                 <>
@@ -674,7 +674,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                         </td>
                         <td className="p-3 text-center">
                           <span className="inline-flex items-center space-x-1 text-[11px] font-semibold text-emerald-400 group-hover:underline">
-                            <span>Trend</span>
+                            <span>{t('recurring.trend')}</span>
                             <ChevronRight className="w-3.5 h-3.5" />
                           </span>
                         </td>
@@ -690,7 +690,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                         className="hover:bg-slate-800/50 transition-colors cursor-pointer group opacity-60"
                       >
                         <td className="p-3 font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                          {plan.title} <span className="ml-1 text-[10px] text-emerald-400 font-normal px-1.5 py-0.5 bg-emerald-950 rounded">Completed</span>
+                          {plan.title} <span className="ml-1 text-[10px] text-emerald-400 font-normal px-1.5 py-0.5 bg-emerald-950 rounded">{t('recurring.completed')}</span>
                         </td>
                         <td className="p-3 text-slate-400">{plan.category}</td>
                         <td className="p-3 text-slate-300 font-medium">{plan.account}</td>
@@ -707,7 +707,7 @@ export function RecurringTab({ transactions, recurringRules, displayCurrency, us
                         </td>
                         <td className="p-3 text-center">
                           <span className="inline-flex items-center space-x-1 text-[11px] font-semibold text-slate-400 group-hover:underline">
-                            <span>Trend</span>
+                            <span>{t('recurring.trend')}</span>
                             <ChevronRight className="w-3.5 h-3.5" />
                           </span>
                         </td>

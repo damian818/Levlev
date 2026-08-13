@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency } from '../types';
 import { analyzeSpending, formatCurrency } from '../utils/financeUtils';
 import { MessageSquare, Send, X, Bot, User, Sparkles, Loader2 } from 'lucide-react';
@@ -20,11 +21,12 @@ export function AiChatWidget({
   displayCurrency,
   usdArsRate,
 }: AiChatWidgetProps) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: 'Hello! I am your AI financial assistant. Ask me anything about your spending, trends, or comparisons (e.g., "Where am I spending more?", "Am I spending more in restaurants than before?").',
+      content: t('ai.chat_intro'),
     },
   ]);
   const [input, setInput] = useState('');
@@ -86,7 +88,7 @@ export function AiChatWidget({
 
       setMessages([...newMessages, { role: 'assistant', content: data.reply }]);
     } catch (err: any) {
-      setMessages([...newMessages, { role: 'assistant', content: `Sorry, I encountered an error: ${err.message}` }]);
+      setMessages([...newMessages, { role: 'assistant', content: t('ai.chat_error', { error: err.message }) }]);
     } finally {
       setLoading(false);
     }
@@ -98,7 +100,7 @@ export function AiChatWidget({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-40 bg-emerald-600 hover:bg-emerald-500 text-white p-3.5 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-        title="Ask AI Financial Assistant"
+        title={t('ai.ask_assistant')}
       >
         <MessageSquare className="w-6 h-6" />
         <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-400 rounded-full animate-ping" />
@@ -115,8 +117,8 @@ export function AiChatWidget({
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-slate-100">AI Financial Assistant</h4>
-                <p className="text-[10px] text-slate-400">Powered by Gemini</p>
+                <h4 className="text-xs font-bold text-slate-100">{t('ai.chat_title')}</h4>
+                <p className="text-[10px] text-slate-400">{t('ai.powered_by')}</p>
               </div>
             </div>
             <button
@@ -151,7 +153,7 @@ export function AiChatWidget({
             {loading && (
               <div className="flex items-center space-x-2 text-slate-400 text-xs py-2">
                 <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                <span>Thinking...</span>
+                <span>{t('ai.thinking')}</span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -160,16 +162,16 @@ export function AiChatWidget({
           {/* Quick Prompts */}
           <div className="px-3 py-2 bg-[#121620]/50 border-t border-slate-800/60 flex gap-1.5 overflow-x-auto text-[11px] no-scrollbar">
             <button
-              onClick={() => setInput("Where am I spending more?")}
+              onClick={() => setInput(t('ai.prompt_spending'))}
               className="px-2.5 py-1 bg-[#1a2234] hover:bg-slate-800 text-slate-300 rounded-lg border border-slate-700 whitespace-nowrap"
             >
-              📊 Where am I spending more?
+              📊 {t('ai.prompt_spending')}
             </button>
             <button
-              onClick={() => setInput("Am I spending more in restaurants than before?")}
+              onClick={() => setInput(t('ai.prompt_restaurants'))}
               className="px-2.5 py-1 bg-[#1a2234] hover:bg-slate-800 text-slate-300 rounded-lg border border-slate-700 whitespace-nowrap"
             >
-              🍽️ Restaurant spending trend?
+              🍽️ {t('ai.prompt_restaurants')}
             </button>
           </div>
 
@@ -179,7 +181,7 @@ export function AiChatWidget({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about your finances..."
+              placeholder={t('ai.chat_placeholder')}
               className="flex-1 bg-[#161b22] border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
             <button

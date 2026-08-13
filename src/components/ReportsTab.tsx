@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency } from '../types';
 import { convertCurrency, formatCurrency, formatCurrencyCompact } from '../utils/financeUtils';
 import { 
@@ -26,6 +27,7 @@ export function ReportsTab({
   currentUserId,
   showSharedData = true,
 }: ReportsTabProps) {
+  const { t } = useTranslation();
   // Time range state
   const [timeRange, setTimeRange] = useState<'6M' | '12M' | 'ALL'>('12M');
   const [chartMode, setChartMode] = useState<'NATIVE_CURRENCY' | 'CONVERTED'>('NATIVE_CURRENCY');
@@ -497,10 +499,10 @@ export function ReportsTab({
 
       if (m.isFuture) {
         doc.setTextColor(217, 119, 6);
-        doc.text('Scheduled', 42, currentY + 3);
+        doc.text(t('reports.scheduled'), 42, currentY + 3);
       } else {
         doc.setTextColor(16, 185, 129);
-        doc.text('Actual', 42, currentY + 3);
+        doc.text(t('reports.actual'), 42, currentY + 3);
       }
 
       doc.setTextColor(51, 65, 85);
@@ -515,7 +517,7 @@ export function ReportsTab({
     // Page number footer
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
-    doc.text(`LevLev Executive Financial Report • Page ${pageNum}`, 14, 288);
+    doc.text(`LevLev Executive Financial Report • ${t('reports.month')} ${pageNum}`, 14, 288);
 
     doc.save(`LevLev_Financial_Report_${displayCurrency}_${timeRange}.pdf`);
   };
@@ -548,7 +550,7 @@ export function ReportsTab({
       return (
         <div className="bg-[#161b22] border border-slate-700 p-3.5 rounded-xl shadow-xl text-xs space-y-2 min-w-[240px]">
           <div className="border-b border-slate-700/80 pb-1 flex justify-between items-center gap-4">
-            <span className="font-bold text-slate-200">Period: {label}</span>
+            <span className="font-bold text-slate-200">{t('reports.period')}: {label}</span>
             <span className="text-[10px] text-slate-400 font-mono">
               $1 USD = ${usdArsRate} ARS
             </span>
@@ -592,9 +594,9 @@ export function ReportsTab({
               <BarChart3 className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-100">Financial Performance Reports</h1>
+              <h1 className="text-xl font-bold text-slate-100">{t('reports.title')}</h1>
               <p className="text-xs text-slate-400">
-                Monthly income vs expense breakdown color-coded by currency (ARS vs USD)
+                {t('reports.subtitle')}
               </p>
             </div>
           </div>
@@ -610,7 +612,7 @@ export function ReportsTab({
                 timeRange === '6M' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              6 Months
+              {t('reports.time_6m')}
             </button>
             <button
               onClick={() => setTimeRange('12M')}
@@ -618,7 +620,7 @@ export function ReportsTab({
                 timeRange === '12M' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              12 Months
+              {t('reports.time_12m')}
             </button>
             <button
               onClick={() => setTimeRange('ALL')}
@@ -626,7 +628,7 @@ export function ReportsTab({
                 timeRange === 'ALL' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              All Time
+              {t('reports.time_all')}
             </button>
           </div>
 
@@ -636,7 +638,7 @@ export function ReportsTab({
             onChange={(e) => setSelectedCategoryFilter(e.target.value)}
             className="px-3 py-1.5 bg-[#0f131a] border border-slate-800 text-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-purple-500 font-medium"
           >
-            <option value="ALL">All Categories</option>
+            <option value="ALL">{t('reports.all_categories')}</option>
             {categoriesList.map(cat => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
@@ -648,7 +650,7 @@ export function ReportsTab({
             className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ml-auto md:ml-0"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Export Report</span>
+            <span>{t('reports.export_report')}</span>
           </button>
         </div>
       </div>
@@ -658,7 +660,7 @@ export function ReportsTab({
         {/* Total Income Card */}
         <div className="bg-[#121620] border border-slate-800/80 rounded-2xl p-4 space-y-2 shadow-md">
           <div className="flex justify-between items-center text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            <span>Total Period Income</span>
+            <span>{t('reports.total_income')}</span>
             <span className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
               <ArrowUpRight className="w-4 h-4" />
             </span>
@@ -679,7 +681,7 @@ export function ReportsTab({
         {/* Total Expenses Card */}
         <div className="bg-[#121620] border border-slate-800/80 rounded-2xl p-4 space-y-2 shadow-md">
           <div className="flex justify-between items-center text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            <span>Total Period Expenses</span>
+            <span>{t('reports.total_expenses')}</span>
             <span className="p-1.5 bg-rose-500/10 text-rose-400 rounded-lg">
               <ArrowDownRight className="w-4 h-4" />
             </span>
@@ -700,7 +702,7 @@ export function ReportsTab({
         {/* Net Savings & Savings Rate */}
         <div className="bg-[#121620] border border-slate-800/80 rounded-2xl p-4 space-y-2 shadow-md">
           <div className="flex justify-between items-center text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            <span>Net Cash Flow</span>
+            <span>{t('reports.net_cash_flow')}</span>
             <span className={`p-1.5 rounded-lg ${summaryMetrics.netSavingsConverted >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
               <TrendingUp className="w-4 h-4" />
             </span>
@@ -709,7 +711,7 @@ export function ReportsTab({
             {formatCurrency(summaryMetrics.netSavingsConverted, displayCurrency)}
           </div>
           <div className="text-xs text-slate-400 pt-1 flex items-center justify-between">
-            <span>Savings Rate:</span>
+            <span>{t('reports.savings_rate')}:</span>
             <span className={`font-bold px-2 py-0.5 rounded text-[11px] ${summaryMetrics.savingsRate >= 20 ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'}`}>
               {summaryMetrics.savingsRate.toFixed(1)}%
             </span>
@@ -719,7 +721,7 @@ export function ReportsTab({
         {/* Monthly Average */}
         <div className="bg-[#121620] border border-slate-800/80 rounded-2xl p-4 space-y-2 shadow-md">
           <div className="flex justify-between items-center text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            <span>Monthly Run-Rate</span>
+            <span>{t('reports.monthly_run_rate')}</span>
             <span className="p-1.5 bg-purple-500/10 text-purple-400 rounded-lg">
               <Calendar className="w-4 h-4" />
             </span>
@@ -729,7 +731,7 @@ export function ReportsTab({
             <span className="text-xs font-normal text-slate-400"> / mo</span>
           </div>
           <div className="text-xs text-slate-400 pt-1 flex items-center justify-between">
-            <span>Avg Income:</span>
+            <span>{t('reports.avg_income')}:</span>
             <span className="font-bold text-emerald-400">
               {formatCurrency(summaryMetrics.avgMonthlyIncome, displayCurrency)}
             </span>
@@ -742,13 +744,13 @@ export function ReportsTab({
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800/80 pb-4">
           <div>
             <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <span>Monthly Expenses vs Income</span>
+              <span>{t('reports.chart_title')}</span>
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                Color-Coded by Currency
+                {t('reports.color_coded')}
               </span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Compare actual vs future scheduled income and expenses per month
+              {t('reports.chart_subtitle')}
             </p>
           </div>
 
@@ -761,7 +763,7 @@ export function ReportsTab({
                   chartMode === 'NATIVE_CURRENCY' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Native Breakdown (ARS/USD)
+                {t('reports.native_breakdown')}
               </button>
               <button
                 onClick={() => setChartMode('CONVERTED')}
@@ -769,7 +771,7 @@ export function ReportsTab({
                   chartMode === 'CONVERTED' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Total Converted ({displayCurrency})
+                {t('reports.total_converted')} ({displayCurrency})
               </button>
             </div>
 
@@ -781,18 +783,18 @@ export function ReportsTab({
                   className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
                     barStyle === 'STACKED' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
                   }`}
-                  title="Stacked Bars"
+                  title={t('reports.stacked')}
                 >
-                  Stacked
+                  {t('reports.stacked')}
                 </button>
                 <button
                   onClick={() => setBarStyle('GROUPED')}
                   className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
                     barStyle === 'GROUPED' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
                   }`}
-                  title="Grouped Bars"
+                  title={t('reports.grouped')}
                 >
-                  Grouped
+                  {t('reports.grouped')}
                 </button>
               </div>
             )}
@@ -804,23 +806,23 @@ export function ReportsTab({
           <div className="flex flex-wrap items-center justify-center gap-6 text-[10px] bg-[#0f131a] p-3 rounded-xl border border-slate-800/80">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.incomeTotal }}></span>
-              <span className="text-slate-300 font-medium">Owned Income ({displayCurrency})</span>
+              <span className="text-slate-300 font-medium">{t('reports.owned_income')} ({displayCurrency})</span>
             </div>
             {showSharedData && (
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedIncomeTotal }}></span>
-                <span className="text-purple-400 font-bold">Shared Income ({displayCurrency})</span>
+                <span className="text-purple-400 font-bold">{t('reports.shared_income')} ({displayCurrency})</span>
               </div>
             )}
             <div className="w-px h-3 bg-slate-800"></div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.expenseTotal }}></span>
-              <span className="text-slate-300 font-medium">Owned Expense ({displayCurrency})</span>
+              <span className="text-slate-300 font-medium">{t('reports.owned_expense')} ({displayCurrency})</span>
             </div>
             {showSharedData && (
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedExpenseTotal }}></span>
-                <span className="text-amber-500 font-bold">Shared Expense ({displayCurrency})</span>
+                <span className="text-amber-500 font-bold">{t('reports.shared_expense')} ({displayCurrency})</span>
               </div>
             )}
           </div>
@@ -829,21 +831,21 @@ export function ReportsTab({
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.incomeARS }}></span>
-                <span className="text-slate-300 font-medium">Income ARS</span>
+                <span className="text-slate-300 font-medium">{t('reports.income_ars')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.incomeUSD }}></span>
-                <span className="text-slate-300 font-medium">Income USD</span>
+                <span className="text-slate-300 font-medium">{t('reports.income_usd')}</span>
               </div>
               {showSharedData && (
                 <>
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedIncomeARS }}></span>
-                    <span className="text-purple-400 font-bold">Shared Income ARS</span>
+                    <span className="text-purple-400 font-bold">{t('reports.shared_income_ars')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedIncomeUSD }}></span>
-                    <span className="text-purple-400 font-bold">Shared Income USD</span>
+                    <span className="text-purple-400 font-bold">{t('reports.shared_income_usd')}</span>
                   </div>
                 </>
               )}
@@ -852,21 +854,21 @@ export function ReportsTab({
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.expenseARS }}></span>
-                <span className="text-slate-300 font-medium">Expense ARS</span>
+                <span className="text-slate-300 font-medium">{t('reports.expense_ars')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.expenseUSD }}></span>
-                <span className="text-slate-300 font-medium">Expense USD</span>
+                <span className="text-slate-300 font-medium">{t('reports.expense_usd')}</span>
               </div>
               {showSharedData && (
                 <>
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedExpenseARS }}></span>
-                    <span className="text-amber-500 font-bold">Shared Expense ARS</span>
+                    <span className="text-amber-500 font-bold">{t('reports.shared_expense_ars')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.sharedExpenseUSD }}></span>
-                    <span className="text-amber-500 font-bold">Shared Expense USD</span>
+                    <span className="text-amber-500 font-bold">{t('reports.shared_expense_usd')}</span>
                   </div>
                 </>
               )}
@@ -902,7 +904,7 @@ export function ReportsTab({
                 {/* Scheduled Income ARS */}
                 <Bar 
                   dataKey="scheduledIncomeARS_Converted" 
-                  name="Scheduled Income ARS" 
+                  name={t('reports.scheduled_income_ars')} 
                   fill={COLORS.incomeARS}
                   fillOpacity={0.4}
                   stroke={COLORS.incomeARS}
@@ -913,7 +915,7 @@ export function ReportsTab({
                 {/* Scheduled Income USD */}
                 <Bar 
                   dataKey="scheduledIncomeUSD_Converted" 
-                  name="Scheduled Income USD" 
+                  name={t('reports.scheduled_income_usd')} 
                   fill={COLORS.incomeUSD} 
                   fillOpacity={0.4}
                   stroke={COLORS.incomeUSD}
@@ -924,7 +926,7 @@ export function ReportsTab({
                 {/* Income ARS */}
                 <Bar 
                   dataKey="incomeARS_Converted" 
-                  name="Income ARS" 
+                  name={t('reports.income_ars')} 
                   fill={COLORS.incomeARS} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
@@ -932,7 +934,7 @@ export function ReportsTab({
                 {/* Shared Income ARS */}
                 <Bar 
                   dataKey="sharedIncomeARS_Converted" 
-                  name="Shared Income ARS" 
+                  name={t('reports.shared_income_ars')} 
                   fill={COLORS.sharedIncomeARS} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
@@ -940,7 +942,7 @@ export function ReportsTab({
                 {/* Income USD */}
                 <Bar 
                   dataKey="incomeUSD_Converted" 
-                  name="Income USD" 
+                  name={t('reports.income_usd')} 
                   fill={COLORS.incomeUSD} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={[4, 4, 0, 0]} 
@@ -948,7 +950,7 @@ export function ReportsTab({
                 {/* Shared Income USD */}
                 <Bar 
                   dataKey="sharedIncomeUSD_Converted" 
-                  name="Shared Income USD" 
+                  name={t('reports.shared_income_usd')} 
                   fill={COLORS.sharedIncomeUSD} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={[4, 4, 0, 0]} 
@@ -956,7 +958,7 @@ export function ReportsTab({
                 {/* Scheduled Expense ARS */}
                 <Bar 
                   dataKey="scheduledExpenseARS_Converted" 
-                  name="Scheduled Expense ARS" 
+                  name={t('reports.scheduled_expense_ars')} 
                   fill={COLORS.expenseARS} 
                   fillOpacity={0.4}
                   stroke={COLORS.expenseARS}
@@ -967,7 +969,7 @@ export function ReportsTab({
                 {/* Scheduled Expense USD */}
                 <Bar 
                   dataKey="scheduledExpenseUSD_Converted" 
-                  name="Scheduled Expense USD" 
+                  name={t('reports.scheduled_expense_usd')} 
                   fill={COLORS.expenseUSD} 
                   fillOpacity={0.4}
                   stroke={COLORS.expenseUSD}
@@ -978,7 +980,7 @@ export function ReportsTab({
                 {/* Expense ARS */}
                 <Bar 
                   dataKey="expenseARS_Converted" 
-                  name="Expense ARS" 
+                  name={t('reports.expense_ars')} 
                   fill={COLORS.expenseARS} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
@@ -986,7 +988,7 @@ export function ReportsTab({
                 {/* Shared Expense ARS */}
                 <Bar 
                   dataKey="sharedExpenseARS_Converted" 
-                  name="Shared Expense ARS" 
+                  name={t('reports.shared_expense_ars')} 
                   fill={COLORS.sharedExpenseARS} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
@@ -994,7 +996,7 @@ export function ReportsTab({
                 {/* Expense USD */}
                 <Bar 
                   dataKey="expenseUSD_Converted" 
-                  name="Expense USD" 
+                  name={t('reports.expense_usd')} 
                   fill={COLORS.expenseUSD} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={[4, 4, 0, 0]} 
@@ -1002,7 +1004,7 @@ export function ReportsTab({
                 {/* Shared Expense USD */}
                 <Bar 
                   dataKey="sharedExpenseUSD_Converted" 
-                  name="Shared Expense USD" 
+                  name={t('reports.shared_expense_usd')} 
                   fill={COLORS.sharedExpenseUSD} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={[4, 4, 0, 0]} 
@@ -1033,7 +1035,7 @@ export function ReportsTab({
                 
                 <Bar 
                   dataKey="scheduledIncomeConverted" 
-                  name={`Scheduled Income (${displayCurrency})`} 
+                  name={`${t('reports.scheduled')} ${t('reports.income')} (${displayCurrency})`} 
                   fill={COLORS.incomeTotal} 
                   fillOpacity={0.4}
                   stroke={COLORS.incomeTotal}
@@ -1043,21 +1045,21 @@ export function ReportsTab({
                 />
                 <Bar 
                   dataKey="incomeConverted" 
-                  name={`Actual Income (${displayCurrency})`} 
+                  name={`${t('reports.actual')} ${t('reports.income')} (${displayCurrency})`} 
                   fill={COLORS.incomeTotal} 
                   stackId="income"
                   radius={[4, 4, 0, 0]} 
                 />
                 <Bar 
                   dataKey="sharedIncomeConverted" 
-                  name={`Shared Income (${displayCurrency})`} 
+                  name={`${t('reports.shared_income')} (${displayCurrency})`} 
                   fill={COLORS.sharedIncomeTotal} 
                   stackId="income"
                   radius={[4, 4, 0, 0]} 
                 />
                 <Bar 
                   dataKey="scheduledExpenseConverted" 
-                  name={`Scheduled Expense (${displayCurrency})`} 
+                  name={`${t('reports.scheduled')} ${t('reports.expense')} (${displayCurrency})`} 
                   fill={COLORS.expenseTotal} 
                   fillOpacity={0.4}
                   stroke={COLORS.expenseTotal}
@@ -1067,14 +1069,14 @@ export function ReportsTab({
                 />
                 <Bar 
                   dataKey="expenseConverted" 
-                  name={`Actual Expense (${displayCurrency})`} 
+                  name={`${t('reports.actual')} ${t('reports.expense')} (${displayCurrency})`} 
                   fill={COLORS.expenseTotal} 
                   stackId="expense"
                   radius={[4, 4, 0, 0]} 
                 />
                 <Bar 
                   dataKey="sharedExpenseConverted" 
-                  name={`Shared Expense (${displayCurrency})`} 
+                  name={`${t('reports.shared_expense')} (${displayCurrency})`} 
                   fill={COLORS.sharedExpenseTotal} 
                   stackId="expense"
                   radius={[4, 4, 0, 0]} 
@@ -1091,12 +1093,12 @@ export function ReportsTab({
         <div className="bg-[#121620] border border-slate-800/80 rounded-2xl p-4 sm:p-6 shadow-lg space-y-4">
           <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
             <PieChartIcon className="w-4 h-4 text-purple-400" />
-            <span>Category Spending Distribution</span>
+            <span>{t('reports.category_performance')}</span>
           </h2>
 
           {categoryBreakdownData.length === 0 ? (
             <div className="h-64 flex items-center justify-center text-slate-500 text-xs">
-              No expense data available for selected criteria.
+              {t('reports.no_category_data')}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
@@ -1117,7 +1119,7 @@ export function ReportsTab({
                       ))}
                     </Pie>
                     <Tooltip 
-                      formatter={(value: any) => [formatCurrency(Number(value), displayCurrency), 'Spent']} 
+                      formatter={(value: any) => [formatCurrency(Number(value), displayCurrency), t('reports.expense')]} 
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -1148,7 +1150,7 @@ export function ReportsTab({
         <div className="bg-[#121620] border border-slate-800/80 rounded-2xl p-4 sm:p-6 shadow-lg space-y-4">
           <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <span>Net Monthly Cash Flow Trend</span>
+            <span>{t('reports.savings_trend')}</span>
           </h2>
 
           <div className="h-60 w-full pt-2">
@@ -1162,11 +1164,11 @@ export function ReportsTab({
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                 <XAxis dataKey="month" stroke="#6b7280" fontSize={11} tickLine={false} />
-                <YAxis stroke="#6b7280" fontSize={10} tickLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
+                <YAxis stroke="#6b7280" fontSize={10} tickLine={false} tickFormatter={(v) => `${v / 1000}k`} />
                 <Tooltip 
-                  formatter={(val: any) => [formatCurrency(Number(val), displayCurrency), 'Net Savings']} 
+                  formatter={(val: any) => [formatCurrency(Number(val), displayCurrency), t('reports.net_cash_flow')]} 
                 />
-                <Area type="monotone" dataKey="netConverted" name="Net Flow" stroke="#10b981" fillOpacity={1} fill="url(#colorNet)" strokeWidth={2} />
+                <Area type="monotone" dataKey="netConverted" name={t('reports.net_flow')} stroke="#10b981" fillOpacity={1} fill="url(#colorNet)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

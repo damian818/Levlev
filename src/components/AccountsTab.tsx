@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule, AccountItem, SharedMember } from '../types';
 import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString, getTransferOutflow, getTransferInflow } from '../utils/financeUtils';
-import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, Eye, EyeOff } from 'lucide-react';
+import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, Eye, EyeOff, MoreVertical, Trash2 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { CreditCardDetailModal } from './CreditCardDetailModal';
 import { ShareAccountModal } from './ShareAccountModal';
@@ -96,37 +96,7 @@ export function AccountsTab({
   // Selected account for sharing modal
   const [sharingAccountName, setSharingAccountName] = useState<string | null>(null);
 
-  // Custom user overrides for account classification (persisted in local state/storage)
-  const [customCCMap, setCustomCCMap] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem('finance_app_cc_map');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return {};
-  });
-
-  // Credit Card closing rules map
-  const [ccRulesMap, setCcRulesMap] = useState<Record<string, CreditCardClosingRule>>(() => {
-    let map: Record<string, CreditCardClosingRule> = {};
-    try {
-      const saved = localStorage.getItem('finance_app_cc_rules');
-      if (saved) map = JSON.parse(saved);
-    } catch (e) {}
-    accounts?.forEach(acc => {
-      if (acc.closingRule && !map[acc.name]) {
-        map[acc.name] = acc.closingRule;
-      }
-    });
-    return map;
-  });
-
   const handleSaveCcRule = (accName: string, rule: CreditCardClosingRule) => {
-    const updated = { ...ccRulesMap, [accName]: rule };
-    setCcRulesMap(updated);
-    try {
-      localStorage.setItem('finance_app_cc_rules', JSON.stringify(updated));
-    } catch (e) {}
-
     const existingAcc = accounts.find(a => a.name.toLowerCase() === accName.toLowerCase());
     if (existingAcc && onEditAccount) {
       onEditAccount(existingAcc.name, { ...existingAcc, closingRule: rule }, false);
@@ -135,11 +105,6 @@ export function AccountsTab({
 
   const toggleAccountClassification = (accName: string, currentIsCC: boolean) => {
     const nextIsCC = !currentIsCC;
-    const updated = { ...customCCMap, [accName]: nextIsCC };
-    setCustomCCMap(updated);
-    try {
-      localStorage.setItem('finance_app_cc_map', JSON.stringify(updated));
-    } catch (e) {}
 
     const existingAcc = accounts.find(a => a.name.toLowerCase() === accName.toLowerCase());
     if (existingAcc && onEditAccount) {
@@ -150,7 +115,7 @@ export function AccountsTab({
         name: accName,
         type: nextIsCC ? 'CREDIT_CARD' : 'CHECKING',
         currency: accName.toLowerCase().includes('usd') ? 'USD' : 'ARS',
-        closingRule: ccRulesMap[accName] || { ruleType: 'FIXED_DAY', fixedDay: 25 },
+        closingRule: { ruleType: 'FIXED_DAY', fixedDay: 25 },
       });
     }
   };
@@ -185,8 +150,9 @@ export function AccountsTab({
     const currentARS = summary.balanceARS;
     const currentUSD = summary.balanceUSD;
 
-    const isCC = isCreditCardAccount(name, customCCMap, accounts);
-    const accountRule = ccRulesMap[name] || { ruleType: 'FIXED_DAY', fixedDay: 25 };
+    const accItem = accounts.find(a => a.name === name);
+    const isCC = accItem?.type === 'CREDIT_CARD' || isCreditCardAccount(name, [], accounts);
+    const accountRule = accItem?.closingRule || { ruleType: 'FIXED_DAY', fixedDay: 25 };
 
     // If it's a credit card, compute statement summary based on current date & time
     const statements = isCC ? getCreditCardStatements(filteredTransactions, name, accountRule, periodStatusOverrides) : [];
@@ -234,6 +200,8 @@ export function AccountsTab({
   const netWorthARS = totalLiquidARS - totalCcDebtARS;
   const netWorthUSD = totalLiquidUSD - totalCcDebtUSD;
 
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
   const pieData = useMemo(() => {
     return liquidAccounts
       .filter(acc => (displayCurrency === 'USD' ? acc.currentUSD : acc.currentARS) > 0)
@@ -264,12 +232,12 @@ export function AccountsTab({
     return {
       id: `acc_${sharingAccountName}`,
       name: sharingAccountName,
-      type: isCreditCardAccount(sharingAccountName, customCCMap) ? ('CREDIT_CARD' as const) : ('CHECKING' as const),
+      type: (accounts.find(a => a.name === sharingAccountName)?.type === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'CHECKING') as any,
       currency: liquidAccounts.find(a => a.accountName === sharingAccountName)?.currency || creditCardAccounts.find(a => a.accountName === sharingAccountName)?.currency || 'ARS',
       isShared: false,
       sharedMembers: [],
     };
-  }, [sharingAccountName, accounts, liquidAccounts, creditCardAccounts, customCCMap]);
+  }, [sharingAccountName, accounts, liquidAccounts, creditCardAccounts]);
 
   return (
     <div className="space-y-6">
@@ -378,147 +346,144 @@ export function AccountsTab({
               const matchedAccount = accounts?.find(a => a.name === acc.accountName);
               const isShared = matchedAccount?.isShared || (matchedAccount?.sharedMembers && matchedAccount.sharedMembers.length > 0);
               const memberCount = matchedAccount?.sharedMembers?.length || 0;
+              const menuId = `cc-${acc.accountName}`;
 
               return (
                 <div
                   key={acc.accountName}
-                  className="p-4 rounded-xl border border-purple-500/20 bg-[#121620] hover:border-purple-500/50 transition-all space-y-3.5 flex flex-col justify-between"
+                  className="p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all shadow-sm flex flex-col relative group"
                 >
-                  <div className="space-y-3">
-                    {/* Header: Title + Primary Action */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1 min-w-0">
-                        <h4 className="text-base font-bold text-slate-100 truncate flex items-center gap-2">
-                          <CreditCard className="w-4 h-4 text-purple-400 shrink-0" />
-                          <span className="truncate">{acc.accountName}</span>
-                        </h4>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-md">
-                            {t('common.credit_card')} ({acc.currency})
-                          </span>
-                          {isShared && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
-                              <Users className="w-2.5 h-2.5" /> {t('accounts.shared')} ({memberCount})
+                  {/* Card Content */}
+                  <div className="flex-1 space-y-4">
+                    {/* Top Header */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                          <CreditCard className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-slate-100 truncate">{acc.accountName}</h4>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[9px] font-bold uppercase text-purple-300/80">
+                              {acc.currency}
                             </span>
-                          )}
-                          {matchedAccount?.ownerId && currentUserId && matchedAccount.ownerId !== currentUserId && (
-                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30 text-[9px] font-bold">{t('accounts.workspace')}</span>
-                          )}
-                          {matchedAccount?.isHiddenFromNewTx && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
-                              <EyeOff className="w-2.5 h-2.5" /> {t('accounts.hidden')}
-                            </span>
-                          )}
+                            {isShared && (
+                              <span className="w-1 h-1 rounded-full bg-slate-700" />
+                            )}
+                            {isShared && (
+                              <span className="text-[9px] font-bold text-purple-400 flex items-center gap-1">
+                                <Users className="w-2.5 h-2.5" /> {memberCount}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCardAccount(acc.accountName)}
-                        className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-600 border border-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shadow-sm shrink-0"
-                      >
-                        <span>{t('accounts.details')}</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Statement metrics box */}
-                    <div className="p-3 bg-[#161b22] rounded-xl border border-slate-800 grid grid-cols-2 gap-3 text-xs">
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-medium block">{t('accounts.current_statement_due')}</span>
-                        <span className={`text-base font-bold ${netDue > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                          {formatCurrency(netDue, acc.originalCurrency as DisplayCurrency)}
-                        </span>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-400 font-medium block">{t('accounts.closing_schedule')}</span>
-                        <span className="text-xs font-semibold text-purple-300">
-                          {getClosingRuleLabel(acc.closingRule)}
-                        </span>
-                        {nextClose && (
-                          <span className="text-[10px] text-slate-400 block font-mono mt-0.5">
-                            {t('accounts.next_close_label')} {nextClose}
-                          </span>
+                      <div className="flex items-center gap-1">
+                        {matchedAccount?.isHiddenFromNewTx && (
+                          <div className="p-1 rounded-lg bg-amber-500/10 text-amber-500/80" title={t('accounts.hidden')}>
+                            <EyeOff className="w-3.5 h-3.5" />
+                          </div>
                         )}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === menuId ? null : menuId); }}
+                            className="p-2 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+
+                          {openMenuId === menuId && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                              <div className="absolute right-0 top-full mt-1 w-48 bg-[#1c2128] border border-slate-700 rounded-xl shadow-2xl z-20 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); setOpenMenuId(null); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                                >
+                                  <ArrowUp className="w-3.5 h-3.5" /> {t('accounts.move_up')}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); setOpenMenuId(null); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                                >
+                                  <ArrowDown className="w-3.5 h-3.5" /> {t('accounts.move_down')}
+                                </button>
+                                <div className="h-px bg-slate-800 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); setOpenMenuId(null); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                                >
+                                  {matchedAccount?.isHiddenFromNewTx ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                  {matchedAccount?.isHiddenFromNewTx ? t('accounts.visible') : t('accounts.hidden')}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setSharingAccountName(acc.accountName); setOpenMenuId(null); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                                >
+                                  <Share2 className="w-3.5 h-3.5" /> {t('accounts.share')}
+                                </button>
+                                <div className="h-px bg-slate-800 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); toggleAccountClassification(acc.accountName, true); setOpenMenuId(null); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                                >
+                                  <Settings className="w-3.5 h-3.5" /> {t('accounts.to_bank')}
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center text-[11px] text-slate-400 pt-0.5">
-                      <span>{t('accounts.transactions_count', { count: acc.txCount })}</span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCardAccount(acc.accountName)}
-                        className="text-purple-400 hover:text-purple-300 font-medium underline"
-                      >
-                        {t('accounts.record_payment')}
-                      </button>
+                    {/* Balance Display */}
+                    <div>
+                      <div className="text-2xl font-bold text-slate-100 tracking-tight">
+                        {formatCurrency(netDue, acc.originalCurrency as DisplayCurrency)}
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">
+                        {t('accounts.current_statement_due')}
+                      </p>
+                    </div>
+
+                    {/* Meta Grid */}
+                    <div className="grid grid-cols-2 gap-4 py-3 border-y border-slate-800/60">
+                      <div>
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">
+                          {t('accounts.closing_schedule')}
+                        </span>
+                        <span className="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3" /> {getClosingRuleLabel(acc.closingRule)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">
+                          {t('accounts.next_close_label')}
+                        </span>
+                        <span className="text-xs font-mono font-bold text-slate-300">
+                          {nextClose || '-'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Card Utilities Footer Bar */}
-                  <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/80 text-xs gap-1.5 flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      {/* Reorder Up / Down */}
-                      <div className="flex items-center bg-[#161b22] border border-slate-700/70 rounded-lg overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); }}
-                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
-                          title={t('accounts.move_up')}
-                        >
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); }}
-                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors border-l border-slate-700/70"
-                          title={t('accounts.move_down')}
-                        >
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Hide / Unhide from new transactions selection */}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); }}
-                        className={`px-2 py-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
-                          matchedAccount?.isHiddenFromNewTx
-                            ? 'bg-amber-950/70 border-amber-700/60 text-amber-300'
-                            : 'bg-[#161b22] border-slate-700/70 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                        }`}
-                        title={matchedAccount?.isHiddenFromNewTx ? t('accounts.hidden_from_new_tx') : t('accounts.hide_from_new_tx')}
-                      >
-                        {matchedAccount?.isHiddenFromNewTx ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        <span className="text-[11px] font-medium">{matchedAccount?.isHiddenFromNewTx ? t('accounts.hidden') : t('accounts.visible')}</span>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setSharingAccountName(acc.accountName); }}
-                        className="px-2.5 py-1.5 bg-[#161b22] hover:bg-purple-950/40 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
-                        title={t('accounts.share')}
-                      >
-                        <Share2 className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">{t('accounts.share')}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleAccountClassification(acc.accountName, true);
-                        }}
-                        className="px-2.5 py-1.5 bg-[#161b22] hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/70 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
-                        title={t('accounts.to_bank')}
-                      >
-                        <Settings className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">{t('accounts.to_bank')}</span>
-                      </button>
-                    </div>
+                  {/* Footer Actions */}
+                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-800/40">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCardAccount(acc.accountName)}
+                      className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2"
+                    >
+                      <span>{t('accounts.details')}</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               );
@@ -547,172 +512,180 @@ export function AccountsTab({
               const matchedAccount = accounts?.find(a => a.name === acc.accountName);
               const isShared = matchedAccount?.isShared || (matchedAccount?.sharedMembers && matchedAccount.sharedMembers.length > 0);
               const memberCount = matchedAccount?.sharedMembers?.length || 0;
+              const menuId = `liquid-${acc.accountName}`;
 
               return (
                 <div 
                   key={acc.accountName} 
-                  className="p-4 rounded-xl border border-slate-800 bg-[#121620] hover:border-emerald-500/50 hover:bg-[#1a212d] transition-all cursor-pointer space-y-3.5 flex flex-col justify-between group"
+                  className="p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all cursor-pointer shadow-sm flex flex-col relative group"
                   onClick={(e) => {
                     if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
                     onNavigateToTransactionsWithFilter({ account: acc.accountName });
                   }}
                 >
-                  <div className="space-y-3">
-                    {/* Header: Title + Primary Action */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1 min-w-0">
-                        <h4 className="text-base font-bold text-slate-100 truncate flex items-center">
-                          <span>{acc.accountName}</span>
-                          <ExternalLink className="w-3.5 h-3.5 ml-1.5 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
-                        </h4>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-slate-800 text-slate-300 border border-slate-700/80 rounded-md">
-                            {acc.currency}
-                          </span>
-                          {isShared && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
-                              <Users className="w-2.5 h-2.5" /> {t('accounts.shared')} ({memberCount})
+                  <div className="flex-1 space-y-4">
+                    {/* Top Header */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                          <Landmark className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-slate-100 truncate flex items-center">
+                            <span>{acc.accountName}</span>
+                            <ExternalLink className="w-3 h-3 ml-1.5 opacity-0 group-hover:opacity-40 transition-opacity shrink-0" />
+                          </h4>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[9px] font-bold uppercase text-emerald-300/80">
+                              {acc.currency}
                             </span>
-                          )}
-                          {matchedAccount?.ownerId && currentUserId && matchedAccount.ownerId !== currentUserId && (
-                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30 text-[9px] font-bold">{t('accounts.workspace')}</span>
-                          )}
-                          {acc.hasCustom && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                              {t('accounts.calibrated')}
-                            </span>
-                          )}
-                          {matchedAccount?.isHiddenFromNewTx && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
-                              <EyeOff className="w-2.5 h-2.5" /> {t('accounts.hidden')}
-                            </span>
-                          )}
+                            {isShared && (
+                              <span className="w-1 h-1 rounded-full bg-slate-700" />
+                            )}
+                            {isShared && (
+                              <span className="text-[9px] font-bold text-purple-400 flex items-center gap-1">
+                                <Users className="w-2.5 h-2.5" /> {memberCount}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      {!isEditing ? (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleStartEdit(acc.accountName, acc.currentBalance); }}
-                          className="px-2.5 py-1.5 text-slate-300 hover:text-white bg-[#161b22] hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1 shrink-0"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span>{t('accounts.set_balance')}</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleSaveEdit(acc.accountName, acc.currency); }}
-                          className="px-3 py-1.5 text-emerald-400 hover:text-emerald-300 bg-emerald-950/80 border border-emerald-800 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1 shrink-0"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>{t('common.save')}</span>
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {matchedAccount?.isHiddenFromNewTx && (
+                          <div className="p-1 rounded-lg bg-amber-500/10 text-amber-500/80" title={t('accounts.hidden')}>
+                            <EyeOff className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === menuId ? null : menuId); }}
+                            className="p-2 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+
+                          {openMenuId === menuId && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                              <div className="absolute right-0 top-full mt-1 w-48 bg-[#1c2128] border border-slate-700 rounded-xl shadow-2xl z-20 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); setOpenMenuId(null); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                                >
+                                  <ArrowUp className="w-3.5 h-3.5" /> {t('accounts.move_up')}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); setOpenMenuId(null); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                                >
+                                  <ArrowDown className="w-3.5 h-3.5" /> {t('accounts.move_down')}
+                                </button>
+                                <div className="h-px bg-slate-800 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); setOpenMenuId(null); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                                >
+                                  {matchedAccount?.isHiddenFromNewTx ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                  {matchedAccount?.isHiddenFromNewTx ? t('accounts.visible') : t('accounts.hidden')}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setSharingAccountName(acc.accountName); setOpenMenuId(null); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                                >
+                                  <Share2 className="w-3.5 h-3.5" /> {t('accounts.share')}
+                                </button>
+                                <div className="h-px bg-slate-800 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); toggleAccountClassification(acc.accountName, false); setOpenMenuId(null); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2"
+                                >
+                                  <Settings className="w-3.5 h-3.5" /> {t('accounts.to_card')}
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Live Balance Box */}
-                    <div className="bg-[#161b22] p-3 rounded-xl border border-slate-800/80 space-y-1.5">
-                      <div className="text-[11px] text-slate-400 font-medium flex justify-between items-center">
-                        <span>{t('accounts.live_balance')}</span>
-                        <span className="text-slate-500 text-[10px]">{t('accounts.transactions_count', { count: acc.txCount })}</span>
-                      </div>
-
+                    {/* Balance Display */}
+                    <div>
                       {isEditing ? (
                         <div className="flex items-center space-x-2 my-1" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-sm text-slate-400 font-bold">$</span>
+                          <span className="text-xl text-slate-500 font-bold">$</span>
                           <input
                             type="number"
                             step="any"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-[#0f131a] border border-slate-600 rounded-lg text-sm font-bold text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            className="w-full px-3 py-2 bg-[#0a0c10] border border-emerald-500/50 rounded-xl text-xl font-bold text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                             autoFocus
                           />
                         </div>
                       ) : (
-                        <div className="space-y-1">
-                          <div className="text-xl font-bold text-slate-50 tracking-tight">
-                            {formatCurrency(acc.balanceOriginal, acc.originalCurrency as DisplayCurrency)}
-                          </div>
-                          <div className="flex items-center space-x-3 text-[10px] pt-0.5">
-                            <div className="flex items-center text-slate-400">
-                              <span className="font-medium mr-1 uppercase opacity-60">ARS:</span>
-                              <span className="font-mono text-slate-300">{formatCurrency(acc.currentARS, 'ARS')}</span>
-                            </div>
-                            <div className="flex items-center text-slate-400 border-l border-slate-800 pl-3">
-                              <span className="font-medium mr-1 uppercase opacity-60">USD:</span>
-                              <span className="font-mono text-slate-300">{formatCurrency(acc.currentUSD, 'USD')}</span>
-                            </div>
-                          </div>
+                        <div className="text-2xl font-bold text-slate-100 tracking-tight">
+                          {formatCurrency(acc.balanceOriginal, acc.originalCurrency as DisplayCurrency)}
                         </div>
                       )}
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+                          {t('accounts.live_balance')}
+                        </p>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {t('accounts.transactions_count', { count: acc.txCount })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Meta Grid (ARS/USD conversion) */}
+                    <div className="grid grid-cols-2 gap-4 py-3 border-t border-slate-800/40">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">
+                          ARS
+                        </span>
+                        <span className="text-xs font-mono font-bold text-slate-300">
+                          {formatCurrency(acc.currentARS, 'ARS')}
+                        </span>
+                      </div>
+                      <div className="flex flex-col text-right">
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">
+                          USD
+                        </span>
+                        <span className="text-xs font-mono font-bold text-slate-300">
+                          {formatCurrency(acc.currentUSD, 'USD')}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Card Utilities Footer Bar */}
-                  <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/80 text-xs gap-1.5 flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      {/* Reorder Up / Down */}
-                      <div className="flex items-center bg-[#161b22] border border-slate-700/70 rounded-lg overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); }}
-                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
-                          title={t('accounts.move_up')}
-                        >
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); }}
-                          className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors border-l border-slate-700/70"
-                          title={t('accounts.move_down')}
-                        >
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Hide / Unhide from new transactions selection */}
+                  {/* Footer Actions */}
+                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-800/40">
+                    {!isEditing ? (
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); handleToggleHideFromNewTx(acc.accountName); }}
-                        className={`px-2 py-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
-                          matchedAccount?.isHiddenFromNewTx
-                            ? 'bg-amber-950/70 border-amber-700/60 text-amber-300'
-                            : 'bg-[#161b22] border-slate-700/70 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                        }`}
-                        title={matchedAccount?.isHiddenFromNewTx ? t('accounts.hidden_from_new_tx') : t('accounts.hide_from_new_tx')}
+                        onClick={(e) => { e.stopPropagation(); handleStartEdit(acc.accountName, acc.currentBalance); }}
+                        className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
                       >
-                        {matchedAccount?.isHiddenFromNewTx ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        <span className="text-[11px] font-medium">{matchedAccount?.isHiddenFromNewTx ? t('accounts.hidden') : t('accounts.visible')}</span>
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>{t('accounts.set_balance')}</span>
                       </button>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
+                    ) : (
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); setSharingAccountName(acc.accountName); }}
-                        className="px-2.5 py-1.5 bg-[#161b22] hover:bg-purple-950/40 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
-                        title={t('accounts.share')}
+                        onClick={(e) => { e.stopPropagation(); handleSaveEdit(acc.accountName, acc.currency); }}
+                        className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
                       >
-                        <Share2 className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">{t('accounts.share')}</span>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>{t('common.save')}</span>
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleAccountClassification(acc.accountName, false);
-                        }}
-                        className="px-2.5 py-1.5 bg-[#161b22] hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/70 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
-                        title={t('accounts.to_card')}
-                      >
-                        <Settings className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">{t('accounts.to_card')}</span>
-                      </button>
-                    </div>
+                    )}
                   </div>
                 </div>
               );
@@ -835,7 +808,7 @@ export function AccountsTab({
           transactions={filteredTransactions}
           displayCurrency={displayCurrency}
           usdArsRate={usdArsRate}
-          closingRule={ccRulesMap[selectedCardAccount] || { ruleType: 'FIXED_DAY', fixedDay: 25 }}
+          closingRule={accounts.find(a => a.name === selectedCardAccount)?.closingRule || { ruleType: 'FIXED_DAY', fixedDay: 25 }}
           periodStatusOverrides={periodStatusOverrides}
           onUpdatePeriodStatus={onUpdatePeriodStatus}
           onUpdateClosingRule={(rule) => handleSaveCcRule(selectedCardAccount, rule)}

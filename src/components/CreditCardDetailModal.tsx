@@ -247,48 +247,48 @@ export function CreditCardDetailModal({
             <div className="flex justify-between items-center border-b border-slate-800 pb-2">
               <h4 className="font-bold text-slate-100 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-purple-400" />
-                <span>Configure Statement Closing Date Schedule</span>
+                <span>{t('cc_modal.rule_editor_title')}</span>
               </h4>
-              <span className="text-[10px] text-slate-400">Rules assign charges to statement cycles</span>
+              <span className="text-[10px] text-slate-400">{t('cc_modal.rule_editor_sub')}</span>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Select Preset Schedule</label>
+                <label className="block text-slate-300 font-medium mb-1">{t('cc_modal.select_preset')}</label>
                 <select
                   value={selectedPreset}
                   onChange={(e) => handlePresetChange(e.target.value)}
                   className="w-full px-3 py-2 bg-[#161b22] border border-slate-700 text-slate-100 font-semibold rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
                 >
-                  <option value="PREVIOUS_THU">Previous to last Thursday of the month (e.g. 2nd-to-last Thursday)</option>
-                  <option value="LAST_FRI">Last Friday of the month</option>
-                  <option value="3RD_THU">3rd Thursday of the month</option>
-                  <option value="PREVIOUS_FRI">Previous to last Friday of the month</option>
-                  <option value="FIXED_25">Fixed Day: 25th of each month</option>
-                  <option value="FIXED_20">Fixed Day: 20th of each month</option>
-                  <option value="CUSTOM">Custom Rule...</option>
+                  <option value="PREVIOUS_THU">{t('cc_modal.preset_previous_thu', { defaultValue: 'Previous to last Thursday of the month' })}</option>
+                  <option value="LAST_FRI">{t('cc_modal.preset_last_fri', { defaultValue: 'Last Friday of the month' })}</option>
+                  <option value="3RD_THU">{t('cc_modal.preset_3rd_thu', { defaultValue: '3rd Thursday of the month' })}</option>
+                  <option value="PREVIOUS_FRI">{t('cc_modal.preset_previous_fri', { defaultValue: 'Previous to last Friday of the month' })}</option>
+                  <option value="FIXED_25">{t('cc_modal.preset_fixed_25', { defaultValue: 'Fixed Day: 25th of each month' })}</option>
+                  <option value="FIXED_20">{t('cc_modal.preset_fixed_20', { defaultValue: 'Fixed Day: 20th of each month' })}</option>
+                  <option value="CUSTOM">{t('cc_modal.custom_rule')}</option>
                 </select>
               </div>
 
               {selectedPreset === 'CUSTOM' && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-[#161b22] rounded-lg border border-slate-800">
                   <div>
-                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Schedule Pattern</label>
+                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">{t('cc_modal.pattern')}</label>
                     <select
                       value={tempRule.ruleType}
                       onChange={(e) => setTempRule({ ...tempRule, ruleType: e.target.value as ClosingRuleType })}
                       className="w-full px-2.5 py-1.5 bg-[#0f131a] border border-slate-700 text-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
                     >
-                      <option value="PREVIOUS_TO_LAST_WEEKDAY">Previous to last [Day of week]</option>
-                      <option value="LAST_WEEKDAY">Last [Day of week] of month</option>
-                      <option value="NTH_WEEKDAY">N-th [Day of week] of month</option>
-                      <option value="FIXED_DAY">Fixed Day of month</option>
+                      <option value="PREVIOUS_TO_LAST_WEEKDAY">{t('cc_modal.rule_prev_last', { defaultValue: 'Previous to last [Day of week]' })}</option>
+                      <option value="LAST_WEEKDAY">{t('cc_modal.rule_last', { defaultValue: 'Last [Day of week] of month' })}</option>
+                      <option value="NTH_WEEKDAY">{t('cc_modal.rule_nth', { defaultValue: 'N-th [Day of week] of month' })}</option>
+                      <option value="FIXED_DAY">{t('cc_modal.rule_fixed', { defaultValue: 'Fixed Day of month' })}</option>
                     </select>
                   </div>
 
                   {tempRule.ruleType === 'FIXED_DAY' ? (
                     <div>
-                      <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Day of Month (1-31)</label>
+                      <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">{t('cc_modal.day_of_month')} (1-31)</label>
                       <input
                         type="number"
                         min="1"
@@ -301,34 +301,34 @@ export function CreditCardDetailModal({
                   ) : (
                     <>
                       <div>
-                        <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Day of Week</label>
+                        <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">{t('cc_modal.day_of_week')}</label>
                         <select
                           value={tempRule.weekday ?? 4}
                           onChange={(e) => setTempRule({ ...tempRule, weekday: parseInt(e.target.value) })}
                           className="w-full px-2.5 py-1.5 bg-[#0f131a] border border-slate-700 text-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
                         >
-                          <option value={1}>Monday</option>
-                          <option value={2}>Tuesday</option>
-                          <option value={3}>Wednesday</option>
-                          <option value={4}>Thursday</option>
-                          <option value={5}>Friday</option>
-                          <option value={6}>Saturday</option>
-                          <option value={0}>Sunday</option>
+                          <option value={1}>{t('common.monday', { defaultValue: 'Monday' })}</option>
+                          <option value={2}>{t('common.tuesday', { defaultValue: 'Tuesday' })}</option>
+                          <option value={3}>{t('common.wednesday', { defaultValue: 'Wednesday' })}</option>
+                          <option value={4}>{t('common.thursday', { defaultValue: 'Thursday' })}</option>
+                          <option value={5}>{t('common.friday', { defaultValue: 'Friday' })}</option>
+                          <option value={6}>{t('common.saturday', { defaultValue: 'Saturday' })}</option>
+                          <option value={0}>{t('common.sunday', { defaultValue: 'Sunday' })}</option>
                         </select>
                       </div>
 
                       {tempRule.ruleType === 'NTH_WEEKDAY' && (
                         <div>
-                          <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Occurrence</label>
+                          <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">{t('cc_modal.occurrence')}</label>
                           <select
                             value={tempRule.nth ?? 3}
                             onChange={(e) => setTempRule({ ...tempRule, nth: parseInt(e.target.value) })}
                             className="w-full px-2.5 py-1.5 bg-[#0f131a] border border-slate-700 text-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
                           >
-                            <option value={1}>1st occurrence</option>
-                            <option value={2}>2nd occurrence</option>
-                            <option value={3}>3rd occurrence</option>
-                            <option value={4}>4th occurrence</option>
+                            <option value={1}>1st</option>
+                            <option value={2}>2nd</option>
+                            <option value={3}>3rd</option>
+                            <option value={4}>4th</option>
                           </select>
                         </div>
                       )}
@@ -339,7 +339,7 @@ export function CreditCardDetailModal({
 
               {/* Preview */}
               <div className="p-3 bg-[#161b22] rounded-lg border border-slate-800">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Calculated Upcoming Closing Dates:</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">{t('cc_modal.upcoming_dates')}:</span>
                 <div className="flex flex-wrap gap-2 text-[11px]">
                   {upcomingCloseDatesPreview.map((item, i) => (
                     <span key={i} className="px-2.5 py-1 bg-[#0f131a] border border-slate-700 text-purple-300 rounded font-mono">
@@ -356,14 +356,14 @@ export function CreditCardDetailModal({
                   onClick={() => setIsEditingRule(false)}
                   className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveRuleSubmit}
                   className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs transition-colors shadow-sm"
                 >
-                  Apply & Save Rule
+                  {t('cc_modal.save_rule')}
                 </button>
               </div>
             </div>
@@ -374,7 +374,7 @@ export function CreditCardDetailModal({
         <div className="p-4 bg-[#0f131a] border-b border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Calendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
-            <span className="text-xs font-semibold text-slate-300">Statement Period:</span>
+            <span className="text-xs font-semibold text-slate-300">{t('cc_modal.statement_period')}:</span>
             <select
               value={selectedStatementIdx}
               onChange={(e) => setSelectedStatementIdx(Number(e.target.value))}
@@ -383,19 +383,19 @@ export function CreditCardDetailModal({
               {statements.map((stmt, idx) => {
                 const isPast = stmt.closeDate < currentCloseDate;
                 const isFuture = stmt.closeDate > currentCloseDate;
-                let tag = 'Current';
+                let tag = t('cc_modal.current', { defaultValue: 'Current' });
                 if (stmt.isManualOverride) {
-                  tag = stmt.isPaid ? 'Paid (Manual)' : 'Open (Manual)';
+                  tag = stmt.isPaid ? `${t('cc_modal.paid')} (${t('common.manual', { defaultValue: 'Manual' })})` : `${t('cc_modal.open')} (${t('common.manual', { defaultValue: 'Manual' })})`;
                 } else if (isPast) {
-                  tag = stmt.isPaid ? 'Paid' : 'Open';
+                  tag = stmt.isPaid ? t('cc_modal.paid') : t('cc_modal.open');
                 } else if (isFuture) {
-                  tag = stmt.isPaid ? 'Paid' : 'Future';
+                  tag = stmt.isPaid ? t('cc_modal.paid') : t('cc_modal.future');
                 } else {
-                  tag = stmt.netDue <= 0 ? 'Current (Paid)' : 'Current (Open)';
+                  tag = stmt.netDue <= 0 ? `${t('cc_modal.current')} (${t('cc_modal.paid')})` : `${t('cc_modal.current')} (${t('cc_modal.open')})`;
                 }
                 return (
                   <option key={stmt.closeDate} value={idx}>
-                    Closing {stmt.closeDate} — {formatCurrency(stmt.totalExpenses, stmt.currency as DisplayCurrency)} [{tag}]
+                    {t('cc_modal.closing_date')} {stmt.closeDate} — {formatCurrency(stmt.totalExpenses, stmt.currency as DisplayCurrency)} [{tag}]
                   </option>
                 );
               })}
@@ -424,7 +424,7 @@ export function CreditCardDetailModal({
                     className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[10px] rounded-lg border border-slate-700"
                     title="Reset to automatic calculation"
                   >
-                    Reset
+                    {t('cc_modal.reset')}
                   </button>
                 )}
               </div>
@@ -446,22 +446,22 @@ export function CreditCardDetailModal({
           {activeStatement && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="p-4 rounded-xl bg-[#121620] border border-slate-800 space-y-1">
-                <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">Statement Expenses</span>
+                <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">{t('cc_modal.statement_expenses')}</span>
                 <div className="text-xl font-bold text-slate-100">
                   {formatCurrency(activeStatement.totalExpenses, activeStatement.currency as DisplayCurrency)}
                 </div>
                 <div className="text-[10px] text-slate-500">
-                  {activeStatement.expenses.length} itemized charges
+                  {t('cc_modal.tx_count', { count: activeStatement.expenses.length, defaultValue: `${activeStatement.expenses.length} itemized charges` })}
                 </div>
               </div>
 
               <div className="p-4 rounded-xl bg-[#121620] border border-slate-800 space-y-1">
-                <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">Payments Applied</span>
+                <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">{t('cc_modal.payments_applied')}</span>
                 <div className="text-xl font-bold text-emerald-400">
                   {formatCurrency(activeStatement.totalPayments, activeStatement.currency as DisplayCurrency)}
                 </div>
                 <div className="text-[10px] text-slate-500">
-                  {activeStatement.payments.length} payment transfers
+                  {t('cc_modal.pmt_count', { count: activeStatement.payments.length, defaultValue: `${activeStatement.payments.length} payment transfers` })}
                 </div>
               </div>
 
@@ -471,15 +471,15 @@ export function CreditCardDetailModal({
                   : 'bg-amber-950/20 border-amber-800/40'
               }`}>
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Net Outstanding Due</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('cc_modal.net_outstanding')}</span>
                   <div className="flex items-center gap-1.5">
                     {activeStatement.netDue <= 0 ? (
                       <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                        <CheckCircle className="w-3 h-3" /> Paid {activeStatement.isManualOverride ? '(Manual)' : ''}
+                        <CheckCircle className="w-3 h-3" /> {t('cc_modal.paid')} {activeStatement.isManualOverride ? `(${t('common.manual')})` : ''}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                        <AlertCircle className="w-3 h-3" /> Outstanding {activeStatement.isManualOverride ? '(Manual)' : ''}
+                        <AlertCircle className="w-3 h-3" /> {t('cc_modal.open')} {activeStatement.isManualOverride ? `(${t('common.manual')})` : ''}
                       </span>
                     )}
                   </div>
@@ -492,7 +492,7 @@ export function CreditCardDetailModal({
                     </div>
                     {activeStatement.dueDate && (
                       <div className="text-[10px] text-slate-400 mt-0.5">
-                        Est. Due Date: {activeStatement.dueDate}
+                        {t('cc_modal.due_date')}: {activeStatement.dueDate}
                       </div>
                     )}
                   </div>
@@ -528,7 +528,7 @@ export function CreditCardDetailModal({
                           className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 rounded-lg text-[10px] transition-colors"
                           title="Reset status to calculated"
                         >
-                          Reset Auto
+                          {t('cc_modal.reset')}
                         </button>
                       )}
                     </div>
@@ -544,19 +544,19 @@ export function CreditCardDetailModal({
               <div className="flex justify-between items-center">
                 <h4 className="text-xs font-bold text-purple-200 flex items-center gap-1.5">
                   <ArrowRightLeft className="w-4 h-4 text-purple-400" />
-                  Record Payment for Statement ({activeStatement.closeDate})
+                  {t('cc_modal.record_payment_for', { date: activeStatement.closeDate, defaultValue: `Record Payment for Statement (${activeStatement.closeDate})` })}
                 </h4>
                 <button
                   onClick={() => setShowPaymentForm(false)}
                   className="text-slate-400 hover:text-slate-200 text-xs"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
 
               <form onSubmit={handleRecordPaymentSubmit} className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Payment Date</label>
+                  <label className="block text-slate-300 font-medium mb-1">{t('cc_modal.payment_date')}</label>
                   <input
                     type="date"
                     required
@@ -567,7 +567,7 @@ export function CreditCardDetailModal({
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Paid From (Bank Account)</label>
+                  <label className="block text-slate-300 font-medium mb-1">{t('cc_modal.paid_from')}</label>
                   <input
                     type="text"
                     required
@@ -579,7 +579,7 @@ export function CreditCardDetailModal({
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Amount Paid ({activeStatement.currency})</label>
+                  <label className="block text-slate-300 font-medium mb-1">{t('cc_modal.amount_paid')} ({activeStatement.currency})</label>
                   <input
                     type="number"
                     step="0.01"
@@ -595,7 +595,7 @@ export function CreditCardDetailModal({
                     type="submit"
                     className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition-colors shadow-sm"
                   >
-                    Confirm Payment
+                    {t('cc_modal.confirm_payment')}
                   </button>
                 </div>
               </form>
@@ -628,12 +628,12 @@ export function CreditCardDetailModal({
                   <table className="w-full text-left text-xs">
                     <thead className="bg-[#0f131a] text-slate-400 border-b border-slate-800 font-medium text-[11px]">
                       <tr>
-                        <th className="py-2.5 px-3">Date</th>
-                        <th className="py-2.5 px-3">Merchant / Title</th>
-                        <th className="py-2.5 px-3">Category</th>
-                        <th className="py-2.5 px-3 text-center">Cuota / Installments</th>
-                        <th className="py-2.5 px-3">Statement Period</th>
-                        <th className="py-2.5 px-3 text-right">Amount</th>
+                        <th className="py-2.5 px-3">{t('common.date')}</th>
+                        <th className="py-2.5 px-3">{t('common.merchant', { defaultValue: 'Merchant / Title' })}</th>
+                        <th className="py-2.5 px-3">{t('common.category')}</th>
+                        <th className="py-2.5 px-3 text-center">{t('common.installments', { defaultValue: 'Cuota / Installments' })}</th>
+                        <th className="py-2.5 px-3">{t('cc_modal.statement_period')}</th>
+                        <th className="py-2.5 px-3 text-right">{t('common.amount')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 text-slate-200">
@@ -678,13 +678,13 @@ export function CreditCardDetailModal({
                                     }`}
                                   >
                                     <option value="AUTO">
-                                      Auto ({autoClose})
+                                      {t('common.auto', { defaultValue: 'Auto' })} ({autoClose})
                                     </option>
                                     {availablePeriods.map((cDate) => {
                                       const isAutoOption = cDate === autoClose;
                                       return (
                                         <option key={cDate} value={cDate}>
-                                          Closing {cDate} {isAutoOption ? '(Auto Default)' : ''}
+                                          {t('cc_modal.closing_date')} {cDate} {isAutoOption ? `(${t('common.auto_default', { defaultValue: 'Auto Default' })})` : ''}
                                         </option>
                                       );
                                     })}
@@ -694,7 +694,7 @@ export function CreditCardDetailModal({
                                       title="Expense reassigned to a custom statement period" 
                                       className="px-1.5 py-0.5 text-[9px] bg-purple-500/20 text-purple-300 rounded border border-purple-500/30 font-semibold"
                                     >
-                                      Reassigned
+                                      {t('common.reassigned', { defaultValue: 'Reassigned' })}
                                     </span>
                                   )}
                                 </div>
@@ -721,12 +721,12 @@ export function CreditCardDetailModal({
           <div className="space-y-3 pt-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
               <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
-              Recorded Payments & Credits ({activeStatement?.payments.length || 0})
+              {t('cc_modal.payments_history', { defaultValue: 'Recorded Payments & Credits' })} ({activeStatement?.payments.length || 0})
             </h3>
 
             {activeStatement?.payments.length === 0 ? (
               <div className="p-4 text-center text-slate-500 bg-[#121620] rounded-xl border border-slate-800 text-xs">
-                No payments registered for this statement yet. Click "Record Statement Payment" above to record one.
+                {t('cc_modal.no_payments_desc', { defaultValue: 'No payments registered for this statement yet. Click "Record Statement Payment" above to record one.' })}
               </div>
             ) : (
               <div className="bg-[#121620] rounded-xl border border-slate-800 overflow-hidden">
@@ -734,11 +734,11 @@ export function CreditCardDetailModal({
                   <table className="w-full text-left text-xs">
                     <thead className="bg-[#0f131a] text-slate-400 border-b border-slate-800 font-medium text-[11px]">
                       <tr>
-                        <th className="py-2.5 px-3">Date</th>
-                        <th className="py-2.5 px-3">Reference</th>
-                        <th className="py-2.5 px-3">Paid From</th>
-                        <th className="py-2.5 px-3">Statement Period</th>
-                        <th className="py-2.5 px-3 text-right">Amount Paid</th>
+                        <th className="py-2.5 px-3">{t('common.date')}</th>
+                        <th className="py-2.5 px-3">{t('common.reference', { defaultValue: 'Reference' })}</th>
+                        <th className="py-2.5 px-3">{t('cc_modal.paid_from_col', { defaultValue: 'Paid From' })}</th>
+                        <th className="py-2.5 px-3">{t('cc_modal.statement_period')}</th>
+                        <th className="py-2.5 px-3 text-right">{t('cc_modal.amount_paid')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 text-slate-200">
@@ -774,13 +774,13 @@ export function CreditCardDetailModal({
                                     }`}
                                   >
                                     <option value="AUTO">
-                                      Auto ({autoClose})
+                                      {t('common.auto')} ({autoClose})
                                     </option>
                                     {availablePeriods.map((cDate) => {
                                       const isAutoOption = cDate === autoClose;
                                       return (
                                         <option key={cDate} value={cDate}>
-                                          Closing {cDate} {isAutoOption ? '(Auto Default)' : ''}
+                                          {t('cc_modal.closing_date')} {cDate} {isAutoOption ? `(${t('common.auto_default')})` : ''}
                                         </option>
                                       );
                                     })}
@@ -790,7 +790,7 @@ export function CreditCardDetailModal({
                                       title="Payment reassigned to a custom statement period" 
                                       className="px-1.5 py-0.5 text-[9px] bg-purple-500/20 text-purple-300 rounded border border-purple-500/30 font-semibold"
                                     >
-                                      Reassigned
+                                      {t('common.reassigned')}
                                     </span>
                                   )}
                                 </div>
@@ -820,7 +820,7 @@ export function CreditCardDetailModal({
             onClick={onClose}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>

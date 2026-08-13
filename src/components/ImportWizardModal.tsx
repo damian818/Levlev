@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Upload, X, Download, AlertCircle, CheckCircle, FileText, ChevronRight, Sparkles } from 'lucide-react';
 import Papa from 'papaparse';
 import { Transaction, AccountItem, CategoryItem, BudgetGoal } from '../types';
@@ -28,6 +29,7 @@ interface ValidationError {
 }
 
 export default function ImportWizardModal({ isOpen, onClose, onImport, existingAccounts, existingCategories, userTimezone = 'America/Argentina/Buenos_Aires' }: ImportWizardModalProps) {
+  const { t } = useTranslation();
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
@@ -408,8 +410,8 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
               <Upload className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-100">Import Data</h2>
-              <p className="text-xs text-slate-400">Upload CSV transactions or JSON backup</p>
+              <h2 className="text-lg font-bold text-slate-100">{t('import.title')}</h2>
+              <p className="text-xs text-slate-400">{t('import.subtitle')}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-full transition-colors">
@@ -425,28 +427,28 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
                 <div className="bg-[#121620] border border-slate-800 rounded-xl p-5 hover:border-emerald-500/30 transition-colors">
                   <h3 className="font-bold text-slate-200 mb-2 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-emerald-400" />
-                    CSV Transactions
+                    {t('import.csv_transactions')}
                   </h3>
                   <p className="text-xs text-slate-400 mb-4 h-12">
-                    Import transactions from a spreadsheet. Manual column mapping required.
+                    {t('import.csv_desc')}
                   </p>
                   <button onClick={handleDownloadTemplate} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors">
                     <Download className="w-3 h-3" />
-                    Download Template
+                    {t('import.download_template')}
                   </button>
                 </div>
 
                 <div className="bg-[#121620] border border-slate-800 rounded-xl p-5 border-purple-500/30 hover:bg-purple-500/5 transition-colors">
                   <h3 className="font-bold text-slate-200 mb-2 flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-purple-400" />
-                    Ivy Wallet
+                    {t('import.ivy_wallet')}
                   </h3>
                   <p className="text-xs text-slate-400 mb-4 h-12">
-                    Direct import from Ivy Wallet CSV export. All fields mapped automatically.
+                    {t('import.ivy_desc')}
                   </p>
                   <label className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm shadow-purple-900/20 uppercase tracking-wider">
                     <Upload className="w-3 h-3" />
-                    Select Ivy Export
+                    {t('import.select_ivy')}
                     <input type="file" accept=".csv" onChange={handleIvyWalletChange} className="hidden" />
                   </label>
                 </div>
@@ -454,24 +456,24 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
                 <div className="bg-[#121620] border border-slate-800 rounded-xl p-5 hover:border-emerald-500/30 transition-colors">
                   <h3 className="font-bold text-slate-200 mb-2 flex items-center gap-2">
                     <Upload className="w-4 h-4 text-emerald-400" />
-                    JSON Backup
+                    {t('import.json_backup')}
                   </h3>
                   <p className="text-xs text-slate-400 mb-4 h-12">
-                    Restore a complete backup including accounts, categories, budgets, and transactions.
+                    {t('import.json_desc')}
                   </p>
                   <div className="text-[10px] text-slate-500 flex items-center gap-2 h-8 font-medium">
-                     Settings {'>'} Export JSON
+                     {t('nav.settings')} {'>'} {t('settings.export_json')}
                   </div>
                 </div>
               </div>
 
               <div className="border-2 border-dashed border-slate-700 rounded-xl p-10 flex flex-col items-center justify-center bg-[#121620] hover:bg-slate-800/50 transition-colors">
                 <Upload className="w-10 h-10 text-slate-500 mb-4" />
-                <h3 className="text-slate-300 font-bold mb-1">Upload File</h3>
-                <p className="text-slate-500 text-xs mb-6">Select a .csv or .json file to begin</p>
+                <h3 className="text-slate-300 font-bold mb-1">{t('import.upload_file')}</h3>
+                <p className="text-slate-500 text-xs mb-6">{t('import.upload_desc')}</p>
                 
                 <label className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95 cursor-pointer">
-                  {isLoading ? 'Processing...' : 'Select File'}
+                  {isLoading ? t('import.processing') : t('import.select_file')}
                   <input type="file" accept=".csv,.json" onChange={handleFileChange} className="hidden" disabled={isLoading} />
                 </label>
               </div>
@@ -480,8 +482,8 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
 
           {step === 'mapping' && (
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-200">Map Columns</h3>
-              <p className="text-xs text-slate-400">Map your CSV columns to the required LevLev fields.</p>
+              <h3 className="text-sm font-bold text-slate-200">{t('import.map_columns')}</h3>
+              <p className="text-xs text-slate-400">{t('import.map_desc')}</p>
               <div className="grid grid-cols-2 gap-4">
                 {fields.map(field => (
                   <div key={field.id} className="flex flex-col gap-1">
@@ -493,7 +495,7 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
                       onChange={(e) => setColumnMapping({ ...columnMapping, [field.id]: e.target.value })}
                       className="bg-[#121620] border border-slate-800 rounded-lg p-2 text-xs text-slate-200"
                     >
-                      <option value="">Select column...</option>
+                      <option value="">{t('import.select_column')}</option>
                       {csvHeaders.map(header => (
                         <option key={header} value={header}>{header}</option>
                       ))}
@@ -511,15 +513,15 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
                 <div className="flex-1 flex items-center gap-6">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-slate-100">{parsedData?.transactions?.length || 0}</p>
-                    <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Transactions</p>
+                    <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">{t('import.transactions')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-slate-100">{parsedData?.accounts?.length || 0}</p>
-                    <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Accounts</p>
+                    <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">{t('import.accounts')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-slate-100">{parsedData?.categories?.length || 0}</p>
-                    <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Categories</p>
+                    <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">{t('import.categories')}</p>
                   </div>
                 </div>
 
@@ -527,17 +529,17 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
                    {hasErrors ? (
                       <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
                          <AlertCircle className="w-5 h-5" />
-                         Found Errors
+                         {t('import.found_errors')}
                       </div>
                    ) : hasWarnings ? (
                       <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
                          <AlertCircle className="w-5 h-5" />
-                         Found Warnings
+                         {t('import.found_warnings')}
                       </div>
                    ) : (
                       <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
                          <CheckCircle className="w-5 h-5" />
-                         Ready to Import
+                         {t('import.ready_to_import')}
                       </div>
                    )}
                 </div>
@@ -546,7 +548,7 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
               {validationErrors.length > 0 && (
                 <div className="bg-[#121620] border border-slate-800 rounded-xl overflow-hidden">
                   <div className="bg-slate-800/50 p-3 border-b border-slate-800">
-                    <h3 className="text-sm font-bold text-slate-200">Validation Feedback</h3>
+                    <h3 className="text-sm font-bold text-slate-200">{t('import.validation_feedback')}</h3>
                   </div>
                   <div className="max-h-48 overflow-y-auto p-2">
                     {validationErrors.map((err, idx) => (
@@ -564,7 +566,7 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
               {parsedData && parsedData.transactions.length > 0 && !hasErrors && (
                 <div className="bg-[#121620] border border-slate-800 rounded-xl overflow-hidden">
                    <div className="bg-slate-800/50 p-3 border-b border-slate-800">
-                    <h3 className="text-sm font-bold text-slate-200">Transactions Preview (First 5)</h3>
+                    <h3 className="text-sm font-bold text-slate-200">{t('import.preview_title')}</h3>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
@@ -600,7 +602,7 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
           {step === 'preview' ? (
             <>
               <button onClick={handleReset} className="px-4 py-2 text-slate-300 hover:text-slate-100 hover:bg-slate-800 rounded-lg text-sm font-medium transition-colors">
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmImport}
@@ -609,23 +611,23 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
                   hasErrors ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95'
                 }`}
               >
-                Confirm Import
+                {t('import.confirm_import')}
                 <ChevronRight className="w-4 h-4" />
               </button>
             </>
           ) : step === 'mapping' ? (
             <>
               <button onClick={handleReset} className="px-4 py-2 text-slate-300 hover:text-slate-100 hover:bg-slate-800 rounded-lg text-sm font-medium transition-colors">
-                Cancel
+                {t('common.cancel')}
               </button>
               <button onClick={handleMappingConfirm} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold transition-all shadow-sm active:scale-95">
-                Next
+                {t('import.next')}
                 <ChevronRight className="w-4 h-4 ml-2" />
               </button>
             </>
           ) : (
             <button onClick={onClose} className="px-4 py-2 text-slate-300 hover:text-slate-100 hover:bg-slate-800 rounded-lg text-sm font-medium transition-colors">
-              Close
+              {t('common.close')}
             </button>
           )}
         </div>

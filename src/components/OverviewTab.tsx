@@ -199,10 +199,10 @@ export function OverviewTab({
           </div>
           <div>
             <h3 className="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-2 flex-wrap">
-              <span>Overview Billing Period:</span>
-              <span className="text-emerald-400 font-mono">{selectedMonth === 'ALL' ? 'All Time' : selectedMonth}</span>
+              <span>{t('overview.billing_period')}</span>
+              <span className="text-emerald-400 font-mono">{selectedMonth === 'ALL' ? t('common.all') : selectedMonth}</span>
             </h3>
-            <p className="text-[10px] sm:text-[11px] text-slate-400">KPI totals and category summaries filtered for this period.</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-400">{t('overview.billing_period_desc')}</p>
           </div>
         </div>
 
@@ -220,7 +220,7 @@ export function OverviewTab({
           </button>
 
           <div className="flex items-center space-x-2 bg-[#121620] px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs flex-1 sm:flex-none">
-            <span className="text-slate-400 font-medium hidden sm:inline">Select Month:</span>
+            <span className="text-slate-400 font-medium hidden sm:inline">{t('overview.select_month')}</span>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
@@ -564,11 +564,11 @@ export function OverviewTab({
                     return null;
                   }}
                 />
-                <Legend />
+                <Legend formatter={(value) => t(`common.${value.toLowerCase()}`)} />
                 <Bar 
                   yAxisId="left"
                   dataKey="income" 
-                  name="Income" 
+                  name={t('common.income')} 
                   fill="#34d399" 
                   radius={[4, 4, 0, 0]} 
                   onClick={(data: any) => {
@@ -585,7 +585,7 @@ export function OverviewTab({
                 <Bar 
                   yAxisId="left"
                   dataKey="expense" 
-                  name="Expense" 
+                  name={t('common.expense')} 
                   fill="#fb7185" 
                   radius={[4, 4, 0, 0]} 
                   onClick={(data: any) => {
@@ -603,7 +603,7 @@ export function OverviewTab({
                   yAxisId="right"
                   type="monotone" 
                   dataKey="forecastBalance" 
-                  name="Predictive EOM Balance" 
+                  name={t('overview.predicted_eom_assets')} 
                   stroke="#f59e0b" 
                   strokeWidth={2.5} 
                   strokeDasharray="4 4"
@@ -638,12 +638,12 @@ export function OverviewTab({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
-              <span>Biggest Expenses (Top Merchants)</span>
+              <span>{t('overview.biggest_expenses')}</span>
               {!showSharedData && (
                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">OWNED DATA ONLY</span>
               )}
             </h3>
-            <p className="text-xs text-slate-400">Click any merchant row to filter its individual transactions.</p>
+            <p className="text-xs text-slate-400">{t('overview.biggest_expenses_desc')}</p>
           </div>
         </div>
 
@@ -651,10 +651,10 @@ export function OverviewTab({
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 uppercase">
-                <th className="pb-3 font-medium">Merchant / Title</th>
-                <th className="pb-3 font-medium text-right">Total Spent</th>
-                <th className="pb-3 font-medium text-right">% of Total Expenses</th>
-                <th className="pb-3 font-medium text-center">Action</th>
+                <th className="pb-3 font-medium">{t('overview.merchant_title')}</th>
+                <th className="pb-3 font-medium text-right">{t('overview.total_spent')}</th>
+                <th className="pb-3 font-medium text-right">{t('overview.share_of_expenses')}</th>
+                <th className="pb-3 font-medium text-center">{t('common.action')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -690,7 +690,7 @@ export function OverviewTab({
                       </div>
                     </td>
                     <td className="py-3 text-center text-slate-500 group-hover:text-slate-300">
-                      <span className="text-[10px] px-2 py-0.5 bg-slate-800 rounded border border-slate-700">Filter →</span>
+                      <span className="text-[10px] px-2 py-0.5 bg-slate-800 rounded border border-slate-700">{t('common.filter')} →</span>
                     </td>
                   </tr>
                 );

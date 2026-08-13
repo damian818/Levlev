@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Trash2, RefreshCw, X } from 'lucide-react';
 
 interface ConfirmDeleteModalProps {
@@ -12,6 +13,7 @@ export function ConfirmDeleteModal({
   onClose,
   onConfirmDeleteAll,
 }: ConfirmDeleteModalProps) {
+  const { t } = useTranslation();
   if (!isOpen) return null;
 
   return (
@@ -30,19 +32,19 @@ export function ConfirmDeleteModal({
         </div>
 
         <div className="space-y-2">
-          <h3 className="text-lg font-bold text-slate-100">Delete Existing Financial Data?</h3>
+          <h3 className="text-lg font-bold text-slate-100">{t('common.delete_data_title')}</h3>
           <p className="text-xs text-slate-400 leading-relaxed">
-            This action will permanently delete all stored transactions and custom budget goals from your local storage session. 
+            {t('common.delete_data_desc')}
           </p>
         </div>
 
         <div className="p-3.5 bg-[#0f131a] rounded-xl border border-slate-800/80 space-y-1.5 text-xs text-slate-300">
           <div className="font-semibold text-rose-400 flex items-center gap-1.5">
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Wipe All Records:</span>
+            <span>{t('common.wipe_records')}</span>
           </div>
           <p className="text-slate-400 text-[11px]">
-            Clears all transaction logs, leaving a blank canvas ready for your custom CSV imports or manual entries.
+            {t('common.wipe_records_desc')}
           </p>
         </div>
 
@@ -55,14 +57,14 @@ export function ConfirmDeleteModal({
             className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm"
           >
             <Trash2 className="w-4 h-4" />
-            <span>Yes, Delete All Data</span>
+            <span>{t('common.confirm_delete_all')}</span>
           </button>
 
           <button
             onClick={onClose}
             className="w-full py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors text-center"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       </div>

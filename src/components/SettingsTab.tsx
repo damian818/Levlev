@@ -145,7 +145,7 @@ export function SettingsTab({
       ran: true,
       totalAccounts: results.length,
       discrepancyCount: 0,
-      summaryMessage: `Successfully re-synchronized all ${results.length} account balance(s) from the ground up (initial balance + cumulative transactions).`
+      summaryMessage: t('settings.syncing')
     });
   };
 
@@ -421,10 +421,10 @@ export function SettingsTab({
         <div>
           <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
             <Sliders className="w-6 h-6 text-emerald-400" />
-            <span>Settings & Master Data</span>
+            <span>{t('settings.title')}</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Configure accounts, custom income/expense categories, exchange rates, and data preferences.
+            {t('settings.subtitle')}
           </p>
         </div>
 
@@ -482,15 +482,15 @@ export function SettingsTab({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-slate-200">Financial Accounts</h3>
-              <p className="text-xs text-slate-400">Manage bank checking accounts, credit cards, investments, and digital wallets.</p>
+              <h3 className="text-base font-bold text-slate-200">{t('settings.financial_accounts')}</h3>
+              <p className="text-xs text-slate-400">{t('settings.financial_accounts_desc')}</p>
             </div>
             <button
               onClick={handleOpenAddAccount}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Account</span>
+              <span>{t('settings.add_account')}</span>
             </button>
           </div>
 
@@ -523,7 +523,7 @@ export function SettingsTab({
                             <span>{acc.name}</span>
                             {(acc.isShared || (acc.sharedMembers && acc.sharedMembers.length > 0)) && (
                               <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1">
-                                <Users className="w-2.5 h-2.5" /> Shared ({acc.sharedMembers?.length || 0})
+                                <Users className="w-2.5 h-2.5" /> {t('settings.shared')} ({acc.sharedMembers?.length || 0})
                               </span>
                             )}
                           </h4>
@@ -537,14 +537,14 @@ export function SettingsTab({
                         <button
                           onClick={() => handleOpenEditAccount(acc)}
                           className="p-1.5 text-slate-400 hover:text-slate-100 bg-slate-800/60 hover:bg-slate-800 rounded-lg border border-slate-700/60 transition-colors"
-                          title="Edit Account"
+                          title={t('settings.edit_account')}
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setDeletingAccName(acc.name)}
                           className="p-1.5 text-rose-400/80 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 rounded-lg border border-rose-500/20 transition-colors"
-                          title="Delete Account"
+                          title={t('settings.delete_account')}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -554,24 +554,24 @@ export function SettingsTab({
                     {isCC && acc.closingRule && (
                       <div className="bg-[#0f131a] p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1">
                         <div className="text-slate-400 font-semibold flex items-center justify-between">
-                          <span>Statement Closing Rule:</span>
+                          <span>{t('settings.closing_rule')}:</span>
                           <span className="text-purple-400 font-bold">{acc.closingRule.ruleType}</span>
                         </div>
                         {acc.closingRule.ruleType === 'FIXED_DAY' && (
-                          <p className="text-slate-300">Closes on day <strong className="text-white">{acc.closingRule.fixedDay || 25}</strong> of each month.</p>
+                          <p className="text-slate-300">{t('settings.closes_on_day')} <strong className="text-white">{acc.closingRule.fixedDay || 25}</strong> {t('settings.of_month')}.</p>
                         )}
                         {acc.closingRule.ruleType === 'NTH_WEEKDAY' && (
-                          <p className="text-slate-300">Closes on the nth weekday of the month.</p>
+                          <p className="text-slate-300">{t('settings.closing_rule')}</p>
                         )}
                         {acc.closingRule.ruleType === 'LAST_WEEKDAY' && (
-                          <p className="text-slate-300">Closes on the last weekday of the month.</p>
+                          <p className="text-slate-300">{t('settings.closing_rule')}</p>
                         )}
                       </div>
                     )}
                   </div>
 
                   <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Usage in Transactions:</span>
+                    <span>{t('settings.usage_in_txs')}:</span>
                     <span className="font-semibold text-slate-200 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700">
                       {usageCount} txs
                     </span>

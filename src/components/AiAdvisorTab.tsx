@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency } from '../types';
 import { analyzeSpending, formatCurrency } from '../utils/financeUtils';
 import { Sparkles, Bot, Loader2, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -11,6 +12,7 @@ interface AiAdvisorTabProps {
 }
 
 export function AiAdvisorTab({ transactions, displayCurrency, usdArsRate }: AiAdvisorTabProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [insights, setInsights] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,9 +56,9 @@ export function AiAdvisorTab({ transactions, displayCurrency, usdArsRate }: AiAd
         <div className="w-12 h-12 bg-amber-950/80 border border-amber-800/50 text-amber-400 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
           <Sparkles className="w-6 h-6" />
         </div>
-        <h3 className="text-lg font-bold text-slate-100">AI Financial Health & Risk Advisor</h3>
+        <h3 className="text-lg font-bold text-slate-100">{t('ai.title')}</h3>
         <p className="text-xs text-slate-400 max-w-lg mx-auto">
-          Leverage Google Gemini to analyze your multi-currency income, spending anomalies, savings potential, and macroeconomic risks.
+          {t('ai.subtitle')}
         </p>
         <button
           onClick={fetchInsights}
@@ -66,12 +68,12 @@ export function AiAdvisorTab({ transactions, displayCurrency, usdArsRate }: AiAd
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin text-slate-300" />
-              <span>Analyzing financial portfolio...</span>
+              <span>{t('ai.analyzing')}</span>
             </>
           ) : (
             <>
               <Bot className="w-4 h-4 mr-2 text-amber-400" />
-              <span>Generate AI Financial Audit</span>
+              <span>{t('ai.generate')}</span>
             </>
           )}
         </button>
@@ -88,7 +90,7 @@ export function AiAdvisorTab({ transactions, displayCurrency, usdArsRate }: AiAd
         <div className="bg-[#161b22] p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
           <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
             <Bot className="w-5 h-5 text-amber-400" />
-            <h4 className="text-sm font-bold text-slate-100">Gemini Advisory Report</h4>
+            <h4 className="text-sm font-bold text-slate-100">{t('ai.report_title')}</h4>
           </div>
           <div className="markdown-body text-xs text-slate-300 leading-relaxed space-y-3">
             <ReactMarkdown>{insights}</ReactMarkdown>

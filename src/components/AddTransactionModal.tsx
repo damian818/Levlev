@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Transaction, AccountItem, CategoryItem } from '../types';
 import { 
   X, 
@@ -100,6 +101,7 @@ export function AddTransactionModal({
   initialAccount,
   usdArsRate = 1250
 }: AddTransactionModalProps) {
+  const { t, i18n } = useTranslation();
   
   // Local list state to support dynamic "Add New"
   const [categoriesList, setCategoriesList] = useState<string[]>(existingCategories);
@@ -760,20 +762,20 @@ export function AddTransactionModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-100">
-                {type === 'EXPENSE' && (editingTx && editingTx.id ? 'Edit Expense' : 'Record New Expense')}
-                {type === 'INCOME' && (editingTx && editingTx.id ? 'Edit Income' : 'Record New Income')}
-                {type === 'TRANSFER' && (editingTx && editingTx.id ? 'Edit Transfer' : 'Account Transfer')}
-                {type === 'CC_PAYMENT' && 'Credit Card Settlement'}
+                {type === 'EXPENSE' && (editingTx && editingTx.id ? t('add_tx.edit_expense') : t('add_tx.record_new_expense'))}
+                {type === 'INCOME' && (editingTx && editingTx.id ? t('add_tx.edit_income') : t('add_tx.record_new_income'))}
+                {type === 'TRANSFER' && (editingTx && editingTx.id ? t('add_tx.edit_transfer') : t('add_tx.account_transfer'))}
+                {type === 'CC_PAYMENT' && t('add_tx.cc_settlement')}
               </h3>
               <p className="text-[11px] text-slate-400">
-                {type === 'TRANSFER' ? 'Transfer funds with live FX calculation' : 'Fast, structured transaction logging'}
+                {type === 'TRANSFER' ? t('add_tx.transfer_desc') : t('add_tx.fast_logging')}
               </p>
             </div>
           </div>
           <button 
             onClick={onClose} 
             className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 rounded-xl transition-colors"
-            title="Close (Esc)"
+            title={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -791,7 +793,7 @@ export function AddTransactionModal({
             }`}
           >
             <ArrowDownLeft className="w-3.5 h-3.5 shrink-0" />
-            <span>Expense</span>
+            <span>{t('add_tx.expense')}</span>
           </button>
 
           <button
@@ -804,7 +806,7 @@ export function AddTransactionModal({
             }`}
           >
             <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
-            <span>Income</span>
+            <span>{t('add_tx.income')}</span>
           </button>
 
           <button
@@ -817,7 +819,7 @@ export function AddTransactionModal({
             }`}
           >
             <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
-            <span>Transfer</span>
+            <span>{t('add_tx.transfer')}</span>
           </button>
 
           <button
@@ -830,7 +832,7 @@ export function AddTransactionModal({
             }`}
           >
             <CreditCard className="w-3.5 h-3.5 shrink-0" />
-            <span>CC Pay</span>
+            <span>{t('add_tx.cc_pay')}</span>
           </button>
         </div>
 
@@ -840,10 +842,10 @@ export function AddTransactionModal({
           <div className="p-3.5 bg-[#0a0c10] border border-slate-800/90 rounded-2xl space-y-2">
             <div className="flex justify-between items-center text-[11px] font-medium text-slate-400">
               <label>
-                {type === 'TRANSFER' ? 'Sent Amount' : 'Amount'}
+                {type === 'TRANSFER' ? t('add_tx.sent_amount') : t('add_tx.amount')}
               </label>
               <div className="flex items-center space-x-1.5">
-                <span className="text-[10px] text-slate-500">Quick Date:</span>
+                <span className="text-[10px] text-slate-500">{t('add_tx.quick_date')}</span>
                 <button
                   type="button"
                   onClick={() => setDate(getTodayStr())}
@@ -851,7 +853,7 @@ export function AddTransactionModal({
                     date === getTodayStr() ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Today
+                  {t('add_tx.today')}
                 </button>
                 <button
                   type="button"
@@ -860,7 +862,7 @@ export function AddTransactionModal({
                     date === getYesterdayStr() ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Yesterday
+                  {t('add_tx.yesterday')}
                 </button>
               </div>
             </div>
@@ -903,7 +905,7 @@ export function AddTransactionModal({
           {/* TITLE INPUT WITH AUTOCOMPLETE SUGGESTIONS */}
           <div className="relative">
             <label className="block text-slate-400 font-medium mb-1">
-              {type === 'CC_PAYMENT' ? 'Payment Reference' : 'Title / Merchant'}
+              {type === 'CC_PAYMENT' ? t('add_tx.payment_ref') : t('add_tx.title_merchant')}
             </label>
             <div className="relative">
               <input
@@ -911,10 +913,10 @@ export function AddTransactionModal({
                 type="text"
                 required
                 placeholder={
-                  type === 'CC_PAYMENT' ? 'e.g. Resumen Agosto Visa BBVA' : 
-                  type === 'TRANSFER' ? 'e.g. Transferencia ahorro mensual' : 
-                  type === 'INCOME' ? 'e.g. Sueldo / Freelance' :
-                  'e.g. Uber, Supermercado Coto, YPF'
+                  type === 'CC_PAYMENT' ? t('add_tx.placeholder_cc_pay') : 
+                  type === 'TRANSFER' ? t('add_tx.placeholder_transfer') : 
+                  type === 'INCOME' ? t('add_tx.placeholder_income') :
+                  t('add_tx.placeholder_merchant')
                 }
                 value={title}
                 onChange={(e) => {
@@ -932,7 +934,7 @@ export function AddTransactionModal({
                   onMouseDown={(e) => e.preventDefault()} // Prevent input blur before click
                 >
                   <div className="px-2.5 py-1 text-[9px] uppercase tracking-wider text-slate-500 font-bold bg-[#11141c]">
-                    Previous Merchants / Suggestions
+                    {t('add_tx.previous_merchants')}
                   </div>
                   {titleSuggestions.map((item, idx) => (
                     <button
@@ -964,7 +966,7 @@ export function AddTransactionModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-400 font-medium mb-1 flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-slate-500" /> Transaction Date
+                <Calendar className="w-3 h-3 text-slate-500" /> {t('add_tx.tx_date')}
               </label>
               <input
                 type="date"
@@ -979,7 +981,7 @@ export function AddTransactionModal({
             {isCC && (
               <div>
                 <label className="block text-slate-400 font-medium mb-1 flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-amber-400" /> Statement Closing Date
+                  <Clock className="w-3 h-3 text-amber-400" /> {t('add_tx.statement_closing')}
                 </label>
                 <select
                   value={statementCloseDate}
@@ -1001,7 +1003,7 @@ export function AddTransactionModal({
             <div className="p-3.5 bg-gradient-to-br from-[#0c1322] to-[#111827] border border-sky-500/30 rounded-2xl space-y-3 shadow-sm">
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <span className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
-                  <ArrowRightLeft className="w-4 h-4" /> {editingTx && editingTx.id ? 'Edit Transfer' : 'Account Transfer'} & FX Conversion
+                  <ArrowRightLeft className="w-4 h-4" /> {editingTx && editingTx.id ? t('add_tx.edit_transfer') : t('add_tx.account_transfer')} & FX Conversion
                 </span>
                 <span className="text-[10px] bg-sky-500/10 text-sky-300 border border-sky-500/20 px-2 py-0.5 rounded-full font-medium">
                   {sourceCurrency} → {destCurrency}
@@ -1012,7 +1014,7 @@ export function AddTransactionModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
-                    From Account (Outflow)
+                    {t('add_tx.from_account')}
                   </label>
                   <select
                     value={account}
@@ -1024,13 +1026,13 @@ export function AddTransactionModal({
                         {acc.name} ({acc.currency})
                       </option>
                     ))}
-                    <option value="__ADD_NEW__" className="text-sky-400 font-bold">+ Add New Account...</option>
+                    <option value="__ADD_NEW__" className="text-sky-400 font-bold">{t('add_tx.add_new_account')}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
-                    To Account (Inflow)
+                    {t('add_tx.to_account')}
                   </label>
                   <select
                     value={toAccount}
@@ -1042,7 +1044,7 @@ export function AddTransactionModal({
                         {acc.name} ({acc.currency})
                       </option>
                     ))}
-                    <option value="__ADD_NEW__" className="text-sky-400 font-bold">+ Add New Account...</option>
+                    <option value="__ADD_NEW__" className="text-sky-400 font-bold">{t('add_tx.add_new_account')}</option>
                   </select>
                 </div>
               </div>
@@ -1052,7 +1054,7 @@ export function AddTransactionModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-medium mb-1 text-[10px]">
-                      Received Amount ({destCurrency})
+                      {t('add_tx.received_amount')} ({destCurrency})
                     </label>
                     <input
                       type="number"
@@ -1069,7 +1071,7 @@ export function AddTransactionModal({
 
                   <div>
                     <label className="block text-slate-400 font-medium mb-1 text-[10px] flex items-center justify-between">
-                      <span>FX Rate Used</span>
+                      <span>{t('add_tx.fx_rate')}</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -1078,7 +1080,7 @@ export function AddTransactionModal({
                         }}
                         className="text-[9px] text-amber-400 hover:text-amber-300 underline font-semibold flex items-center gap-0.5"
                       >
-                        <RefreshCw className="w-2.5 h-2.5" /> Live: {usdArsRate}
+                        <RefreshCw className="w-2.5 h-2.5" /> {t('add_tx.fx_auto')}: {usdArsRate}
                       </button>
                     </label>
                     <input
@@ -1113,12 +1115,12 @@ export function AddTransactionModal({
           {type === 'CC_PAYMENT' && (
             <div className="p-3.5 bg-purple-500/10 border border-purple-500/25 rounded-2xl space-y-3">
               <div className="text-[11px] font-bold text-purple-300 flex items-center gap-1.5">
-                <CreditCard className="w-3.5 h-3.5 text-purple-400" /> Credit Card Settlement Details
+                <CreditCard className="w-3.5 h-3.5 text-purple-400" /> {t('add_tx.cc_settlement')}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
-                    Paid From (Bank / Cash Account)
+                    {t('add_tx.from_account')}
                   </label>
                   <select
                     value={account}
@@ -1130,13 +1132,13 @@ export function AddTransactionModal({
                         {acc.name} ({acc.currency})
                       </option>
                     ))}
-                    <option value="__ADD_NEW__" className="text-purple-400 font-bold">+ Add New Account...</option>
+                    <option value="__ADD_NEW__" className="text-purple-400 font-bold">{t('add_tx.add_new_account')}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
-                    Paid To (Credit Card)
+                    {t('add_tx.to_account')}
                   </label>
                   <select
                     value={toAccount}
@@ -1148,7 +1150,7 @@ export function AddTransactionModal({
                         💳 {acc.name} ({acc.currency})
                       </option>
                     ))}
-                    <option value="__ADD_NEW__" className="text-purple-400 font-bold">+ Add New Credit Card...</option>
+                    <option value="__ADD_NEW__" className="text-purple-400 font-bold">{t('add_tx.add_new_account')}</option>
                   </select>
                 </div>
               </div>
@@ -1162,14 +1164,14 @@ export function AddTransactionModal({
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-slate-400 font-medium flex items-center gap-1">
-                    <Tag className="w-3 h-3 text-slate-500" /> Category
+                    <Tag className="w-3 h-3 text-slate-500" /> {t('add_tx.category')}
                   </label>
                   <button
                     type="button"
                     onClick={() => setIsAddingCategory(true)}
                     className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-0.5"
                   >
-                    <Plus className="w-2.5 h-2.5" /> New
+                    <Plus className="w-2.5 h-2.5" /> {t('common.add')}
                   </button>
                 </div>
                 <select
@@ -1182,7 +1184,7 @@ export function AddTransactionModal({
                       {catName}
                     </option>
                   ))}
-                  <option value="__ADD_NEW__" className="text-emerald-400 font-bold">+ Add New Category...</option>
+                  <option value="__ADD_NEW__" className="text-emerald-400 font-bold">{t('add_tx.add_new_category')}</option>
                 </select>
               </div>
 
@@ -1190,14 +1192,14 @@ export function AddTransactionModal({
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-slate-400 font-medium flex items-center gap-1">
-                    <Wallet className="w-3 h-3 text-slate-500" /> Account
+                    <Wallet className="w-3 h-3 text-slate-500" /> {t('common.account')}
                   </label>
                   <button
                     type="button"
                     onClick={() => setIsAddingAccount(true)}
                     className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-0.5"
                   >
-                    <Plus className="w-2.5 h-2.5" /> New
+                    <Plus className="w-2.5 h-2.5" /> {t('common.add')}
                   </button>
                 </div>
                 <select
@@ -1210,7 +1212,7 @@ export function AddTransactionModal({
                       {acc.name} ({acc.currency})
                     </option>
                   ))}
-                  <option value="__ADD_NEW__" className="text-emerald-400 font-bold">+ Add New Account...</option>
+                  <option value="__ADD_NEW__" className="text-emerald-400 font-bold">{t('add_tx.add_new_account')}</option>
                 </select>
               </div>
             </div>
@@ -1221,10 +1223,10 @@ export function AddTransactionModal({
             <div className="p-3.5 bg-[#0d1017] border border-slate-800 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-amber-400" /> Installments / Cuotas Breakdown
+                  <Layers className="w-3.5 h-3.5 text-amber-400" /> {t('add_tx.installments')}
                 </span>
                 <span className="text-[10px] text-slate-400 font-mono">
-                  {numInstallments === 1 ? 'Single Payment' : `${numInstallments} Monthly Payments`}
+                  {numInstallments === 1 ? t('add_tx.one_payment') : t('common.monthly_payments', { count: numInstallments })}
                 </span>
               </div>
 
@@ -1334,7 +1336,7 @@ export function AddTransactionModal({
               onClick={onClose}
               className="px-4 py-2 border border-slate-700 rounded-xl font-semibold text-slate-300 bg-[#121620] hover:bg-slate-800 transition-colors text-xs"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
@@ -1347,10 +1349,10 @@ export function AddTransactionModal({
             >
               <Check className="w-4 h-4" />
               <span>
-                {type === 'EXPENSE' && (numInstallments > 1 ? `Save ${numInstallments} Installments` : 'Save Expense')}
-                {type === 'INCOME' && 'Save Income'}
-                {type === 'TRANSFER' && 'Complete Transfer'}
-                {type === 'CC_PAYMENT' && 'Record Payment'}
+                {type === 'EXPENSE' && (numInstallments > 1 ? t('common.save_installments', { count: numInstallments }) : t('add_tx.save_tx'))}
+                {type === 'INCOME' && t('add_tx.save_tx')}
+                {type === 'TRANSFER' && t('add_tx.save_tx')}
+                {type === 'CC_PAYMENT' && t('add_tx.save_tx')}
               </span>
             </button>
           </div>
@@ -1363,7 +1365,7 @@ export function AddTransactionModal({
             <div className="bg-[#161b22] border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                 <h4 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
-                  <Tag className="w-4 h-4 text-emerald-400" /> Create New Category
+                  <Tag className="w-4 h-4 text-emerald-400" /> {t('add_tx.add_category_title')}
                 </h4>
                 <button 
                   type="button" 
@@ -1377,7 +1379,7 @@ export function AddTransactionModal({
               <form onSubmit={handleSaveNewCategory} className="space-y-3">
                 <div>
                   <label className="block text-slate-300 text-xs font-semibold mb-1">
-                    Category Name
+                    {t('add_tx.name')}
                   </label>
                   <input
                     type="text"
@@ -1396,13 +1398,13 @@ export function AddTransactionModal({
                     onClick={() => setIsAddingCategory(false)}
                     className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg text-xs font-semibold"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold"
                   >
-                    Add Category
+                    {t('common.add')}
                   </button>
                 </div>
               </form>
@@ -1416,7 +1418,7 @@ export function AddTransactionModal({
             <div className="bg-[#161b22] border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                 <h4 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
-                  <Wallet className="w-4 h-4 text-sky-400" /> Create New Account
+                  <Wallet className="w-4 h-4 text-sky-400" /> {t('add_tx.add_account_title')}
                 </h4>
                 <button 
                   type="button" 
@@ -1430,7 +1432,7 @@ export function AddTransactionModal({
               <form onSubmit={handleSaveNewAccount} className="space-y-3">
                 <div>
                   <label className="block text-slate-300 text-xs font-semibold mb-1">
-                    Account Name
+                    {t('add_tx.name')}
                   </label>
                   <input
                     type="text"
@@ -1446,7 +1448,7 @@ export function AddTransactionModal({
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-slate-300 text-xs font-semibold mb-1">
-                      Type
+                      {t('add_tx.type')}
                     </label>
                     <select
                       value={newAccType}
@@ -1462,7 +1464,7 @@ export function AddTransactionModal({
 
                   <div>
                     <label className="block text-slate-300 text-xs font-semibold mb-1">
-                      Currency
+                      {t('add_tx.currency')}
                     </label>
                     <select
                       value={newAccCurrency}
@@ -1481,13 +1483,13 @@ export function AddTransactionModal({
                     onClick={() => setIsAddingAccount(false)}
                     className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg text-xs font-semibold"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold"
                   >
-                    Create Account
+                    {t('common.add')}
                   </button>
                 </div>
               </form>

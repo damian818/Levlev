@@ -177,7 +177,7 @@ export function Navbar({
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
-                  title="Switch to English"
+                  title={t('landing.lang_en')}
                 >
                   EN
                 </button>
@@ -192,7 +192,7 @@ export function Navbar({
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
-                  title="Cambiar a Español"
+                  title={t('landing.lang_es')}
                 >
                   ES
                 </button>
@@ -219,7 +219,7 @@ export function Navbar({
                     setDisplayCurrency(e.target.value as DisplayCurrency);
                   }}
                   className="bg-[#0f131a] text-slate-200 text-xs font-bold px-2.5 py-2 rounded-lg border border-slate-700 focus:outline-none cursor-pointer hover:border-slate-600 transition-colors min-h-[36px]"
-                  title="Select active view currency"
+                  title={t('nav.display_currency_label')}
                 >
                   <option value="ARS">ARS ($)</option>
                   <option value="USD">USD ($)</option>
@@ -257,7 +257,7 @@ export function Navbar({
                       ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-xs shadow-amber-950/50'
                       : 'bg-[#161b22] border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                   }`}
-                  title={privacyMode ? 'Privacy Mode Active (Figures Masked)' : 'Enable Privacy Mode'}
+                  title={privacyMode ? t('nav.private_mode') : t('nav.privacy_off')}
                 >
                   {privacyMode ? (
                     <>
@@ -283,11 +283,11 @@ export function Navbar({
                       ? 'bg-purple-500/20 border-purple-500/40 text-purple-300 shadow-xs shadow-purple-950/50'
                       : 'bg-[#161b22] border-slate-700 text-purple-300 hover:text-white hover:bg-slate-800'
                   }`}
-                  title="Share Workspace with family or partner"
+                  title={t('nav.share_household')}
                 >
                   <Users className="w-3.5 h-3.5 text-purple-400" />
                   <span>
-                    {isWorkspaceShared ? `Household (${workspaceMembersCount})` : t('nav.share_household')}
+                    {isWorkspaceShared ? t('nav.household', { count: workspaceMembersCount }) : t('nav.share_household')}
                   </span>
                 </button>
 
@@ -300,7 +300,7 @@ export function Navbar({
                   className="cursor-pointer inline-flex items-center justify-center px-3.5 py-2.5 border border-slate-800 rounded-xl text-xs font-medium text-slate-300 bg-[#161b22] hover:bg-slate-800 transition-colors shrink-0 min-h-[44px] min-w-[44px]"
                 >
                   <Upload className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
-                  <span>Import</span>
+                  <span>{t('nav.import')}</span>
                 </button>
 
                 {/* Google SSO Login */}
@@ -311,7 +311,7 @@ export function Navbar({
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
                       : 'bg-[#161b22] border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
                   }`}
-                  title={user ? `Signed in as ${user.email}` : 'Sign in with Google SSO'}
+                  title={user ? t('nav.signed_in_as', { email: user.email }) : t('nav.sign_in_google')}
                 >
                   {user ? (
                     <>
@@ -321,7 +321,7 @@ export function Navbar({
                   ) : (
                     <>
                       <LogIn className="w-3.5 h-3.5 text-teal-400" />
-                      <span>Google SSO</span>
+                      <span>{t('nav.google_sso')}</span>
                     </>
                   )}
                 </button>
@@ -344,7 +344,7 @@ export function Navbar({
                     triggerHaptic(15);
                     onOpenDeleteModal();
                   }}
-                  title="Delete data"
+                  title={t('nav.reset_data')}
                   className="p-2.5 text-rose-500/60 hover:text-rose-400 transition-colors rounded-xl hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 min-h-[44px] min-w-[44px] flex items-center justify-center"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -373,7 +373,7 @@ export function Navbar({
           {mobileToolsOpen && (
             <div className="lg:hidden p-3.5 bg-[#121722] border-t border-b border-slate-800 rounded-2xl mb-2 space-y-3 shadow-xl animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between text-xs font-bold text-slate-400 border-b border-slate-800 pb-2">
-                <span>Quick Options & Preferences</span>
+                <span>{t('nav.quick_options')}</span>
                 <span className="text-[10px] text-slate-500 font-mono">LevLev Tools</span>
               </div>
 
@@ -381,7 +381,7 @@ export function Navbar({
                 
                 {/* Rate setting */}
                 <div className="col-span-2 flex items-center justify-between bg-[#0a0c10] px-3 py-2 rounded-xl border border-slate-800 min-h-[44px]">
-                  <span className="text-slate-400 font-medium">USD/ARS FX Rate:</span>
+                  <span className="text-slate-400 font-medium">{t('nav.fx_rate_label')}</span>
                   <div className="flex items-center gap-1">
                     <span className="text-slate-500">$</span>
                     <input
@@ -395,7 +395,7 @@ export function Navbar({
 
                 {/* Display Currency Selection (Mobile) */}
                 <div className="col-span-2 flex items-center justify-between bg-[#0a0c10] px-3 py-2 rounded-xl border border-slate-800 min-h-[44px]">
-                  <span className="text-slate-400 font-medium">Display Currency:</span>
+                  <span className="text-slate-400 font-medium">{t('nav.display_currency_label')}</span>
                   <select
                     value={displayCurrency}
                     onChange={(e) => {
@@ -428,7 +428,7 @@ export function Navbar({
                   }`}
                 >
                   {privacyMode ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
-                  <span>{privacyMode ? 'Private Mode' : 'Privacy Off'}</span>
+                  <span>{privacyMode ? t('nav.private_mode') : t('nav.privacy_off')}</span>
                 </button>
 
                 {/* Share Household */}
@@ -445,7 +445,7 @@ export function Navbar({
                   }`}
                 >
                   <Users className="w-4 h-4 text-purple-400" />
-                  <span>{isWorkspaceShared ? `Household (${workspaceMembersCount})` : 'Share House'}</span>
+                  <span>{isWorkspaceShared ? t('nav.household', { count: workspaceMembersCount }) : t('nav.share_house')}</span>
                 </button>
 
                 {/* Import CSV */}
@@ -458,7 +458,7 @@ export function Navbar({
                   className="flex items-center justify-center gap-2 p-2.5 rounded-xl font-bold bg-[#161b22] border border-slate-800 text-slate-300 hover:text-white min-h-[44px]"
                 >
                   <Upload className="w-4 h-4 text-slate-400" />
-                  <span>Import CSV</span>
+                  <span>{t('common.import_csv')}</span>
                 </button>
 
                 {/* Language Switcher Segmented Control (Mobile) */}
@@ -513,7 +513,7 @@ export function Navbar({
                   }`}
                 >
                   {user ? <UserCheck className="w-4 h-4 text-emerald-400" /> : <LogIn className="w-4 h-4 text-teal-400" />}
-                  <span className="truncate">{user ? user.email?.split('@')[0] : 'Google SSO'}</span>
+                  <span className="truncate">{user ? user.email?.split('@')[0] : t('nav.google_sso')}</span>
                 </button>
               </div>
 
@@ -528,7 +528,7 @@ export function Navbar({
                     className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30 min-h-[44px]"
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    <span>Log Out</span>
+                    <span>{t('nav.logout')}</span>
                   </button>
                 ) : <div />}
 
@@ -541,7 +541,7 @@ export function Navbar({
                   className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 text-rose-400/80 hover:text-rose-400 border border-slate-700 min-h-[44px]"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>Reset / Delete Data</span>
+                  <span>{t('nav.reset_data')}</span>
                 </button>
               </div>
             </div>
@@ -590,7 +590,7 @@ export function Navbar({
           }`}
         >
           <LayoutDashboard className={`w-5 h-5 ${currentTab === 'overview' ? 'text-emerald-400' : 'text-slate-400'}`} />
-          <span className="text-[10px] mt-0.5 tracking-tight font-semibold">Overview</span>
+          <span className="text-[10px] mt-0.5 tracking-tight font-semibold">{t('nav.overview')}</span>
         </button>
 
         {/* 2. Transactions */}
@@ -607,7 +607,7 @@ export function Navbar({
           }`}
         >
           <Receipt className={`w-5 h-5 ${currentTab === 'transactions' ? 'text-emerald-400' : 'text-slate-400'}`} />
-          <span className="text-[10px] mt-0.5 tracking-tight font-semibold">Txs</span>
+          <span className="text-[10px] mt-0.5 tracking-tight font-semibold">{t('nav.transactions_short')}</span>
         </button>
 
         {/* 3. CENTER PROMINENT FLOATING "+ NEW TRANSACTION" ACTION BUTTON WITH DISTINCT HAPTIC FEEDBACK */}
@@ -618,7 +618,7 @@ export function Navbar({
             setMoreMenuOpen(false);
           }}
           className="-translate-y-4 flex flex-col items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-emerald-400 text-white shadow-xl shadow-emerald-500/30 border-4 border-[#0a0b0d] hover:scale-105 active:scale-95 transition-all shrink-0 cursor-pointer min-h-[56px] min-w-[56px]"
-          title="Create New Transaction"
+          title={t('nav.new_transaction')}
         >
           <Plus className="w-6 h-6 stroke-[3] text-white" />
         </button>
@@ -637,7 +637,7 @@ export function Navbar({
           }`}
         >
           <Wallet className={`w-5 h-5 ${currentTab === 'accounts' ? 'text-emerald-400' : 'text-slate-400'}`} />
-          <span className="text-[10px] mt-0.5 tracking-tight font-semibold">Accounts</span>
+          <span className="text-[10px] mt-0.5 tracking-tight font-semibold">{t('nav.accounts')}</span>
         </button>
 
         {/* 5. More Tabs Menu Drawer Trigger */}
@@ -653,7 +653,7 @@ export function Navbar({
           }`}
         >
           <Grid className={`w-5 h-5 ${moreMenuOpen || !['overview', 'transactions', 'accounts'].includes(currentTab) ? 'text-emerald-400' : 'text-slate-400'}`} />
-          <span className="text-[10px] mt-0.5 tracking-tight font-semibold">More</span>
+          <span className="text-[10px] mt-0.5 tracking-tight font-semibold">{t('nav.more')}</span>
         </button>
       </nav>
 
@@ -672,7 +672,7 @@ export function Navbar({
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Grid className="w-5 h-5 text-emerald-400" />
-                <h3 className="font-extrabold text-white text-base">All Views & Modules</h3>
+                <h3 className="font-extrabold text-white text-base">{t('nav.all_views')}</h3>
               </div>
               <button 
                 onClick={() => {

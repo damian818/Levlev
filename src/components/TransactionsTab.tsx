@@ -46,7 +46,7 @@ export function TransactionsTab({
   showSharedData = true,
   userTimezone = 'America/Argentina/Buenos_Aires',
 }: TransactionsTabProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchTerm, setSearchTerm] = useState(activeFilter?.search || '');
   const [selectedType, setSelectedType] = useState<string>(activeFilter?.type || 'ALL');
   const [selectedCategory, setSelectedCategory] = useState<string>(activeFilter?.category || 'ALL');
@@ -346,7 +346,7 @@ export function TransactionsTab({
             className="text-slate-400 hover:text-slate-200 flex items-center space-x-1 underline text-[11px]"
           >
             <X className="w-3 h-3" />
-            <span>Reset Filters</span>
+            <span>{t('transactions.reset_filters')}</span>
           </button>
         </div>
       )}
@@ -388,7 +388,7 @@ export function TransactionsTab({
               }`}
               title="Show only single one-time transactions"
             >
-              One-time
+              {t('common.one_time', 'One-time')}
             </button>
             <button
               type="button"
@@ -401,7 +401,7 @@ export function TransactionsTab({
               title="Show only recurring bills, subscriptions, installments, and fixed costs"
             >
               <Repeat className="w-3 h-3 text-purple-400" />
-              <span>Recurring</span>
+              <span>{t('recurring.title_short', 'Recurring')}</span>
             </button>
           </div>
 
@@ -416,7 +416,7 @@ export function TransactionsTab({
             title="Future transactions are hidden from balances by default"
           >
             <Clock className={`w-3.5 h-3.5 ${showFutureTransactions ? 'text-amber-400' : 'text-slate-500'}`} />
-            <span>{showFutureTransactions ? 'Showing Future' : 'Future Hidden'}</span>
+            <span>{showFutureTransactions ? t('transactions.showing_future') : t('transactions.future_hidden')}</span>
           </button>
         </div>
 
@@ -426,7 +426,7 @@ export function TransactionsTab({
             onChange={(e) => setSelectedMonth(e.target.value)}
             className="px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-500 font-medium"
           >
-            <option value="ALL">All Months</option>
+            <option value="ALL">{t('transactions.all_months')}</option>
             {availableMonths.map(m => (
               <option key={m} value={m}>{m} {m === currentMonthKey ? `(${t('common.today')})` : ''}</option>
             ))}
@@ -565,7 +565,7 @@ export function TransactionsTab({
                   className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
                 >
                   <div className="flex items-center gap-1">
-                    <span>Date</span>
+                    <span>{t('common.date')}</span>
                     {sortField === 'date' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
                     ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
@@ -576,7 +576,7 @@ export function TransactionsTab({
                   className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
                 >
                   <div className="flex items-center gap-1">
-                    <span>Title / Merchant</span>
+                    <span>{t('transactions.merchant_title')}</span>
                     {sortField === 'title' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
                     ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
@@ -587,7 +587,7 @@ export function TransactionsTab({
                   className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
                 >
                   <div className="flex items-center gap-1">
-                    <span>Category</span>
+                    <span>{t('common.category')}</span>
                     {sortField === 'category' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
                     ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
@@ -598,7 +598,7 @@ export function TransactionsTab({
                   className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
                 >
                   <div className="flex items-center gap-1">
-                    <span>Account</span>
+                    <span>{t('common.account')}</span>
                     {sortField === 'account' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
                     ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
@@ -609,7 +609,7 @@ export function TransactionsTab({
                   className="p-3 cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
                 >
                   <div className="flex items-center gap-1">
-                    <span>Type</span>
+                    <span>{t('common.type')}</span>
                     {sortField === 'type' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
                     ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
@@ -620,7 +620,7 @@ export function TransactionsTab({
                   className="p-3 text-right cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
                 >
                   <div className="flex items-center justify-end gap-1">
-                    <span>Original Amount</span>
+                    <span>{t('transactions.original_amount')}</span>
                     {sortField === 'amount' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
                     ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
@@ -631,20 +631,20 @@ export function TransactionsTab({
                   className="p-3 text-right cursor-pointer hover:bg-slate-800/80 transition-colors select-none"
                 >
                   <div className="flex items-center justify-end gap-1">
-                    <span>Converted ({displayCurrency})</span>
+                    <span>{t('transactions.converted_amount', { currency: displayCurrency })}</span>
                     {sortField === 'converted' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
                     ) : <ArrowUpDown className="w-3 h-3 text-slate-600" />}
                   </div>
                 </th>
-                <th className="p-3 text-center">Actions</th>
+                <th className="p-3 text-center">{t('nav.more')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {paginated.length === 0 ? (
                 <tr>
                   <td colSpan={isBulkMode ? 9 : 8} className="p-8 text-center text-slate-500">
-                    No transactions match your filters.
+                    {t('transactions.no_matches')}
                   </td>
                 </tr>
               ) : (
@@ -684,14 +684,14 @@ export function TransactionsTab({
                           <span>
                             {tx.date
                               ? tx.date.includes('T')
-                                ? new Date(tx.date).toLocaleDateString('en-US', { timeZone: userTimezone })
-                                : new Date(`${tx.date.substring(0, 10)}T12:00:00`).toLocaleDateString()
+                                ? new Date(tx.date).toLocaleDateString(i18n.language === 'es' ? 'es-AR' : 'en-US', { timeZone: userTimezone })
+                                : new Date(`${tx.date.substring(0, 10)}T12:00:00`).toLocaleDateString(i18n.language === 'es' ? 'es-AR' : undefined)
                               : 'N/A'}
                           </span>
                           {isFuture && (
                             <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold inline-flex items-center w-fit" title="Future date - transaction is pending and excluded from current live balances">
                               <Clock className="w-2.5 h-2.5 mr-0.5 shrink-0" />
-                              Pending/Future
+                              {t('transactions.pending_future')}
                             </span>
                           )}
                         </div>
@@ -700,14 +700,14 @@ export function TransactionsTab({
                         <div className="flex items-center space-x-1.5">
                           <span>{tx.title}</span>
                           {tx.ownerId && currentUserId && tx.ownerId !== currentUserId && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[9px] font-bold" title="Shared by another workspace member">Shared</span>
+                            <span className="px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[9px] font-bold" title="Shared by another workspace member">{t('transactions.shared')}</span>
                           )}
                         </div>
                         {tx.description && <div className="text-[10px] text-slate-500">{tx.description}</div>}
                       </td>
                       <td className="p-3 text-slate-300">
                         <span className="px-2 py-0.5 bg-slate-800 border border-slate-700/80 rounded-md text-slate-300 font-medium">
-                          {tx.category || 'General'}
+                          {tx.category || t('common.general', 'General')}
                         </span>
                       </td>
                       <td className="p-3 text-slate-300 font-medium">
@@ -867,21 +867,21 @@ export function TransactionsTab({
                 className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>Delete ALL Installments in this Series</span>
+                <span>{t('transactions.delete_all_series')}</span>
               </button>
 
               <button
                 onClick={handleDeleteOnlySingleCuota}
                 className="w-full py-2.5 px-4 bg-[#21262d] hover:bg-[#30363d] border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors text-center"
               >
-                Delete ONLY this single Cuota ({installmentTxToDelete.installments || '1'})
+                {t('transactions.delete_single_cuota')} ({installmentTxToDelete.installments || '1'})
               </button>
 
               <button
                 onClick={() => setInstallmentTxToDelete(null)}
                 className="w-full py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors text-center mt-1"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -924,7 +924,7 @@ export function TransactionsTab({
               onClick={() => setBulkActionTarget(null)}
               className="w-full py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </div>
@@ -966,7 +966,7 @@ export function TransactionsTab({
               onClick={() => setBulkActionTarget(null)}
               className="w-full py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </div>

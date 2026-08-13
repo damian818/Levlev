@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Transaction, BudgetGoal, DisplayCurrency } from '../types';
 import { analyzeSpending, formatCurrency, convertCurrency, deriveBudgetsFromTransactions, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth } from '../utils/financeUtils';
 import { Target, AlertTriangle, CheckCircle, Plus, Calendar, RefreshCw, Sparkles } from 'lucide-react';
@@ -12,6 +13,7 @@ interface BudgetTabProps {
 }
 
 export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurrency, usdArsRate }: BudgetTabProps) {
+  const { t } = useTranslation();
   const [budgetList, setBudgetList] = useState<BudgetGoal[]>(budgets);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -70,9 +72,9 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
         <div>
           <h3 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
             <Target className="w-5 h-5 text-emerald-400" />
-            <span>Monthly Budget Goals</span>
+            <span>{t('budget.monthly_goals')}</span>
           </h3>
-          <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">Control spending limits across categories.</p>
+          <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{t('budget.control_spending')}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
@@ -84,7 +86,7 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="bg-transparent border-none py-0 text-xs text-slate-200 font-semibold focus:outline-none"
             >
-              <option value="ALL">All Time</option>
+              <option value="ALL">{t('budget.all_time')}</option>
               {availableMonths.map((m) => (
                 <option key={m} value={m}>
                   {m}
@@ -100,13 +102,13 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
                   onClick={() => setIsEditing(false)}
                   className="flex-1 sm:flex-none px-3 py-1.5 border border-slate-700 rounded-lg text-xs font-medium text-slate-300 bg-[#121620] hover:bg-slate-800"
                 >
-                  Cancel
+                  {t('budget.cancel')}
                 </button>
                 <button
                   onClick={handleSave}
                   className="flex-1 sm:flex-none px-3 py-1.5 bg-emerald-600 border border-emerald-500 text-white rounded-lg text-xs font-medium hover:bg-emerald-500"
                 >
-                  Save
+                  {t('budget.save')}
                 </button>
               </div>
             ) : (
@@ -115,7 +117,7 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
                   onClick={() => setIsEditing(true)}
                   className="flex-1 sm:flex-none px-3 py-1.5 border border-slate-700 rounded-lg text-xs font-medium text-slate-300 bg-[#121620] hover:bg-slate-800"
                 >
-                  Configure
+                  {t('budget.configure')}
                 </button>
               </div>
             )}
@@ -129,9 +131,9 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
             <Sparkles className="w-6 h-6" />
           </div>
           <div className="max-w-md mx-auto space-y-1">
-            <h4 className="text-base font-bold text-slate-100">No Budget Goals Set Yet</h4>
+            <h4 className="text-base font-bold text-slate-100">{t('budget.no_goals_title')}</h4>
             <p className="text-xs text-slate-400">
-              Generate automatic category budget limits based on your uploaded CSV transaction categories.
+              {t('budget.no_goals_desc')}
             </p>
           </div>
           <button
@@ -139,7 +141,7 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition-colors inline-flex items-center space-x-2"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Generate Budget Goals for CSV Categories</span>
+            <span>{t('budget.generate')}</span>
           </button>
         </div>
       ) : (
@@ -160,17 +162,17 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
                     <h4 className="text-sm font-bold text-slate-100">{budget.category}</h4>
                   </div>
                   {isOver ? (
-                    <span className="px-2 py-0.5 bg-rose-950/80 border border-rose-800/50 text-rose-300 text-[10px] font-bold rounded">Over Budget</span>
+                    <span className="px-2 py-0.5 bg-rose-950/80 border border-rose-800/50 text-rose-300 text-[10px] font-bold rounded">{t('budget.over')}</span>
                   ) : (
-                    <span className="px-2 py-0.5 bg-emerald-950/80 border border-emerald-800/50 text-emerald-300 text-[10px] font-bold rounded">On Track</span>
+                    <span className="px-2 py-0.5 bg-emerald-950/80 border border-emerald-800/50 text-emerald-300 text-[10px] font-bold rounded">{t('budget.on_track')}</span>
                   )}
                 </div>
 
                 <div className="flex justify-between items-baseline text-xs">
-                  <span className="text-slate-400">Spent ({selectedMonth === 'ALL' ? 'All-time' : selectedMonth}): <strong className="text-slate-100">{formatCurrency(categorySpent, displayCurrency)}</strong></span>
+                  <span className="text-slate-400">{t('budget.spent')} ({selectedMonth === 'ALL' ? t('budget.all_time') : selectedMonth}): <strong className="text-slate-100">{formatCurrency(categorySpent, displayCurrency)}</strong></span>
                   {isEditing ? (
                     <div className="flex items-center space-x-1">
-                      <span className="text-slate-400">Limit (ARS):</span>
+                      <span className="text-slate-400">{t('budget.limit')} (ARS):</span>
                       <input
                         type="number"
                         value={budget.monthlyLimitARS}
@@ -179,7 +181,7 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
                       />
                     </div>
                   ) : (
-                    <span className="text-slate-400">Limit: <strong className="text-slate-100">{formatCurrency(limitConverted, displayCurrency)}</strong></span>
+                    <span className="text-slate-400">{t('budget.limit')}: <strong className="text-slate-100">{formatCurrency(limitConverted, displayCurrency)}</strong></span>
                   )}
                 </div>
 
@@ -192,8 +194,8 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
                 </div>
 
                 <div className="flex justify-between items-center text-[11px] text-slate-500">
-                  <span>{percentage.toFixed(1)}% used</span>
-                  <span>Remaining: {formatCurrency(Math.max(limitConverted - categorySpent, 0), displayCurrency)}</span>
+                  <span>{percentage.toFixed(1)}% {t('budget.used')}</span>
+                  <span>{t('budget.remaining')}: {formatCurrency(Math.max(limitConverted - categorySpent, 0), displayCurrency)}</span>
                 </div>
               </div>
             );
