@@ -116,7 +116,8 @@ export function AddTransactionModal({
 
   useEffect(() => {
     if (accountsList && accountsList.length > 0) {
-      setAccountItems(accountsList);
+      const sorted = [...accountsList].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      setAccountItems(sorted);
     } else {
       // Fallback convert strings to AccountItems
       const items: AccountItem[] = existingAccounts.map((name, idx) => ({
@@ -1021,7 +1022,7 @@ export function AddTransactionModal({
                     onChange={(e) => handleAccountChange(e.target.value)}
                     className="w-full px-3 py-2 bg-[#0a0c10] border border-slate-700 text-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 font-medium text-xs cursor-pointer"
                   >
-                    {accountItems.map((acc) => (
+                    {visibleAccountItems.map((acc) => (
                       <option key={acc.id} value={acc.name}>
                         {acc.name} ({acc.currency})
                       </option>
@@ -1039,7 +1040,7 @@ export function AddTransactionModal({
                     onChange={(e) => handleToAccountChange(e.target.value)}
                     className="w-full px-3 py-2 bg-[#0a0c10] border border-slate-700 text-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-500 font-medium text-xs cursor-pointer"
                   >
-                    {accountItems.map((acc) => (
+                    {visibleAccountItems.map((acc) => (
                       <option key={acc.id} value={acc.name}>
                         {acc.name} ({acc.currency})
                       </option>
@@ -1207,7 +1208,7 @@ export function AddTransactionModal({
                   onChange={(e) => handleAccountChange(e.target.value)}
                   className="w-full px-3 py-2 bg-[#0a0c10] border border-slate-700 text-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-slate-500 text-xs font-medium cursor-pointer"
                 >
-                  {accountItems.map((acc) => (
+                  {visibleAccountItems.map((acc) => (
                     <option key={acc.id} value={acc.name}>
                       {acc.name} ({acc.currency})
                     </option>

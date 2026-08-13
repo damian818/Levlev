@@ -111,7 +111,21 @@ export const AccountsTab = React.memo(function AccountsTab({
 
   const handleReorderAllAccounts = (newOrder: typeof allAccountMetrics) => {
     if (!onReorderAccounts) return;
-    const reorderedItems = newOrder.map(re => accounts.find(a => a.name === re.accountName)).filter(Boolean) as AccountItem[];
+    const reorderedItems: AccountItem[] = newOrder.map((acc, idx) => {
+      const existing = accounts.find(a => a.name.toLowerCase() === acc.accountName.toLowerCase());
+      if (existing) {
+        return { ...existing, order: idx };
+      }
+      return {
+        id: `acc-${Date.now()}-${idx}`,
+        name: acc.accountName,
+        type: acc.isCreditCard ? 'CREDIT_CARD' : 'CHECKING',
+        currency: acc.currency,
+        closingRule: acc.closingRule,
+        icon: acc.icon,
+        order: idx
+      };
+    });
     onReorderAccounts(reorderedItems);
   };
 
@@ -188,7 +202,7 @@ export const AccountsTab = React.memo(function AccountsTab({
 
   // Reconstructed summary list with Credit Card classification
   const reconstructedAccounts = useMemo(() => {
-    return computedSummaries.map(summary => {
+    const list = computedSummaries.map(summary => {
       const name = summary.accountName;
       const currency = summary.originalCurrency;
       const isUsd = currency.toUpperCase().includes('USD');
@@ -227,7 +241,18 @@ export const AccountsTab = React.memo(function AccountsTab({
         statements,
       };
     });
-  }, [computedSummaries, filteredTransactions, accounts, periodStatusOverrides, customBalances]);
+
+    const itemOrderMap = new Map<string, number>();
+    filteredAccountItems.forEach((acc, idx) => {
+      itemOrderMap.set(acc.name.toLowerCase(), acc.order !== undefined ? acc.order : idx);
+    });
+
+    return list.sort((a, b) => {
+      const orderA = itemOrderMap.has(a.accountName.toLowerCase()) ? itemOrderMap.get(a.accountName.toLowerCase())! : 999;
+      const orderB = itemOrderMap.has(b.accountName.toLowerCase()) ? itemOrderMap.get(b.accountName.toLowerCase())! : 999;
+      return orderA - orderB;
+    });
+  }, [computedSummaries, filteredTransactions, accounts, filteredAccountItems, periodStatusOverrides, customBalances]);
 
   const allAccountMetrics = reconstructedAccounts;
 
@@ -415,7 +440,7 @@ export const AccountsTab = React.memo(function AccountsTab({
             axis="y" 
             values={allAccountMetrics} 
             onReorder={handleReorderAllAccounts}
-            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            className="space-y-3"
           >
             {allAccountMetrics.map((acc) => {
               const isCC = acc.isCreditCard;

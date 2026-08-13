@@ -190,10 +190,32 @@ export const TransactionsTab = React.memo(function TransactionsTab({
   }, [transactions]);
 
   const accounts = useMemo(() => {
-    const set = new Set<string>();
-    transactions.forEach(t => { if (t.account) set.add(t.account); });
-    return Array.from(set).sort();
-  }, [transactions]);
+    const list: string[] = [];
+    const added = new Set<string>();
+
+    if (accountsList && accountsList.length > 0) {
+      const sorted = [...accountsList].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      sorted.forEach(a => {
+        if (!a.isHiddenFromNewTx && !added.has(a.name)) {
+          added.add(a.name);
+          list.push(a.name);
+        }
+      });
+    }
+
+    transactions.forEach(t => {
+      if (t.account && !added.has(t.account)) {
+        added.add(t.account);
+        list.push(t.account);
+      }
+      if (t.toAccount && !added.has(t.toAccount)) {
+        added.add(t.toAccount);
+        list.push(t.toAccount);
+      }
+    });
+
+    return list;
+  }, [accountsList, transactions]);
 
   // Set of recurring transaction IDs
   const recurringTxSet = useMemo(() => {
