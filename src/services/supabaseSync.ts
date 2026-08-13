@@ -69,11 +69,12 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
   const userId = session.user.id;
 
   try {
-    const [catRes, accRes, budRes, setRes] = await Promise.all([
+    const [catRes, accRes, budRes, setRes, txResFirstPage] = await Promise.all([
       client.from('categories').select('*'),
       client.from('accounts').select('*'),
       client.from('budgets').select('*'),
       client.from('user_settings').select('*').eq('user_id', session.user.id).maybeSingle(),
+      client.from('transactions').select('*').order('date', { ascending: false }).range(0, 999),
     ]);
 
     if (catRes.error) console.warn('Supabase fetch categories error:', catRes.error);
@@ -95,35 +96,39 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     const ccMap = userSettings?.ccMap || {};
     const accountConfigs = userSettings?.accountConfigs || {};
 
-    // Fetch transactions in paginated chunks of 1000 to bypass PostgREST max row limit
-    let rawTxRows: any[] = [];
-    let page = 0;
-    const pageSize = 1000;
-    let keepGoing = true;
+    // Handle transactions (first page already fetched)
+    let rawTxRows: any[] = txResFirstPage.data || [];
+    if (txResFirstPage.error) console.warn('Supabase fetch transactions error:', txResFirstPage.error);
 
-    while (keepGoing) {
-      const from = page * pageSize;
-      const to = from + pageSize - 1;
-      const txRes = await client
-        .from('transactions')
-        .select('*')
-        .order('date', { ascending: false })
-        .range(from, to);
+    if (txResFirstPage.data && txResFirstPage.data.length === 1000) {
+      let page = 1;
+      const pageSize = 1000;
+      let keepGoing = true;
 
-      if (txRes.error) {
-        console.warn('Supabase fetch transactions range error:', txRes.error);
-        break;
-      }
+      while (keepGoing) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+        const txRes = await client
+          .from('transactions')
+          .select('*')
+          .order('date', { ascending: false })
+          .range(from, to);
 
-      if (txRes.data && txRes.data.length > 0) {
-        rawTxRows = rawTxRows.concat(txRes.data);
-        if (txRes.data.length < pageSize) {
-          keepGoing = false;
-        } else {
-          page++;
+        if (txRes.error) {
+          console.warn('Supabase fetch transactions range error:', txRes.error);
+          break;
         }
-      } else {
-        keepGoing = false;
+
+        if (txRes.data && txRes.data.length > 0) {
+          rawTxRows = rawTxRows.concat(txRes.data);
+          if (txRes.data.length < pageSize) {
+            keepGoing = false;
+          } else {
+            page++;
+          }
+        } else {
+          keepGoing = false;
+        }
       }
     }
 

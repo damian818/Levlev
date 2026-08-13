@@ -26,7 +26,7 @@ interface OverviewTabProps {
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
 
-export function OverviewTab({
+export const OverviewTab = React.memo(function OverviewTab({
   transactions,
   displayCurrency,
   usdArsRate,
@@ -92,10 +92,10 @@ export function OverviewTab({
     }
   }, [availableMonths]);
 
-  const spending = analyzeSpending(filteredTransactions, displayCurrency, usdArsRate, selectedMonth);
+  const spending = useMemo(() => analyzeSpending(filteredTransactions, displayCurrency, usdArsRate, selectedMonth), [filteredTransactions, displayCurrency, usdArsRate, selectedMonth]);
 
-  const accounts = computeAccountBalances(filteredTransactions, usdArsRate, customBalances);
-  const { trendData, metrics } = computePredictiveTrend(filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData);
+  const accounts = useMemo(() => computeAccountBalances(filteredTransactions, usdArsRate, customBalances), [filteredTransactions, usdArsRate, customBalances]);
+  const { trendData, metrics } = useMemo(() => computePredictiveTrend(filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData), [filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData]);
 
   // Apply forecasts if enabled
   const isCurrentMonth = selectedMonth === currentMonthKey;
@@ -721,5 +721,5 @@ export function OverviewTab({
       />
     </div>
   );
-}
+});
 

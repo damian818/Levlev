@@ -20,7 +20,7 @@ interface ReportsTabProps {
   showSharedData?: boolean;
 }
 
-export function ReportsTab({
+export const ReportsTab = React.memo(function ReportsTab({
   transactions,
   displayCurrency,
   usdArsRate,
@@ -1176,4 +1176,4 @@ export function ReportsTab({
       </div>
     </div>
   );
-}
+});

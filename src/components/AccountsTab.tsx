@@ -47,7 +47,7 @@ const getAccountIcon = (type: string, icon?: string) => {
   }
 };
 
-export function AccountsTab({
+export const AccountsTab = React.memo(function AccountsTab({
   transactions,
   displayCurrency,
   usdArsRate,
@@ -174,65 +174,78 @@ export function AccountsTab({
   }, [accounts, showSharedData, currentUserId]);
 
   // Calculate account summaries using central financeUtils helper
-  const computedSummaries = computeAccountBalances(filteredTransactions, usdArsRate, customBalances, filteredAccountItems);
+  const computedSummaries = useMemo(() => 
+    computeAccountBalances(filteredTransactions, usdArsRate, customBalances, filteredAccountItems),
+    [filteredTransactions, usdArsRate, customBalances, filteredAccountItems]
+  );
 
   // Reconstructed summary list with Credit Card classification
-  const reconstructedAccounts = computedSummaries.map(summary => {
-    const name = summary.accountName;
-    const currency = summary.originalCurrency;
-    const isUsd = currency.toUpperCase().includes('USD');
-    const currentBalance = summary.balanceOriginal;
-    const currentARS = summary.balanceARS;
-    const currentUSD = summary.balanceUSD;
+  const reconstructedAccounts = useMemo(() => {
+    return computedSummaries.map(summary => {
+      const name = summary.accountName;
+      const currency = summary.originalCurrency;
+      const isUsd = currency.toUpperCase().includes('USD');
+      const currentBalance = summary.balanceOriginal;
+      const currentARS = summary.balanceARS;
+      const currentUSD = summary.balanceUSD;
 
-    const accItem = accounts.find(a => a.name === name);
-    const isCC = accItem?.type === 'CREDIT_CARD' || isCreditCardAccount(name, [], accounts);
-    const accountRule = accItem?.closingRule || { ruleType: 'FIXED_DAY', fixedDay: 25 };
-    const icon = accItem?.icon;
+      const accItem = accounts.find(a => a.name === name);
+      const isCC = accItem?.type === 'CREDIT_CARD' || isCreditCardAccount(name, [], accounts);
+      const accountRule = accItem?.closingRule || { ruleType: 'FIXED_DAY', fixedDay: 25 };
+      const icon = accItem?.icon;
 
-    // If it's a credit card, compute statement summary based on current date & time
-    const statements = isCC ? getCreditCardStatements(filteredTransactions, name, accountRule, periodStatusOverrides) : [];
-    const currentStatement = isCC ? getCurrentStatement(statements, accountRule) : undefined;
-    const nextCloseDate = isCC ? getNextCloseDate(accountRule) : undefined;
+      // If it's a credit card, compute statement summary based on current date & time
+      const statements = isCC ? getCreditCardStatements(filteredTransactions, name, accountRule, periodStatusOverrides) : [];
+      const currentStatement = isCC ? getCurrentStatement(statements, accountRule) : undefined;
+      const nextCloseDate = isCC ? getNextCloseDate(accountRule) : undefined;
 
-    return {
-      accountName: name,
-      currency,
-      originalCurrency: currency,
-      isUsd,
-      isCreditCard: isCC,
-      closingRule: accountRule,
-      icon,
-      currentBalance,
-      balanceOriginal: currentBalance,
-      netDelta: currentBalance,
-      reconstructedInitialBalance: 0,
-      currentARS,
-      currentUSD,
-      txCount: summary.txCount,
-      hasCustom: customBalances[name] !== undefined,
-      currentStatement,
-      nextCloseDate,
-      statements,
-    };
-  });
+      return {
+        accountName: name,
+        currency,
+        originalCurrency: currency,
+        isUsd,
+        isCreditCard: isCC,
+        closingRule: accountRule,
+        icon,
+        currentBalance,
+        balanceOriginal: currentBalance,
+        netDelta: currentBalance,
+        reconstructedInitialBalance: 0,
+        currentARS,
+        currentUSD,
+        txCount: summary.txCount,
+        hasCustom: customBalances[name] !== undefined,
+        currentStatement,
+        nextCloseDate,
+        statements,
+      };
+    });
+  }, [computedSummaries, filteredTransactions, accounts, periodStatusOverrides, customBalances]);
 
   // Separate Liquid Accounts vs Credit Card Accounts
-  const liquidAccounts = reconstructedAccounts.filter(a => !a.isCreditCard);
-  const creditCardAccounts = reconstructedAccounts.filter(a => a.isCreditCard);
+  const liquidAccounts = useMemo(() => reconstructedAccounts.filter(a => !a.isCreditCard), [reconstructedAccounts]);
+  const creditCardAccounts = useMemo(() => reconstructedAccounts.filter(a => a.isCreditCard), [reconstructedAccounts]);
 
   // Totals calculations
-  const totalLiquidARS = liquidAccounts.reduce((acc, curr) => acc + curr.currentARS, 0);
-  const totalLiquidUSD = liquidAccounts.reduce((acc, curr) => acc + curr.currentUSD, 0);
+  const { totalLiquidARS, totalLiquidUSD, totalCcDebtARS, totalCcDebtUSD } = useMemo(() => {
+    const liqARS = liquidAccounts.reduce((acc, curr) => acc + curr.currentARS, 0);
+    const liqUSD = liquidAccounts.reduce((acc, curr) => acc + curr.currentUSD, 0);
 
-  // Credit Card Outstanding Debt (Expenses minus payments)
-  const totalCcDebtARS = creditCardAccounts.reduce((acc, curr) => {
-    const debt = curr.currentStatement ? Math.max(0, curr.currentStatement.netDue) : Math.abs(Math.min(0, curr.currentBalance));
-    const debtARS = curr.isUsd ? debt * usdArsRate : debt;
-    return acc + debtARS;
-  }, 0);
+    const debtARS = creditCardAccounts.reduce((acc, curr) => {
+      const debt = curr.currentStatement ? Math.max(0, curr.currentStatement.netDue) : Math.abs(Math.min(0, curr.currentBalance));
+      const dARS = curr.isUsd ? debt * usdArsRate : debt;
+      return acc + dARS;
+    }, 0);
 
-  const totalCcDebtUSD = usdArsRate > 0 ? totalCcDebtARS / usdArsRate : 0;
+    const debtUSD = usdArsRate > 0 ? debtARS / usdArsRate : 0;
+
+    return {
+      totalLiquidARS: liqARS,
+      totalLiquidUSD: liqUSD,
+      totalCcDebtARS: debtARS,
+      totalCcDebtUSD: debtUSD
+    };
+  }, [liquidAccounts, creditCardAccounts, usdArsRate]);
 
   const netWorthARS = totalLiquidARS - totalCcDebtARS;
   const netWorthUSD = totalLiquidUSD - totalCcDebtUSD;
@@ -941,5 +954,5 @@ export function AccountsTab({
       )}
     </div>
   );
-}
+});
 

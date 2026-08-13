@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
@@ -11,21 +11,24 @@ import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMo
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
 import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase } from './services/supabaseSync';
 import { Navbar } from './components/Navbar';
-import { OverviewTab } from './components/OverviewTab';
-import { ReportsTab } from './components/ReportsTab';
-import { TransactionsTab } from './components/TransactionsTab';
-import { AccountsTab } from './components/AccountsTab';
-import { BudgetTab } from './components/BudgetTab';
-import { RecurringTab } from './components/RecurringTab';
-import { InflationVsFxTab } from './components/InflationVsFxTab';
-import { AiAdvisorTab } from './components/AiAdvisorTab';
-import { SettingsTab } from './components/SettingsTab';
-import { AddTransactionModal } from './components/AddTransactionModal';
-import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
-import { ShareWorkspaceModal } from './components/ShareWorkspaceModal';
-import { AiChatWidget } from './components/AiChatWidget';
+
+// Lazy load non-critical components
+const OverviewTab = lazy(() => import('./components/OverviewTab').then(m => ({ default: m.OverviewTab })));
+const ReportsTab = lazy(() => import('./components/ReportsTab').then(m => ({ default: m.ReportsTab })));
+const TransactionsTab = lazy(() => import('./components/TransactionsTab').then(m => ({ default: m.TransactionsTab })));
+const AccountsTab = lazy(() => import('./components/AccountsTab').then(m => ({ default: m.AccountsTab })));
+const BudgetTab = lazy(() => import('./components/BudgetTab').then(m => ({ default: m.BudgetTab })));
+const RecurringTab = lazy(() => import('./components/RecurringTab').then(m => ({ default: m.RecurringTab })));
+const InflationVsFxTab = lazy(() => import('./components/InflationVsFxTab').then(m => ({ default: m.InflationVsFxTab })));
+const AiAdvisorTab = lazy(() => import('./components/AiAdvisorTab').then(m => ({ default: m.AiAdvisorTab })));
+const SettingsTab = lazy(() => import('./components/SettingsTab').then(m => ({ default: m.SettingsTab })));
+const AddTransactionModal = lazy(() => import('./components/AddTransactionModal').then(m => ({ default: m.AddTransactionModal })));
+const ConfirmDeleteModal = lazy(() => import('./components/ConfirmDeleteModal').then(m => ({ default: m.ConfirmDeleteModal })));
+const ShareWorkspaceModal = lazy(() => import('./components/ShareWorkspaceModal').then(m => ({ default: m.ShareWorkspaceModal })));
+const AiChatWidget = lazy(() => import('./components/AiChatWidget').then(m => ({ default: m.AiChatWidget })));
+const ImportWizardModal = lazy(() => import('./components/ImportWizardModal'));
+
 import { LandingPage } from './components/LandingPage';
-import ImportWizardModal from './components/ImportWizardModal';
 import { LevLevIcon, LevLevLogo } from './components/LevLevLogo';
 import i18n from './i18n';
 
@@ -476,16 +479,22 @@ export default function App() {
           if (isMounted) setAuthError(error.message);
         }
         if (isMounted) {
-          setAuthUser(session?.user || null);
-          if (session?.user) {
-            await syncFromSupabase();
+          const user = session?.user || null;
+          setAuthUser(user);
+          
+          // Set loading false as soon as we know the auth state, 
+          // allowing the app to show cached data while syncing in background.
+          setAuthLoading(false);
+
+          if (user) {
+            syncFromSupabase(); // Don't await here to avoid blocking UI
           }
         }
       } catch (err: any) {
         console.warn('Auth init error:', err);
+        if (isMounted) setAuthLoading(false);
       } finally {
         if (isMounted) {
-          setAuthLoading(false);
           // Clean hash after session is processed
           if (window.location.hash && (window.location.hash.includes('access_token') || window.location.hash.includes('error'))) {
             setTimeout(() => {
@@ -498,15 +507,12 @@ export default function App() {
 
     initSession();
 
-    const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
-      setAuthUser(session?.user || null);
-      if (session?.user) {
-        try {
-          await syncFromSupabase();
-        } catch (e) {
-          console.warn('Sync error on auth state change:', e);
-        }
+      const user = session?.user || null;
+      setAuthUser(user);
+      if (user) {
+        syncFromSupabase();
       }
       setAuthLoading(false);
       if (window.location.hash && (window.location.hash.includes('access_token') || window.location.hash.includes('error'))) {
@@ -817,181 +823,198 @@ export default function App() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 pb-28 lg:pb-8 max-w-full overflow-x-hidden">
-        {currentTab === 'overview' && (
-          <OverviewTab
-            transactions={transactions}
-            displayCurrency={displayCurrency}
-            usdArsRate={usdArsRate}
-            historyData={historyData}
-            recurringRules={[]}
-            customBalances={customBalances}
-            onNavigateTab={setCurrentTab}
-            onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
-            currentUserId={authUser?.id}
-            showSharedData={showSharedData}
-            userTimezone={userTimezone}
-          />
-        )}
-        {currentTab === 'transactions' && (
-          <TransactionsTab
-            transactions={transactions}
-            displayCurrency={displayCurrency}
-            usdArsRate={usdArsRate}
-            historyData={historyData}
-            onDeleteTransaction={handleDeleteTransaction}
-            onUpdateTransaction={handleUpdateTransaction}
-            onEditTransaction={handleEditTransaction}
-            onDuplicateTransaction={handleDuplicateTransaction}
-            categoriesList={categories}
-            accountsList={accounts}
-            onOpenAddModal={() => setIsAddModalOpen(true)}
-            onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
-            activeFilter={activeFilter}
-            onClearFilter={() => setActiveFilter(undefined)}
-            currentUserId={authUser?.id}
-            showSharedData={showSharedData}
-            userTimezone={userTimezone}
-          />
-        )}
-        {currentTab === 'accounts' && (
-          <AccountsTab
-            transactions={transactions}
-            displayCurrency={displayCurrency}
-            usdArsRate={usdArsRate}
-            customBalances={customBalances}
-            accounts={accounts}
-            periodStatusOverrides={periodStatusOverrides}
-            isWorkspaceShared={isWorkspaceShared}
-            workspaceMembersCount={workspaceMembers.length}
-            onOpenShareWorkspaceModal={() => setIsShareWorkspaceModalOpen(true)}
-            onUpdatePeriodStatus={handleUpdatePeriodStatus}
-            onUpdateAccountBalance={handleUpdateAccountBalance}
-            onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
-            onAddTransaction={handleAddTransaction}
-            onReassignTransactionPeriod={handleReassignTransactionPeriod}
-            onUpdateAccountSharing={handleUpdateAccountSharing}
-            onEditAccount={handleEditAccount}
-            onAddAccount={handleAddAccount}
-            onReorderAccounts={handleReorderAccounts}
-            currentUserId={authUser?.id}
-            showSharedData={showSharedData}
-            userTimezone={userTimezone}
-          />
-        )}
-        {currentTab === 'reports' && (
-          <ReportsTab
-            transactions={transactions}
-            displayCurrency={displayCurrency}
-            usdArsRate={usdArsRate}
-            currentUserId={authUser?.id}
-            showSharedData={showSharedData}
-          />
-        )}
-        {currentTab === 'budgets' && (
-          <BudgetTab
-            transactions={transactions}
-            budgets={budgets}
-            onUpdateBudgets={setBudgets}
-            displayCurrency={displayCurrency}
-            usdArsRate={usdArsRate}
-          />
-        )}
-        {currentTab === 'recurring' && (
-          <RecurringTab
-            transactions={transactions}
-            recurringRules={[]}
-            displayCurrency={displayCurrency}
-            usdArsRate={usdArsRate}
-            historyData={historyData}
-          />
-        )}
-        {currentTab === 'inflation' && <InflationVsFxTab historyData={historyData} />}
-        {currentTab === 'ai-advisor' && (
-          <AiAdvisorTab transactions={transactions} displayCurrency={displayCurrency} usdArsRate={usdArsRate} />
-        )}
-        {currentTab === 'settings' && (
-          <SettingsTab
-            authUser={authUser}
-            authLoading={authLoading}
-            categories={categories}
-            accounts={accounts}
-            transactions={transactions}
-            budgets={budgets}
-            usdArsRate={usdArsRate}
-            userTimezone={userTimezone}
-            onUpdateTimezone={setUserTimezone}
-            privacyMode={privacyMode}
-            isWorkspaceShared={isWorkspaceShared}
-            showSharedData={showSharedData}
-            onToggleShowSharedData={() => setShowSharedData(prev => !prev)}
-            workspaceMembersCount={workspaceMembers.length}
-            onOpenShareWorkspaceModal={() => setIsShareWorkspaceModalOpen(true)}
-            customBalances={customBalances}
-            onTogglePrivacyMode={handleTogglePrivacyMode}
-            onUpdateRate={setUsdArsRate}
-            onAddCategory={handleAddCategory}
-            onEditCategory={handleEditCategory}
-            onDeleteCategory={handleDeleteCategory}
-            onAddAccount={handleAddAccount}
-            onEditAccount={handleEditAccount}
-            onDeleteAccount={handleDeleteAccount}
-            onImportBackup={handleImportBackup}
-            onOpenImportModal={() => setIsImportModalOpen(true)}
-            onRecalculateBalances={handleRecalculateAllBalances}
-            onLogout={handleLogout}
-          />
-        )}
+        <Suspense fallback={
+          <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+            <Loader2 className="w-8 h-8 animate-spin mb-3 text-emerald-500/50" />
+            <p className="text-sm font-medium animate-pulse">Loading view...</p>
+          </div>
+        }>
+          {currentTab === 'overview' && (
+            <OverviewTab
+              transactions={transactions}
+              displayCurrency={displayCurrency}
+              usdArsRate={usdArsRate}
+              historyData={historyData}
+              recurringRules={[]}
+              customBalances={customBalances}
+              onNavigateTab={setCurrentTab}
+              onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
+              currentUserId={authUser?.id}
+              showSharedData={showSharedData}
+              userTimezone={userTimezone}
+            />
+          )}
+          {currentTab === 'transactions' && (
+            <TransactionsTab
+              transactions={transactions}
+              displayCurrency={displayCurrency}
+              usdArsRate={usdArsRate}
+              historyData={historyData}
+              onDeleteTransaction={handleDeleteTransaction}
+              onUpdateTransaction={handleUpdateTransaction}
+              onEditTransaction={handleEditTransaction}
+              onDuplicateTransaction={handleDuplicateTransaction}
+              categoriesList={categories}
+              accountsList={accounts}
+              onOpenAddModal={() => setIsAddModalOpen(true)}
+              onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
+              activeFilter={activeFilter}
+              onClearFilter={() => setActiveFilter(undefined)}
+              currentUserId={authUser?.id}
+              showSharedData={showSharedData}
+              userTimezone={userTimezone}
+            />
+          )}
+          {currentTab === 'accounts' && (
+            <AccountsTab
+              transactions={transactions}
+              displayCurrency={displayCurrency}
+              usdArsRate={usdArsRate}
+              customBalances={customBalances}
+              accounts={accounts}
+              periodStatusOverrides={periodStatusOverrides}
+              isWorkspaceShared={isWorkspaceShared}
+              workspaceMembersCount={workspaceMembers.length}
+              onOpenShareWorkspaceModal={() => setIsShareWorkspaceModalOpen(true)}
+              onUpdatePeriodStatus={handleUpdatePeriodStatus}
+              onUpdateAccountBalance={handleUpdateAccountBalance}
+              onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
+              onAddTransaction={handleAddTransaction}
+              onReassignTransactionPeriod={handleReassignTransactionPeriod}
+              onUpdateAccountSharing={handleUpdateAccountSharing}
+              onEditAccount={handleEditAccount}
+              onAddAccount={handleAddAccount}
+              onReorderAccounts={handleReorderAccounts}
+              currentUserId={authUser?.id}
+              showSharedData={showSharedData}
+              userTimezone={userTimezone}
+            />
+          )}
+          {currentTab === 'reports' && (
+            <ReportsTab
+              transactions={transactions}
+              displayCurrency={displayCurrency}
+              usdArsRate={usdArsRate}
+              currentUserId={authUser?.id}
+              showSharedData={showSharedData}
+            />
+          )}
+          {currentTab === 'budgets' && (
+            <BudgetTab
+              transactions={transactions}
+              budgets={budgets}
+              onUpdateBudgets={setBudgets}
+              displayCurrency={displayCurrency}
+              usdArsRate={usdArsRate}
+            />
+          )}
+          {currentTab === 'recurring' && (
+            <RecurringTab
+              transactions={transactions}
+              recurringRules={[]}
+              displayCurrency={displayCurrency}
+              usdArsRate={usdArsRate}
+              historyData={historyData}
+            />
+          )}
+          {currentTab === 'inflation' && <InflationVsFxTab historyData={historyData} />}
+          {currentTab === 'ai-advisor' && (
+            <AiAdvisorTab transactions={transactions} displayCurrency={displayCurrency} usdArsRate={usdArsRate} />
+          )}
+          {currentTab === 'settings' && (
+            <SettingsTab
+              authUser={authUser}
+              authLoading={authLoading}
+              categories={categories}
+              accounts={accounts}
+              transactions={transactions}
+              budgets={budgets}
+              usdArsRate={usdArsRate}
+              userTimezone={userTimezone}
+              onUpdateTimezone={setUserTimezone}
+              privacyMode={privacyMode}
+              isWorkspaceShared={isWorkspaceShared}
+              showSharedData={showSharedData}
+              onToggleShowSharedData={() => setShowSharedData(prev => !prev)}
+              workspaceMembersCount={workspaceMembers.length}
+              onOpenShareWorkspaceModal={() => setIsShareWorkspaceModalOpen(true)}
+              customBalances={customBalances}
+              onTogglePrivacyMode={handleTogglePrivacyMode}
+              onUpdateRate={setUsdArsRate}
+              onAddCategory={handleAddCategory}
+              onEditCategory={handleEditCategory}
+              onDeleteCategory={handleDeleteCategory}
+              onAddAccount={handleAddAccount}
+              onEditAccount={handleEditAccount}
+              onDeleteAccount={handleDeleteAccount}
+              onImportBackup={handleImportBackup}
+              onOpenImportModal={() => setIsImportModalOpen(true)}
+              onRecalculateBalances={handleRecalculateAllBalances}
+              onLogout={handleLogout}
+            />
+          )}
+        </Suspense>
       </main>
 
-      <AddTransactionModal
-        isOpen={isAddModalOpen}
-        onClose={() => {
-          setIsAddModalOpen(false);
-          setEditingTransaction(null);
-        }}
-        onAddTransaction={handleAddTransaction}
-        onUpdateTransaction={handleUpdateTransaction}
-        editingTx={editingTransaction}
-        accountsList={accounts}
-        existingAccounts={accounts.map(a => a.name)}
-        existingCategories={categories.map(c => c.name)}
-        existingTransactions={transactions}
-        onAddCategory={handleAddCategory}
-        onAddAccount={handleAddAccount}
-        usdArsRate={usdArsRate}
-      />
+      <Suspense fallback={null}>
+        {isAddModalOpen && (
+          <AddTransactionModal
+            isOpen={isAddModalOpen}
+            onClose={() => {
+              setIsAddModalOpen(false);
+              setEditingTransaction(null);
+            }}
+            onAddTransaction={handleAddTransaction}
+            onUpdateTransaction={handleUpdateTransaction}
+            editingTx={editingTransaction}
+            accountsList={accounts}
+            existingAccounts={accounts.map(a => a.name)}
+            existingCategories={categories.map(c => c.name)}
+            existingTransactions={transactions}
+            onAddCategory={handleAddCategory}
+            onAddAccount={handleAddAccount}
+            usdArsRate={usdArsRate}
+          />
+        )}
 
-      <ImportWizardModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onImport={(data) => {
-          handleImportBackup(data);
-          alert('Data imported successfully!');
-        }}
-        existingAccounts={accounts}
-        existingCategories={categories}
-        userTimezone={userTimezone}
-      />
+        {isImportModalOpen && (
+          <ImportWizardModal
+            isOpen={isImportModalOpen}
+            onClose={() => setIsImportModalOpen(false)}
+            onImport={(data) => {
+              handleImportBackup(data);
+              alert('Data imported successfully!');
+            }}
+            existingAccounts={accounts}
+            existingCategories={categories}
+            userTimezone={userTimezone}
+          />
+        )}
 
-      <ConfirmDeleteModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirmDeleteAll={handleDeleteAllData}
-      />
+        {isDeleteModalOpen && (
+          <ConfirmDeleteModal
+            isOpen={isDeleteModalOpen}
+            onClose={() => setIsDeleteModalOpen(false)}
+            onConfirmDeleteAll={handleDeleteAllData}
+          />
+        )}
 
-      <ShareWorkspaceModal
-        isOpen={isShareWorkspaceModalOpen}
-        onClose={() => setIsShareWorkspaceModalOpen(false)}
-        isWorkspaceShared={isWorkspaceShared}
-        workspaceMembers={workspaceMembers}
-        onUpdateWorkspaceSharing={handleUpdateWorkspaceSharing}
-      />
+        {isShareWorkspaceModalOpen && (
+          <ShareWorkspaceModal
+            isOpen={isShareWorkspaceModalOpen}
+            onClose={() => setIsShareWorkspaceModalOpen(false)}
+            isWorkspaceShared={isWorkspaceShared}
+            workspaceMembers={workspaceMembers}
+            onUpdateWorkspaceSharing={handleUpdateWorkspaceSharing}
+          />
+        )}
 
-      <AiChatWidget
-        transactions={transactions}
-        displayCurrency={displayCurrency}
-        usdArsRate={usdArsRate}
-      />
+        <AiChatWidget
+          transactions={transactions}
+          displayCurrency={displayCurrency}
+          usdArsRate={usdArsRate}
+        />
+      </Suspense>
     </div>
   );
 }

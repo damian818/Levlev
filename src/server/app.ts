@@ -1,10 +1,12 @@
 import express from "express";
+import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const app = express();
+app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 
 // Helper function to fetch with timeout
@@ -74,9 +76,22 @@ const FALLBACK_INFLATION_HISTORY = [
   { month: '2026-08', inflationIndex: 169.1, usdArsRate: 1496 },
 ];
 
+// Simple in-memory cache for external API calls
+const cache = {
+  fxRates: { data: null as any, timestamp: 0 },
+  inflationHistory: { data: null as any, timestamp: 0 }
+};
+const CACHE_TTL = 3600000; // 1 hour
+
 // API Routes
 app.get(["/api/fx-rates", "/fx-rates"], async (req, res) => {
   try {
+    // Return cached data if fresh
+    const now = Date.now();
+    if (cache.fxRates.data && (now - cache.fxRates.timestamp < CACHE_TTL)) {
+      return res.json(cache.fxRates.data);
+    }
+
     const [dolarRes, globalRes] = await Promise.allSettled([
       fetchWithTimeout("https://dolarapi.com/v1/dolares", {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
@@ -114,11 +129,16 @@ app.get(["/api/fx-rates", "/fx-rates"], async (req, res) => {
       globalRates['ARS'] = mepRate;
     }
 
-    res.json({
+    const responseData = {
       rates: Object.keys(ratesMap).length > 0 ? ratesMap : FALLBACK_FX_RATES,
       globalRates,
       fetchedAt: new Date().toISOString()
-    });
+    };
+
+    // Update cache
+    cache.fxRates = { data: responseData, timestamp: Date.now() };
+
+    res.json(responseData);
   } catch (error: any) {
     console.warn("Using fallback FX rates due to upstream timeout/error:", error?.message || error);
     res.json({
@@ -200,6 +220,12 @@ app.get(["/api/fx-convert", "/fx-convert", "/api/fx-pair", "/fx-pair"], async (r
 
 app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res) => {
   try {
+    // Return cached data if fresh (ignoring startDate for simplicity or adding it to cache key)
+    const now = Date.now();
+    if (cache.inflationHistory.data && (now - cache.inflationHistory.timestamp < CACHE_TTL)) {
+      return res.json(cache.inflationHistory.data);
+    }
+
     const [inflResSettled, fxResSettled] = await Promise.allSettled([
       fetchWithTimeout("https://api.argentinadatos.com/v1/finanzas/indices/inflacion", {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
@@ -262,11 +288,16 @@ app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res)
       };
     }).filter(pt => pt.usdArsRate !== null || pt.month >= '2024-09');
 
-    res.json({
+    const responseData = {
       points: historyPoints,
       source: "ArgentinaDatos API (INDEC CPI & MEP FX Rate)",
       fetchedAt: new Date().toISOString()
-    });
+    };
+
+    // Update cache
+    cache.inflationHistory = { data: responseData, timestamp: Date.now() };
+
+    res.json(responseData);
   } catch (error: any) {
     console.warn("Error fetching inflation/FX history, returning fallback historical data:", error?.message || error);
     res.json({

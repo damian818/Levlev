@@ -27,7 +27,7 @@ interface TransactionsTabProps {
 type SortField = 'date' | 'title' | 'category' | 'account' | 'type' | 'amount' | 'converted';
 type SortOrder = 'asc' | 'desc';
 
-export function TransactionsTab({
+export const TransactionsTab = React.memo(function TransactionsTab({
   transactions,
   displayCurrency,
   usdArsRate,
@@ -973,4 +973,4 @@ export function TransactionsTab({
       )}
     </div>
   );
-}
+});
