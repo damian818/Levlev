@@ -540,7 +540,7 @@ export const AccountsTab = React.memo(function AccountsTab({
             </Reorder.Group>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {allAccountMetrics.map((acc, index) => {
               const isCC = acc.isCreditCard;
               const matchedAccount = accounts?.find(a => a.name === acc.accountName);
@@ -558,37 +558,37 @@ export const AccountsTab = React.memo(function AccountsTab({
               return (
                 <div
                   key={acc.accountName}
-                  className={`p-4 rounded-2xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all shadow-sm flex flex-col relative group ${!isCC ? 'cursor-pointer' : ''}`}
+                  className={`p-3 rounded-xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all shadow-xs flex flex-col relative group ${!isCC ? 'cursor-pointer' : ''}`}
                   onClick={(e) => {
                     if (isCC || (e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
                     onNavigateToTransactionsWithFilter({ account: acc.accountName });
                   }}
                 >
                   {/* Card Content */}
-                  <div className="flex-1 space-y-4">
+                  <div className="flex-1 space-y-2.5">
                     {/* Top Header */}
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`p-2 rounded-xl border ${isCC ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`p-1.5 rounded-lg border ${isCC ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
                           {getAccountIcon(isCC ? 'CREDIT_CARD' : 'CHECKING', acc.icon)}
                         </div>
                         <div className="min-w-0">
-                          <h4 className="text-sm font-bold text-slate-100 truncate flex items-center">
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-100 truncate flex items-center">
                             <span>{acc.accountName}</span>
-                            {!isCC && <ExternalLink className="w-3 h-3 ml-1.5 opacity-0 group-hover:opacity-40 transition-opacity shrink-0" />}
+                            {!isCC && <ExternalLink className="w-2.5 h-2.5 ml-1 opacity-0 group-hover:opacity-40 transition-opacity shrink-0" />}
                           </h4>
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="flex items-center gap-1 mt-0.5">
                             <span className={`text-[9px] font-bold uppercase ${isCC ? 'text-purple-300/80' : 'text-emerald-300/80'}`}>
                               {acc.currency}
                             </span>
                             {isShared && <span className="w-1 h-1 rounded-full bg-slate-700" />}
                             {isShared && (
-                              <span className="text-[9px] font-bold text-purple-400 flex items-center gap-1">
+                              <span className="text-[8px] font-bold text-purple-400 flex items-center gap-0.5">
                                 <Users className="w-2.5 h-2.5" /> {memberCount}
                               </span>
                             )}
                             {isCC && (
-                              <span className="ml-1.5 text-[8px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-black uppercase tracking-tighter">
+                              <span className="ml-1 text-[8px] px-1 py-0.2 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-black uppercase tracking-tighter">
                                 CC
                               </span>
                             )}
@@ -596,19 +596,19 @@ export const AccountsTab = React.memo(function AccountsTab({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5">
                         {matchedAccount?.isHiddenFromNewTx && (
                           <div className="p-1 rounded-lg bg-amber-500/10 text-amber-500/80" title={t('accounts.hidden')}>
-                            <EyeOff className="w-3.5 h-3.5" />
+                            <EyeOff className="w-3 h-3" />
                           </div>
                         )}
                         <div className="relative">
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === menuId ? null : menuId); }}
-                            className="p-2 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
+                            className="p-1 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                           >
-                            <MoreVertical className="w-4 h-4" />
+                            <MoreVertical className="w-3.5 h-3.5" />
                           </button>
 
                           {openMenuId === menuId && (
@@ -718,68 +718,68 @@ export const AccountsTab = React.memo(function AccountsTab({
                     {/* Balance Display */}
                     <div>
                       {editingAccount === acc.accountName ? (
-                        <div className="flex items-center space-x-2 my-1" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-xl text-slate-500 font-bold">$</span>
+                        <div className="flex items-center space-x-2 my-0.5" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-base text-slate-500 font-bold">$</span>
                           <input
                             type="number"
                             step="any"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
-                            className={`w-full px-3 py-2 bg-[#0a0c10] border ${isCC ? 'border-purple-500/50' : 'border-emerald-500/50'} rounded-xl text-xl font-bold text-slate-100 focus:outline-none focus:ring-1 ${isCC ? 'focus:ring-purple-500' : 'focus:ring-emerald-500'}`}
+                            className={`w-full px-2.5 py-1.5 bg-[#0a0c10] border ${isCC ? 'border-purple-500/50' : 'border-emerald-500/50'} rounded-lg text-base font-bold text-slate-100 focus:outline-none focus:ring-1 ${isCC ? 'focus:ring-purple-500' : 'focus:ring-emerald-500'}`}
                             autoFocus
                           />
                         </div>
                       ) : (
-                        <div className="text-2xl font-bold text-slate-100 tracking-tight">
+                        <div className="text-lg sm:text-xl font-bold text-slate-100 tracking-tight">
                           {isCC 
                             ? formatCurrency(netDue, acc.originalCurrency as DisplayCurrency)
                             : formatCurrency(acc.balanceOriginal, acc.originalCurrency as DisplayCurrency)
                           }
                         </div>
                       )}
-                      <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">
+                      <p className="text-[9px] text-slate-400 font-medium mt-0.5 uppercase tracking-wider">
                         {isCC ? t('accounts.current_statement_due') : t('accounts.live_balance')}
                       </p>
                     </div>
 
                     {/* Meta Grid */}
                     {isCC ? (
-                      <div className="grid grid-cols-2 gap-4 py-3 border-y border-slate-800/60">
+                      <div className="grid grid-cols-2 gap-3 py-2 border-y border-slate-800/60">
                         <div>
-                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">{t('accounts.closing_schedule')}</span>
-                          <span className="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
-                            <Calendar className="w-3 h-3" /> {getClosingRuleLabel(acc.closingRule)}
+                          <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-0.5">{t('accounts.closing_schedule')}</span>
+                          <span className="text-[11px] font-semibold text-purple-300 flex items-center gap-1">
+                            <Calendar className="w-2.5 h-2.5" /> {getClosingRuleLabel(acc.closingRule)}
                           </span>
                         </div>
                         <div className="text-right">
-                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">{t('accounts.next_close_label')}</span>
-                          <span className="text-xs font-mono font-bold text-slate-300">{nextClose || '-'}</span>
+                          <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-0.5">{t('accounts.next_close_label')}</span>
+                          <span className="text-[11px] font-mono font-bold text-slate-300">{nextClose || '-'}</span>
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-4 py-3 border-t border-slate-800/40">
+                      <div className="grid grid-cols-2 gap-3 py-2 border-t border-slate-800/40">
                         <div className="flex flex-col">
-                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">ARS</span>
-                          <span className="text-xs font-mono font-bold text-slate-300">{formatCurrency(acc.currentARS, 'ARS')}</span>
+                          <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-0.5">ARS</span>
+                          <span className="text-[11px] font-mono font-bold text-slate-300">{formatCurrency(acc.currentARS, 'ARS')}</span>
                         </div>
                         <div className="flex flex-col text-right">
-                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">USD</span>
-                          <span className="text-xs font-mono font-bold text-slate-300">{formatCurrency(acc.currentUSD, 'USD')}</span>
+                          <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-0.5">USD</span>
+                          <span className="text-[11px] font-mono font-bold text-slate-300">{formatCurrency(acc.currentUSD, 'USD')}</span>
                         </div>
                       </div>
                     )}
                   </div>
 
                   {/* Footer Actions */}
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-800/40">
+                  <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-slate-800/40">
                     {isCC ? (
                       <button
                         type="button"
                         onClick={() => setSelectedCardAccount(acc.accountName)}
-                        className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2"
+                        className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-purple-900/20 flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <span>{t('accounts.details')}</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
+                        <ChevronRight className="w-3 h-3" />
                       </button>
                     ) : (
                       <>
@@ -787,18 +787,18 @@ export const AccountsTab = React.memo(function AccountsTab({
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleStartEdit(acc.accountName, acc.currentBalance); }}
-                            className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                            className="flex-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Edit3 className="w-3 h-3" />
                             <span>{t('accounts.set_balance')}</span>
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleSaveEdit(acc.accountName, acc.currency); }}
-                            className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+                            className="flex-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-emerald-900/20 flex items-center justify-center gap-1.5 cursor-pointer"
                           >
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="w-3 h-3" />
                             <span>{t('common.save')}</span>
                           </button>
                         )}
