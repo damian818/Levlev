@@ -51,7 +51,7 @@ export interface SupabaseUserData {
     ccMap?: Record<string, boolean>;
     ccPeriodStatuses?: Record<string, 'PAID' | 'OPEN'>;
     customBalances?: Record<string, AccountCustomBalance>;
-    accountConfigs?: Record<string, { order?: number; isHiddenFromNewTx?: boolean }>;
+    accountConfigs?: Record<string, { order?: number; isHiddenFromNewTx?: boolean; icon?: any }>;
     workspaceSharing?: {
       isShared?: boolean;
       members?: SharedMember[];
@@ -196,7 +196,10 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
         }
       }
 
-      const config = accountConfigs[row.name] || accountConfigs[row.name.replace(' (Shared)', '')] || {};
+      const config = accountConfigs[row.name] || 
+                     accountConfigs[row.name.replace(' (Shared)', '')] || 
+                     accountConfigs[row.name.toLowerCase()] ||
+                     {};
 
       return {
         id: row.id || `acc-${Math.random().toString(36).substring(2)}`,
@@ -208,9 +211,31 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
         isShared: row.is_shared || false,
         sharedMembers: Array.isArray(row.shared_members) ? row.shared_members : [],
         closingRule,
-        order: config.order,
-        isHiddenFromNewTx: config.isHiddenFromNewTx,
+        order: typeof config.order === 'number' ? config.order : undefined,
+        isHiddenFromNewTx: !!config.isHiddenFromNewTx,
+        icon: config.icon,
       };
+    });
+
+    // Also include accounts that might only exist in accountConfigs (e.g. auto-detected from transactions)
+    const existingAccountNames = new Set(accounts.map(a => a.name.toLowerCase()));
+    const existingCleanNames = new Set(accounts.map(a => a.name.replace(' (Shared)', '').toLowerCase()));
+
+    Object.entries(accountConfigs).forEach(([name, config]) => {
+      const lowerName = name.toLowerCase();
+      if (!existingAccountNames.has(lowerName) && !existingCleanNames.has(lowerName)) {
+        accounts.push({
+          id: `acc-cfg-${Math.random().toString(36).substring(2)}`,
+          ownerId: userId,
+          name: name,
+          type: 'CHECKING',
+          currency: 'ARS',
+          initialBalance: 0,
+          order: typeof config.order === 'number' ? config.order : undefined,
+          isHiddenFromNewTx: !!config.isHiddenFromNewTx,
+          icon: config.icon,
+        });
+      }
     });
 
     // Sort accounts by order if available
@@ -419,7 +444,9 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
     // 5. User Settings upsert (CC Rules, CC Classification map, Period Statuses, Custom Balances, Account Configs)
     const ccRulesMapFromAccs: Record<string, CreditCardClosingRule> = {};
     const ccMapFromAccs: Record<string, boolean> = {};
-    const accountConfigs: Record<string, { order?: number; isHiddenFromNewTx?: boolean }> = {};
+    const accountConfigs: Record<string, { order?: number; isHiddenFromNewTx?: boolean; icon?: any }> = {
+      ...(data.settings?.accountConfigs || {})
+    };
 
     (data.accounts || []).forEach(a => {
       if (a.closingRule) {
@@ -427,11 +454,12 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       }
       ccMapFromAccs[a.name] = a.type === 'CREDIT_CARD';
       
-      if (a.order !== undefined || a.isHiddenFromNewTx !== undefined) {
+      if (a.order !== undefined || a.isHiddenFromNewTx !== undefined || a.icon !== undefined) {
         const cleanName = a.name.replace(' (Shared)', '');
         accountConfigs[cleanName] = {
           order: a.order,
-          isHiddenFromNewTx: a.isHiddenFromNewTx
+          isHiddenFromNewTx: a.isHiddenFromNewTx,
+          icon: a.icon
         };
       }
     });
@@ -442,7 +470,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       ccPeriodStatuses: data.settings?.ccPeriodStatuses || {},
       customBalances: data.settings?.customBalances || {},
       workspaceSharing: data.settings?.workspaceSharing || {},
-      accountConfigs: { ...accountConfigs, ...(data.settings?.accountConfigs || {}) },
+      accountConfigs: accountConfigs,
     };
 
     try {

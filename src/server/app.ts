@@ -79,11 +79,11 @@ app.get(["/api/fx-rates", "/fx-rates"], async (req, res) => {
   try {
     const [dolarRes, globalRes] = await Promise.allSettled([
       fetchWithTimeout("https://dolarapi.com/v1/dolares", {
-        headers: { 'User-Agent': 'LevLev-App/1.0' }
-      }, 3500),
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+      }, 8000),
       fetchWithTimeout("https://open.er-api.com/v6/latest/USD", {
-        headers: { 'User-Agent': 'LevLev-App/1.0' }
-      }, 3500)
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+      }, 8000)
     ]);
 
     const ratesMap: Record<string, { buy: number; sell: number; name: string; updated: string }> = {};
@@ -142,8 +142,8 @@ app.get(["/api/fx-convert", "/fx-convert", "/api/fx-pair", "/fx-pair"], async (r
 
     try {
       const globalRes = await fetchWithTimeout(`https://open.er-api.com/v6/latest/${from}`, {
-        headers: { 'User-Agent': 'LevLev-App/1.0' }
-      }, 3500);
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+      }, 8000);
 
       if (globalRes.ok) {
         const data = await globalRes.json();
@@ -158,8 +158,8 @@ app.get(["/api/fx-convert", "/fx-convert", "/api/fx-pair", "/fx-pair"], async (r
     if (from === 'ARS' || to === 'ARS') {
       try {
         const dolarRes = await fetchWithTimeout("https://dolarapi.com/v1/dolares/bolsa", {
-          headers: { 'User-Agent': 'LevLev-App/1.0' }
-        }, 3000);
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+        }, 8000);
         if (dolarRes.ok) {
           const mep = await dolarRes.json();
           if (mep && mep.venta) {
@@ -200,17 +200,26 @@ app.get(["/api/fx-convert", "/fx-convert", "/api/fx-pair", "/fx-pair"], async (r
 
 app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res) => {
   try {
-    const [inflRes, fxRes] = await Promise.all([
+    const [inflResSettled, fxResSettled] = await Promise.allSettled([
       fetchWithTimeout("https://api.argentinadatos.com/v1/finanzas/indices/inflacion", {
-        headers: { 'User-Agent': 'Finlev-App/1.0' }
-      }, 3500),
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+      }, 10000),
       fetchWithTimeout("https://api.argentinadatos.com/v1/cotizaciones/dolares/bolsa", {
-        headers: { 'User-Agent': 'Finlev-App/1.0' }
-      }, 3500)
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+      }, 10000)
     ]);
 
+    if (inflResSettled.status === 'rejected' || fxResSettled.status === 'rejected') {
+      const inflErr = inflResSettled.status === 'rejected' ? inflResSettled.reason : null;
+      const fxErr = fxResSettled.status === 'rejected' ? fxResSettled.reason : null;
+      throw new Error(`Connection error: ${inflErr?.message || fxErr?.message || 'Unknown network error'}`);
+    }
+
+    const inflRes = inflResSettled.value;
+    const fxRes = fxResSettled.value;
+
     if (!inflRes.ok || !fxRes.ok) {
-      throw new Error("Failed to fetch inflation or FX history from ArgentinaDatos");
+      throw new Error(`API returned error status: Inflation=${inflRes.status}, FX=${fxRes.status}`);
     }
 
     const inflData: { fecha: string; valor: number }[] = await inflRes.json();

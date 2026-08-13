@@ -116,6 +116,7 @@ export interface AccountItem {
   sharedMembers?: SharedMember[];
   order?: number;
   isHiddenFromNewTx?: boolean;
+  icon?: 'bank' | 'card' | 'cash' | 'wallet' | 'landmark' | 'other';
 }
 
 export type ViewTab = 'overview' | 'transactions' | 'accounts' | 'budgets' | 'recurring' | 'inflation' | 'ai-advisor' | 'settings' | 'reports';

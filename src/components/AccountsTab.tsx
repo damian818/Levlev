@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule, AccountItem, SharedMember } from '../types';
 import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString, getTransferOutflow, getTransferInflow } from '../utils/financeUtils';
-import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, Eye, EyeOff, MoreVertical, Trash2 } from 'lucide-react';
+import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, Eye, EyeOff, MoreVertical, Trash2, Building2, Coins } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { CreditCardDetailModal } from './CreditCardDetailModal';
 import { ShareAccountModal } from './ShareAccountModal';
@@ -33,6 +33,20 @@ interface AccountsTabProps {
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
 
+const getAccountIcon = (type: string, icon?: string) => {
+  const className = "w-5 h-5";
+  switch (icon) {
+    case 'bank': return <Building2 className={className} />;
+    case 'card': return <CreditCard className={className} />;
+    case 'cash': return <Coins className={className} />;
+    case 'wallet': return <Wallet className={className} />;
+    case 'landmark': return <Landmark className={className} />;
+    case 'other': return <HelpCircle className={className} />;
+    default:
+      return type === 'CREDIT_CARD' ? <CreditCard className={className} /> : <Landmark className={className} />;
+  }
+};
+
 export function AccountsTab({
   transactions,
   displayCurrency,
@@ -62,8 +76,29 @@ export function AccountsTab({
 
   const handleMoveAccount = (accName: string, direction: 'up' | 'down') => {
     if (!onReorderAccounts || !accounts || accounts.length < 2) return;
-    const index = accounts.findIndex(a => a.name.toLowerCase() === accName.toLowerCase());
-    if (index === -1) return;
+    let index = accounts.findIndex(a => a.name.toLowerCase() === accName.toLowerCase());
+    
+    // If account is not in the explicit accounts list (auto-detected), add it first
+    if (index === -1) {
+      const summary = liquidAccounts.find(a => a.accountName.toLowerCase() === accName.toLowerCase()) || 
+                      creditCardAccounts.find(a => a.accountName.toLowerCase() === accName.toLowerCase());
+      if (summary && onAddAccount) {
+        const newAcc: AccountItem = {
+          id: `acc-${Date.now()}`,
+          name: summary.accountName,
+          type: summary.isCreditCard ? 'CREDIT_CARD' : 'CHECKING',
+          currency: summary.currency,
+          order: accounts.length
+        };
+        onAddAccount(newAcc);
+        // We can't immediately reorder because the state update is async, 
+        // but adding it ensures the next reorder attempt will work.
+        // Actually, let's try to do it in one go if possible, but the parent handleReorderAccounts 
+        // expects the full list. For now, adding it is a good first step.
+        return;
+      }
+      return;
+    }
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= accounts.length) return;
 
@@ -153,6 +188,7 @@ export function AccountsTab({
     const accItem = accounts.find(a => a.name === name);
     const isCC = accItem?.type === 'CREDIT_CARD' || isCreditCardAccount(name, [], accounts);
     const accountRule = accItem?.closingRule || { ruleType: 'FIXED_DAY', fixedDay: 25 };
+    const icon = accItem?.icon;
 
     // If it's a credit card, compute statement summary based on current date & time
     const statements = isCC ? getCreditCardStatements(filteredTransactions, name, accountRule, periodStatusOverrides) : [];
@@ -166,6 +202,7 @@ export function AccountsTab({
       isUsd,
       isCreditCard: isCC,
       closingRule: accountRule,
+      icon,
       currentBalance,
       balanceOriginal: currentBalance,
       netDelta: currentBalance,
@@ -223,6 +260,21 @@ export function AccountsTab({
       onUpdateAccountBalance(accName, num, currency);
     }
     setEditingAccount(null);
+  };
+
+  const handleSetAccountIcon = (accName: string, icon: 'bank' | 'card' | 'cash' | 'wallet' | 'landmark' | 'other') => {
+    const existingAcc = accounts.find(a => a.name.toLowerCase() === accName.toLowerCase());
+    if (existingAcc && onEditAccount) {
+      onEditAccount(existingAcc.name, { ...existingAcc, icon }, false);
+    } else if (onAddAccount) {
+      onAddAccount({
+        id: `acc-${Date.now()}`,
+        name: accName,
+        type: accName.toLowerCase().includes('card') ? 'CREDIT_CARD' : 'CHECKING',
+        currency: accName.toLowerCase().includes('usd') ? 'USD' : 'ARS',
+        icon
+      });
+    }
   };
 
   const selectedAccountToShare = useMemo(() => {
@@ -359,7 +411,7 @@ export function AccountsTab({
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
-                          <CreditCard className="w-5 h-5" />
+                          {getAccountIcon('CREDIT_CARD', acc.icon)}
                         </div>
                         <div className="min-w-0">
                           <h4 className="text-sm font-bold text-slate-100 truncate">{acc.accountName}</h4>
@@ -428,6 +480,34 @@ export function AccountsTab({
                                 >
                                   <Share2 className="w-3.5 h-3.5" /> {t('accounts.share')}
                                 </button>
+                                <div className="h-px bg-slate-800 my-1" />
+                                <div className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  {t('accounts.select_icon', { defaultValue: 'Select Icon' })}
+                                </div>
+                                <div className="grid grid-cols-3 gap-1 px-2 pb-2">
+                                  {[
+                                    { id: 'bank', icon: Building2 },
+                                    { id: 'card', icon: CreditCard },
+                                    { id: 'cash', icon: Coins },
+                                    { id: 'wallet', icon: Wallet },
+                                    { id: 'landmark', icon: Landmark },
+                                    { id: 'other', icon: HelpCircle }
+                                  ].map((iconData) => (
+                                    <button
+                                      key={iconData.id}
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleSetAccountIcon(acc.accountName, iconData.id as any); setOpenMenuId(null); }}
+                                      className={`p-2 rounded-lg border transition-all hover:bg-slate-700 flex items-center justify-center ${
+                                        acc.icon === iconData.id 
+                                          ? 'bg-purple-500/20 border-purple-500/50 text-purple-300' 
+                                          : 'bg-slate-800 border-slate-700 text-slate-400'
+                                      }`}
+                                      title={iconData.id}
+                                    >
+                                      <iconData.icon className="w-3.5 h-3.5" />
+                                    </button>
+                                  ))}
+                                </div>
                                 <div className="h-px bg-slate-800 my-1" />
                                 <button
                                   type="button"
@@ -528,7 +608,7 @@ export function AccountsTab({
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                          <Landmark className="w-5 h-5" />
+                          {getAccountIcon('CHECKING', acc.icon)}
                         </div>
                         <div className="min-w-0">
                           <h4 className="text-sm font-bold text-slate-100 truncate flex items-center">
@@ -600,6 +680,34 @@ export function AccountsTab({
                                 >
                                   <Share2 className="w-3.5 h-3.5" /> {t('accounts.share')}
                                 </button>
+                                <div className="h-px bg-slate-800 my-1" />
+                                <div className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  {t('accounts.select_icon', { defaultValue: 'Select Icon' })}
+                                </div>
+                                <div className="grid grid-cols-3 gap-1 px-2 pb-2">
+                                  {[
+                                    { id: 'bank', icon: Building2 },
+                                    { id: 'card', icon: CreditCard },
+                                    { id: 'cash', icon: Coins },
+                                    { id: 'wallet', icon: Wallet },
+                                    { id: 'landmark', icon: Landmark },
+                                    { id: 'other', icon: HelpCircle }
+                                  ].map((iconData) => (
+                                    <button
+                                      key={iconData.id}
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleSetAccountIcon(acc.accountName, iconData.id as any); setOpenMenuId(null); }}
+                                      className={`p-2 rounded-lg border transition-all hover:bg-slate-700 flex items-center justify-center ${
+                                        acc.icon === iconData.id 
+                                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' 
+                                          : 'bg-slate-800 border-slate-700 text-slate-400'
+                                      }`}
+                                      title={iconData.id}
+                                    >
+                                      <iconData.icon className="w-3.5 h-3.5" />
+                                    </button>
+                                  ))}
+                                </div>
                                 <div className="h-px bg-slate-800 my-1" />
                                 <button
                                   type="button"

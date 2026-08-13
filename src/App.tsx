@@ -394,7 +394,22 @@ export default function App() {
       if (data) {
         setTransactions(data.transactions || []);
         if (data.categories && data.categories.length > 0) setCategories(data.categories);
-        if (data.accounts && data.accounts.length > 0) setAccounts(data.accounts);
+        if (data.accounts && data.accounts.length > 0) {
+          setAccounts(prev => {
+            const merged = [...prev];
+            data.accounts.forEach(newAcc => {
+              const idx = merged.findIndex(a => a.name.toLowerCase() === newAcc.name.toLowerCase());
+              if (idx >= 0) {
+                // Merge, but prefer newAcc properties (which include Supabase-synced configs)
+                merged[idx] = { ...merged[idx], ...newAcc };
+              } else {
+                merged.push(newAcc);
+              }
+            });
+            // Re-sort by order
+            return merged.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+          });
+        }
         setBudgets(data.budgets || []);
 
         if (data.settings) {
