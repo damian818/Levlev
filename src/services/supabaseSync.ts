@@ -206,6 +206,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       const config = accountConfigs[row.name] || 
                      accountConfigs[row.name.replace(' (Shared)', '')] || 
                      accountConfigs[row.name.toLowerCase()] ||
+                     accountConfigs[row.name.replace(' (Shared)', '').toLowerCase()] ||
                      {};
 
       return {
@@ -234,7 +235,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
         const lowerName = savedAcc.name.toLowerCase();
         const found = accounts.find(a => a.name.toLowerCase() === lowerName || a.name.replace(' (Shared)', '').toLowerCase() === lowerName);
         if (found) {
-          if (savedAcc.order !== undefined) found.order = savedAcc.order;
+          found.order = savedAcc.order !== undefined ? savedAcc.order : idx;
           if (savedAcc.isHiddenFromNewTx !== undefined) found.isHiddenFromNewTx = savedAcc.isHiddenFromNewTx;
           if (savedAcc.icon) found.icon = savedAcc.icon;
           if (savedAcc.type) found.type = savedAcc.type;
@@ -485,11 +486,17 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       ccMapFromAccs[a.name] = a.type === 'CREDIT_CARD';
       
       const cleanName = a.name.replace(' (Shared)', '');
-      accountConfigs[cleanName] = {
+      const itemConfig = {
         order: a.order !== undefined ? a.order : idx,
         isHiddenFromNewTx: !!a.isHiddenFromNewTx,
         icon: a.icon
       };
+      accountConfigs[cleanName] = itemConfig;
+      accountConfigs[cleanName.toLowerCase()] = itemConfig;
+      if (a.name !== cleanName) {
+        accountConfigs[a.name] = itemConfig;
+        accountConfigs[a.name.toLowerCase()] = itemConfig;
+      }
     });
 
     const isTourCompleted = data.settings?.onboardingCompleted ?? (

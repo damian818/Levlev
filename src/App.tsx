@@ -280,6 +280,27 @@ export default function App() {
       order: index,
     }));
     setAccounts(withOrder);
+    try {
+      localStorage.setItem('finance_app_custom_accounts', JSON.stringify(withOrder));
+    } catch (e) {}
+
+    // Immediate sync save to Supabase to guarantee cross-device sync
+    if (authUser && hasInitialSynced) {
+      saveAllUserDataToSupabase({
+        transactions,
+        categories,
+        accounts: withOrder,
+        budgets,
+        settings: {
+          ccPeriodStatuses: periodStatusOverrides,
+          customBalances,
+          workspaceSharing: {
+            isShared: isWorkspaceShared,
+            members: workspaceMembers,
+          },
+        },
+      });
+    }
   };
 
   const handleImportBackup = (data: { transactions: Transaction[]; categories: CategoryItem[]; accounts: AccountItem[]; budgets: BudgetGoal[]; isFullBackup?: boolean }) => {
@@ -541,6 +562,37 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, [syncFromSupabase]);
+
+  // Auto-sync when switching tabs/apps or returning to mobile browser
+  useEffect(() => {
+    if (!authUser) return;
+
+    let isThrottled = false;
+    const triggerSync = () => {
+      if (document.visibilityState === 'visible' && !isThrottled) {
+        isThrottled = true;
+        syncFromSupabase();
+        setTimeout(() => {
+          isThrottled = false;
+        }, 6000);
+      }
+    };
+
+    window.addEventListener('visibilitychange', triggerSync);
+    window.addEventListener('focus', triggerSync);
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        syncFromSupabase();
+      }
+    }, 45000);
+
+    return () => {
+      window.removeEventListener('visibilitychange', triggerSync);
+      window.removeEventListener('focus', triggerSync);
+      clearInterval(interval);
+    };
+  }, [authUser, syncFromSupabase]);
 
   // Sync budgets to localStorage on update
   useEffect(() => {

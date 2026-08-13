@@ -2,9 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule, AccountItem, SharedMember } from '../types';
 import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString, getTransferOutflow, getTransferInflow } from '../utils/financeUtils';
-import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, Eye, EyeOff, MoreVertical, Trash2, Building2, Coins, GripVertical } from 'lucide-react';
+import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, ChevronUp, ChevronDown, ArrowUpDown, Eye, EyeOff, MoreVertical, Trash2, Building2, Coins, GripVertical } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { motion, Reorder } from 'motion/react';
+import { motion } from 'motion/react';
 import { CreditCardDetailModal } from './CreditCardDetailModal';
 import { ShareAccountModal } from './ShareAccountModal';
 
@@ -430,7 +430,7 @@ export const AccountsTab = React.memo(function AccountsTab({
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
             }`}
           >
-            <GripVertical className="w-3.5 h-3.5" />
+            {isReorderMode ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <ArrowUpDown className="w-3.5 h-3.5" />}
             <span>{isReorderMode ? t('accounts.done_reordering', { defaultValue: 'Exit Reorder Mode' }) : t('accounts.reorder_mode', { defaultValue: 'Reorder Mode' })}</span>
           </button>
         </div>
@@ -440,51 +440,61 @@ export const AccountsTab = React.memo(function AccountsTab({
             {t('accounts.no_accounts_yet')}
           </div>
         ) : isReorderMode ? (
-          /* Compact Reorder List Mode */
-          <div className="space-y-2">
-            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between text-xs text-slate-400">
-              <span>{t('accounts.drag_or_click', { defaultValue: 'Drag rows or use quick move buttons to easily reorder:' })}</span>
-              <span className="font-bold text-emerald-400">{allAccountMetrics.length} accounts</span>
+          /* Dedicated 2-Row Reorder Mode with High-Usability Touch Controls */
+          <div className="space-y-2.5">
+            <div className="p-3 bg-emerald-950/20 rounded-xl border border-emerald-500/30 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <ArrowUpDown className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="text-slate-300 font-medium truncate">
+                  {t('accounts.reorder_instructions', { defaultValue: 'Use the quick buttons to customize account order. Top account appears first.' })}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReorderMode(false)}
+                className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg font-bold text-xs flex items-center gap-1.5 shrink-0 transition-colors shadow-sm cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>{t('common.done', { defaultValue: 'Done' })}</span>
+              </button>
             </div>
-            <Reorder.Group 
-              axis="y" 
-              values={allAccountMetrics} 
-              onReorder={handleReorderAllAccounts}
-              className="space-y-2"
-            >
+
+            <div className="space-y-2">
               {allAccountMetrics.map((acc, index) => {
                 const isCC = acc.isCreditCard;
                 const isFirst = index === 0;
                 const isLast = index === allAccountMetrics.length - 1;
 
                 return (
-                  <Reorder.Item
+                  <div
                     key={acc.accountName}
-                    value={acc}
-                    className="p-3 rounded-xl border border-slate-800 bg-[#121620] hover:bg-[#1a212d] transition-all flex items-center justify-between gap-3 cursor-grab active:cursor-grabbing select-none"
+                    className="p-3 rounded-xl border border-slate-800 bg-[#121620] hover:bg-[#161c28] transition-all shadow-xs flex flex-col gap-2.5"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="text-slate-500 hover:text-emerald-400 transition-colors">
-                        <GripVertical className="w-4 h-4" />
-                      </div>
-                      <div className={`p-1.5 rounded-lg border text-xs ${isCC ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
-                        {getAccountIcon(isCC ? 'CREDIT_CARD' : 'CHECKING', acc.icon)}
-                      </div>
-                      <div className="min-w-0 flex items-center gap-2">
-                        <span className="text-xs sm:text-sm font-bold text-slate-100 truncate">{acc.accountName}</span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${isCC ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
-                          {acc.currency}
+                    {/* Row 1: Position, Identity, and Balance (Full Width, No Truncation) */}
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                          #{index + 1}
                         </span>
-                        {isCC && (
-                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-200 border border-purple-700/50 uppercase">
-                            CC
+                        <div className={`p-1.5 rounded-lg border text-xs shrink-0 ${isCC ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+                          {getAccountIcon(isCC ? 'CREDIT_CARD' : 'CHECKING', acc.icon)}
+                        </div>
+                        <div className="min-w-0 flex items-center gap-1.5 flex-1">
+                          <span className="text-xs sm:text-sm font-bold text-slate-100 truncate">
+                            {acc.accountName}
                           </span>
-                        )}
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0 ${isCC ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                            {acc.currency}
+                          </span>
+                          {isCC && (
+                            <span className="text-[7px] font-black px-1 py-0.2 rounded bg-purple-900/60 text-purple-200 border border-purple-700/50 uppercase shrink-0">
+                              CC
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="text-right hidden sm:block">
+                      <div className="text-right shrink-0">
                         <span className="text-xs font-mono font-bold text-slate-200">
                           {isCC 
                             ? formatCurrency(acc.currentStatement?.netDue || 0, acc.originalCurrency as DisplayCurrency)
@@ -492,52 +502,55 @@ export const AccountsTab = React.memo(function AccountsTab({
                           }
                         </span>
                       </div>
-
-                      <div className="flex items-center gap-1 bg-[#0a0c10] p-1 rounded-xl border border-slate-800">
-                        <button
-                          type="button"
-                          disabled={isFirst}
-                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'top'); }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-colors text-[10px] font-bold flex items-center gap-0.5"
-                          title="Move to Top"
-                        >
-                          <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span className="hidden md:inline">Top</span>
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isFirst}
-                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'up'); }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
-                          title="Move Up"
-                        >
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isLast}
-                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'down'); }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
-                          title="Move Down"
-                        >
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isLast}
-                          onClick={(e) => { e.stopPropagation(); handleMoveAccount(acc.accountName, 'bottom'); }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-20 disabled:hover:bg-transparent transition-colors text-[10px] font-bold flex items-center gap-0.5"
-                          title="Move to Bottom"
-                        >
-                          <ArrowDown className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span className="hidden md:inline">Bottom</span>
-                        </button>
-                      </div>
                     </div>
-                  </Reorder.Item>
+
+                    {/* Row 2: Large, Finger-Friendly Action Buttons */}
+                    <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-800/60">
+                      <button
+                        type="button"
+                        disabled={isFirst}
+                        onClick={() => handleMoveAccount(acc.accountName, 'top')}
+                        className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 disabled:opacity-20 disabled:hover:bg-slate-800 text-slate-200 text-[11px] font-bold flex items-center justify-center gap-1 border border-slate-700/60 transition-all cursor-pointer disabled:cursor-not-allowed"
+                        title="Move to First Position"
+                      >
+                        <ChevronsUp className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Top</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isFirst}
+                        onClick={() => handleMoveAccount(acc.accountName, 'up')}
+                        className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 disabled:opacity-20 disabled:hover:bg-slate-800 text-slate-200 text-[11px] font-bold flex items-center justify-center gap-1 border border-slate-700/60 transition-all cursor-pointer disabled:cursor-not-allowed"
+                        title="Move Up One"
+                      >
+                        <ChevronUp className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Up</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isLast}
+                        onClick={() => handleMoveAccount(acc.accountName, 'down')}
+                        className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 disabled:opacity-20 disabled:hover:bg-slate-800 text-slate-200 text-[11px] font-bold flex items-center justify-center gap-1 border border-slate-700/60 transition-all cursor-pointer disabled:cursor-not-allowed"
+                        title="Move Down One"
+                      >
+                        <ChevronDown className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Down</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isLast}
+                        onClick={() => handleMoveAccount(acc.accountName, 'bottom')}
+                        className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 disabled:opacity-20 disabled:hover:bg-slate-800 text-slate-200 text-[11px] font-bold flex items-center justify-center gap-1 border border-slate-700/60 transition-all cursor-pointer disabled:cursor-not-allowed"
+                        title="Move to Last Position"
+                      >
+                        <ChevronsDown className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Bottom</span>
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
-            </Reorder.Group>
+            </div>
           </div>
         ) : (
           <div className="space-y-2">

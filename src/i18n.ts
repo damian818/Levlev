@@ -321,6 +321,11 @@ export const resources = {
         hidden_from_new_tx: 'Hidden from new tx selection (Click to show)',
         workspace: 'Workspace',
         shared: 'Shared',
+        reorder_mode: 'Reorder Mode',
+        done_reordering: 'Exit Reorder Mode',
+        reorder_instructions: 'Use the quick buttons to customize account order. Top account appears first.',
+        your_accounts_title: 'Your Accounts',
+        your_accounts_sub: 'Manage all your accounts and credit cards in one place.',
       },
       cc_modal: {
         title: 'Credit Card Account',
@@ -1002,6 +1007,11 @@ export const resources = {
         hidden_from_new_tx: 'Oculto de selección de nueva transacción (clic para mostrar)',
         workspace: 'Espacio',
         shared: 'Compartida',
+        reorder_mode: 'Modo Reordenar',
+        done_reordering: 'Salir de Reordenar',
+        reorder_instructions: 'Usa los botones rápidos para organizar el orden de las cuentas. La primera cuenta aparecerá primero.',
+        your_accounts_title: 'Tus Cuentas',
+        your_accounts_sub: 'Gestiona todas tus cuentas y tarjetas en un solo lugar.',
       },
       cc_modal: {
         title: 'Cuenta de Tarjeta de Crédito',
