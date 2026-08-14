@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember } from './types';
+import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember, RecurringRule } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
 import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount } from './utils/financeUtils';
@@ -628,6 +628,54 @@ export default function App() {
     return {};
   });
 
+  // Recurring rules and exclusions state
+  const [recurringRules, setRecurringRules] = useState<RecurringRule[]>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_recurring_rules');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [nonRecurringKeys, setNonRecurringKeys] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('levlev_non_recurring_keys') || localStorage.getItem('finance_app_non_recurring_keys');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleSaveRecurringRule = (rule: RecurringRule) => {
+    setRecurringRules(prev => {
+      const exists = prev.some(r => r.id === rule.id);
+      const next = exists ? prev.map(r => r.id === rule.id ? rule : r) : [...prev, rule];
+      try {
+        localStorage.setItem('finance_app_recurring_rules', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const handleDeleteRecurringRule = (ruleId: string) => {
+    setRecurringRules(prev => {
+      const next = prev.filter(r => r.id !== ruleId);
+      try {
+        localStorage.setItem('finance_app_recurring_rules', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const handleUpdateNonRecurringKeys = (keys: string[]) => {
+    setNonRecurringKeys(keys);
+    try {
+      localStorage.setItem('levlev_non_recurring_keys', JSON.stringify(keys));
+      localStorage.setItem('finance_app_non_recurring_keys', JSON.stringify(keys));
+    } catch (e) {}
+  };
+
   const handleUpdatePeriodStatus = (accountName: string, closeDate: string, status?: 'PAID' | 'OPEN') => {
     setPeriodStatusOverrides(prev => {
       const key = `${accountName}|${closeDate}`;
@@ -902,7 +950,8 @@ export default function App() {
               displayCurrency={displayCurrency}
               usdArsRate={usdArsRate}
               historyData={historyData}
-              recurringRules={[]}
+              recurringRules={recurringRules}
+              nonRecurringKeys={nonRecurringKeys}
               customBalances={customBalances}
               onNavigateTab={setCurrentTab}
               onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
@@ -978,10 +1027,16 @@ export default function App() {
           {currentTab === 'recurring' && (
             <RecurringTab
               transactions={transactions}
-              recurringRules={[]}
+              recurringRules={recurringRules}
+              onSaveRecurringRule={handleSaveRecurringRule}
+              onDeleteRecurringRule={handleDeleteRecurringRule}
+              nonRecurringKeys={nonRecurringKeys}
+              onUpdateNonRecurringKeys={handleUpdateNonRecurringKeys}
               displayCurrency={displayCurrency}
               usdArsRate={usdArsRate}
               historyData={historyData}
+              accountsList={accounts}
+              categoriesList={categories}
             />
           )}
           {currentTab === 'inflation' && <InflationVsFxTab historyData={historyData} />}

@@ -259,6 +259,7 @@ export interface IdentifiedRecurringItem {
   installmentTotal?: number;
   installmentStartDate?: string;
   installmentEndDate?: string;
+  isExcluded?: boolean;
   history: RecurringOccurrence[];
   monthlyTrend: {
     month: string;

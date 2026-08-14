@@ -1716,6 +1716,16 @@ export interface EffectiveRecurringItem {
   frequency?: string;
 }
 
+export function getSavedNonRecurringKeys(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('levlev_non_recurring_keys') || localStorage.getItem('finance_app_non_recurring_keys');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function getEffectiveRecurringItems(
   transactions: Transaction[],
   recurringRules: RecurringRule[] = [],
@@ -1724,15 +1734,34 @@ export function getEffectiveRecurringItems(
   usdArsRate: number = 1521
 ): EffectiveRecurringItem[] {
   const result: EffectiveRecurringItem[] = [];
-  const normalizedExclusions = new Set(nonRecurringKeys.map(k => k.toLowerCase().trim()));
+  const keysToUse = (nonRecurringKeys && nonRecurringKeys.length > 0)
+    ? nonRecurringKeys
+    : getSavedNonRecurringKeys();
+
+  const normalizedExclusions = new Set<string>();
+  keysToUse.forEach(k => {
+    if (!k) return;
+    const lower = k.toLowerCase().trim();
+    normalizedExclusions.add(lower);
+    const cleanK = normalizeCleanTitle(k).toLowerCase().trim();
+    if (cleanK) normalizedExclusions.add(cleanK);
+  });
+
   const coveredManualTitles = new Set<string>();
 
   // 1. Manual Recurring Rules (highest priority, user explicitly customized)
   recurringRules.forEach(rule => {
-    if (rule.isActive === false) return;
-    const cleanT = normalizeCleanTitle(rule.title || '').toLowerCase().trim();
-    if (cleanT) coveredManualTitles.add(cleanT);
-    coveredManualTitles.add((rule.title || '').toLowerCase().trim());
+    if (rule.isActive === false || (rule as any).isExcluded === true) return;
+    const rawClean = normalizeCleanTitle(rule.title || '').toLowerCase().trim();
+    const rawTitle = (rule.title || '').toLowerCase().trim();
+    const rawId = (rule.id || '').toLowerCase().trim();
+
+    if (normalizedExclusions.has(rawClean) || normalizedExclusions.has(rawTitle) || normalizedExclusions.has(rawId)) {
+      return;
+    }
+
+    if (rawClean) coveredManualTitles.add(rawClean);
+    if (rawTitle) coveredManualTitles.add(rawTitle);
 
     result.push({
       id: rule.id || `rule-${Math.random().toString(36).substring(2)}`,
@@ -1758,12 +1787,19 @@ export function getEffectiveRecurringItems(
   detected.forEach(item => {
     const rawClean = item.cleanTitle.toLowerCase().trim();
     const rawTitle = item.title.toLowerCase().trim();
+    const rawNorm = normalizeCleanTitle(item.title).toLowerCase().trim();
+    const rawId = (item.id || '').toLowerCase().trim();
 
-    const isExcluded = normalizedExclusions.has(rawClean) || normalizedExclusions.has(rawTitle);
+    const isExcluded = item.isExcluded === true ||
+      normalizedExclusions.has(rawClean) || 
+      normalizedExclusions.has(rawTitle) || 
+      normalizedExclusions.has(rawNorm) ||
+      normalizedExclusions.has(rawId);
+
     if (isExcluded) return;
 
     // If already covered by a manual rule, don't duplicate
-    if (coveredManualTitles.has(rawClean) || coveredManualTitles.has(rawTitle)) return;
+    if (coveredManualTitles.has(rawClean) || coveredManualTitles.has(rawTitle) || coveredManualTitles.has(rawNorm)) return;
 
     result.push({
       id: `detected-${item.id}`,
@@ -1792,7 +1828,16 @@ export function getEffectiveRecurringItems(
     if (!plan.installmentEndDate && plan.installmentCurrent !== undefined && plan.installmentTotal !== undefined && plan.installmentCurrent >= plan.installmentTotal) return;
 
     const rawClean = plan.cleanTitle.toLowerCase().trim();
-    const isExcluded = normalizedExclusions.has(rawClean);
+    const rawTitle = plan.title.toLowerCase().trim();
+    const rawNorm = normalizeCleanTitle(plan.title).toLowerCase().trim();
+    const rawId = (plan.id || '').toLowerCase().trim();
+
+    const isExcluded = plan.isExcluded === true ||
+      normalizedExclusions.has(rawClean) ||
+      normalizedExclusions.has(rawTitle) ||
+      normalizedExclusions.has(rawNorm) ||
+      normalizedExclusions.has(rawId);
+
     if (isExcluded) return;
 
     result.push({

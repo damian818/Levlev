@@ -124,12 +124,32 @@ export const OverviewTab = React.memo(function OverviewTab({
     }
   }, [availableMonths]);
 
+  const effectiveNonRecurringKeys = useMemo(() => {
+    if (nonRecurringKeys && nonRecurringKeys.length > 0) return nonRecurringKeys;
+    try {
+      const raw = localStorage.getItem('levlev_non_recurring_keys') || localStorage.getItem('finance_app_non_recurring_keys');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }, [nonRecurringKeys]);
+
+  const effectiveRecurringRules = useMemo(() => {
+    if (recurringRules && recurringRules.length > 0) return recurringRules;
+    try {
+      const raw = localStorage.getItem('finance_app_recurring_rules');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }, [recurringRules]);
+
   const spending = useMemo(() => analyzeSpending(filteredTransactions, displayCurrency, usdArsRate, selectedMonth), [filteredTransactions, displayCurrency, usdArsRate, selectedMonth]);
 
   const accounts = useMemo(() => computeAccountBalances(filteredTransactions, usdArsRate, customBalances), [filteredTransactions, usdArsRate, customBalances]);
-  const { trendData, metrics } = useMemo(() => computePredictiveTrend(filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData, nonRecurringKeys), [filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData, nonRecurringKeys]);
+  const { trendData, metrics } = useMemo(() => computePredictiveTrend(filteredTransactions, displayCurrency, usdArsRate, effectiveRecurringRules, customBalances, historyData, effectiveNonRecurringKeys), [filteredTransactions, displayCurrency, usdArsRate, effectiveRecurringRules, customBalances, historyData, effectiveNonRecurringKeys]);
   
-  const projectedBalanceResult = useMemo(() => calculateProjectedBalance(filteredTransactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate, customBalances, 6, historyData), [filteredTransactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate, customBalances, historyData]);
+  const projectedBalanceResult = useMemo(() => calculateProjectedBalance(filteredTransactions, effectiveRecurringRules, effectiveNonRecurringKeys, displayCurrency, usdArsRate, customBalances, 6, historyData), [filteredTransactions, effectiveRecurringRules, effectiveNonRecurringKeys, displayCurrency, usdArsRate, customBalances, historyData]);
 
   // Apply forecasts if enabled
   const isCurrentMonth = selectedMonth === currentMonthKey;
