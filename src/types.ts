@@ -14,6 +14,7 @@ export interface Transaction {
   receiveAmount?: number;
   receiveCurrency?: string;
   description?: string;
+  notes?: string;
   dueDate?: string;
   installments?: string; // e.g. "1/3"
   installmentNumber?: number; // e.g. 1
@@ -71,13 +72,38 @@ export interface BudgetGoal {
 
 export interface RecurringRule {
   id: string;
+  ownerId?: string;
   title: string;
   category: string;
   account: string;
   amount: number;
   currency: string;
   type: 'EXPENSE' | 'INCOME';
+  dayOfMonth: number; // 1-31
+  frequency?: 'MONTHLY' | 'WEEKLY' | 'BIWEEKLY' | 'YEARLY';
+  isActive?: boolean;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  updatedAt?: string;
+}
+
+export interface PendingRecurringItem {
+  id: string;
+  title: string;
+  category: string;
+  account: string;
+  amount: number;
+  convertedAmount: number;
+  currency: string;
+  type: 'EXPENSE' | 'INCOME';
   dayOfMonth: number;
+  isManualRule: boolean;
+  ruleId?: string;
+  isInstallment?: boolean;
+  installmentInfo?: string;
+  isExcluded?: boolean;
+  originalItem?: IdentifiedRecurringItem | RecurringRule;
 }
 
 export interface InflationPoint {

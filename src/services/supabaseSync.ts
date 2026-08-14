@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../lib/supabase';
-import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember } from '../types';
+import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule } from '../types';
 
 const DELETED_TX_KEY = 'finance_app_deleted_tx_ids';
 
@@ -46,6 +46,8 @@ export interface SupabaseUserData {
   categories: CategoryItem[];
   accounts: AccountItem[];
   budgets: BudgetGoal[];
+  recurringRules?: RecurringRule[];
+  nonRecurringKeys?: string[];
   settings?: {
     ccRulesMap?: Record<string, CreditCardClosingRule>;
     ccMap?: Record<string, boolean>;
@@ -53,6 +55,8 @@ export interface SupabaseUserData {
     customBalances?: Record<string, AccountCustomBalance>;
     accountConfigs?: Record<string, { order?: number; isHiddenFromNewTx?: boolean; icon?: any }>;
     accountsList?: AccountItem[];
+    recurringRules?: RecurringRule[];
+    nonRecurringKeys?: string[];
     onboardingCompleted?: boolean;
     workspaceSharing?: {
       isShared?: boolean;
@@ -278,7 +282,10 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       monthlyLimitARS: Number(row.monthly_limit) || 0,
     }));
 
-    return { transactions, categories, accounts, budgets, settings: userSettings };
+    const recurringRules: RecurringRule[] = Array.isArray(userSettings?.recurringRules) ? userSettings.recurringRules : [];
+    const nonRecurringKeys: string[] = Array.isArray(userSettings?.nonRecurringKeys) ? userSettings.nonRecurringKeys : [];
+
+    return { transactions, categories, accounts, budgets, recurringRules, nonRecurringKeys, settings: userSettings };
   } catch (err) {
     console.error('Error fetching data from Supabase:', err);
     return null;
@@ -516,6 +523,8 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       workspaceSharing: data.settings?.workspaceSharing || {},
       accountConfigs: accountConfigs,
       accountsList: data.accounts || [],
+      recurringRules: data.recurringRules || data.settings?.recurringRules || [],
+      nonRecurringKeys: data.nonRecurringKeys || data.settings?.nonRecurringKeys || [],
       onboardingCompleted: !!isTourCompleted,
     };
 

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
-import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections } from '../utils/financeUtils';
+import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections, getPendingRecurringForMonth } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon, Upload, Sparkle } from 'lucide-react';
 import { MonthlyCategoryDonut } from './MonthlyCategoryDonut';
@@ -17,10 +17,12 @@ interface OverviewTabProps {
   usdArsRate: number;
   historyData?: InflationPoint[];
   recurringRules?: RecurringRule[];
+  nonRecurringKeys?: string[];
   customBalances?: Record<string, AccountCustomBalance>;
   onNavigateTab: (tab: ViewTab) => void;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
   onOpenImportModal?: () => void;
+  onAddTransaction?: (tx: Transaction | Transaction[]) => void;
   currentUserId?: string;
   showSharedData?: boolean;
   userTimezone?: string;
@@ -33,11 +35,13 @@ export const OverviewTab = React.memo(function OverviewTab({
   displayCurrency,
   usdArsRate,
   historyData,
-  recurringRules,
+  recurringRules = [],
+  nonRecurringKeys = [],
   customBalances,
   onNavigateTab,
   onNavigateToTransactionsWithFilter,
   onOpenImportModal,
+  onAddTransaction,
   currentUserId,
   showSharedData = true,
   userTimezone = 'America/Argentina/Buenos_Aires',
@@ -123,7 +127,7 @@ export const OverviewTab = React.memo(function OverviewTab({
   const spending = useMemo(() => analyzeSpending(filteredTransactions, displayCurrency, usdArsRate, selectedMonth), [filteredTransactions, displayCurrency, usdArsRate, selectedMonth]);
 
   const accounts = useMemo(() => computeAccountBalances(filteredTransactions, usdArsRate, customBalances), [filteredTransactions, usdArsRate, customBalances]);
-  const { trendData, metrics } = useMemo(() => computePredictiveTrend(filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData), [filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData]);
+  const { trendData, metrics } = useMemo(() => computePredictiveTrend(filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData, nonRecurringKeys), [filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData, nonRecurringKeys]);
 
   // Apply forecasts if enabled
   const isCurrentMonth = selectedMonth === currentMonthKey;
@@ -135,7 +139,7 @@ export const OverviewTab = React.memo(function OverviewTab({
     // For future or current month, add pending recurring items
     // If it's a future month, we use the average/latest recurring items as the "forecast"
     if (isFutureMonth) {
-      const projections = computeFutureRecurringProjections(filteredTransactions, displayCurrency, usdArsRate, 24);
+      const projections = computeFutureRecurringProjections(filteredTransactions, displayCurrency, usdArsRate, 24, recurringRules, nonRecurringKeys);
       const targetProj = projections.find(p => p.month === selectedMonth);
       if (targetProj) {
         return {
@@ -148,21 +152,25 @@ export const OverviewTab = React.memo(function OverviewTab({
         };
       }
     } else if (isCurrentMonth) {
-      // Add pending recurring to current actuals
+      // Calculate pending recurring items for the current month
+      const pendingMonthData = getPendingRecurringForMonth(selectedMonth, filteredTransactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
+      const effPendingIncome = pendingMonthData.totalPendingIncome;
+      const effPendingExpense = pendingMonthData.totalPendingExpense;
+
       return {
         ...spending,
-        totalIncome: spending.totalIncome + metrics.pendingRecurringIncome,
-        totalExpenses: spending.totalExpenses + metrics.pendingRecurringExpense,
-        netSavings: (spending.totalIncome + metrics.pendingRecurringIncome) - (spending.totalExpenses + metrics.pendingRecurringExpense),
-        savingsRate: (spending.totalIncome + metrics.pendingRecurringIncome) > 0 
-          ? (((spending.totalIncome + metrics.pendingRecurringIncome) - (spending.totalExpenses + metrics.pendingRecurringExpense)) / (spending.totalIncome + metrics.pendingRecurringIncome)) * 100 
+        totalIncome: spending.totalIncome + effPendingIncome,
+        totalExpenses: spending.totalExpenses + effPendingExpense,
+        netSavings: (spending.totalIncome + effPendingIncome) - (spending.totalExpenses + effPendingExpense),
+        savingsRate: (spending.totalIncome + effPendingIncome) > 0 
+          ? (((spending.totalIncome + effPendingIncome) - (spending.totalExpenses + effPendingExpense)) / (spending.totalIncome + effPendingIncome)) * 100 
           : 0,
         isForecast: true
       };
     }
     
     return spending;
-  }, [spending, showForecasts, selectedMonth, currentMonthKey, filteredTransactions, displayCurrency, usdArsRate, metrics]);
+  }, [spending, showForecasts, selectedMonth, currentMonthKey, filteredTransactions, displayCurrency, usdArsRate, metrics, recurringRules, nonRecurringKeys]);
 
   // Filter trend data based on date filters
   const filteredTrendData = useMemo(() => {
@@ -741,6 +749,8 @@ export const OverviewTab = React.memo(function OverviewTab({
           displayCurrency={displayCurrency}
           usdArsRate={usdArsRate}
           recurringRules={recurringRules}
+          nonRecurringKeys={nonRecurringKeys}
+          onAddTransaction={onAddTransaction}
         />
       </div>
 

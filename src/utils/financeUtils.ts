@@ -1,4 +1,4 @@
-import { Transaction, DisplayCurrency, RecurringRule, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem, AccountCustomBalance } from '../types';
+import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem, AccountCustomBalance } from '../types';
 
 export function isCreditCardAccount(
   accountName: string, 
@@ -1020,7 +1020,8 @@ export function computePredictiveTrend(
   usdArsRate: number,
   recurringRules: RecurringRule[] = [],
   customBalances?: Record<string, { currentBalance: number; currency: string }>,
-  historyOverride?: InflationPoint[]
+  historyOverride?: InflationPoint[],
+  nonRecurringKeys: string[] = []
 ): {
   trendData: TrendPoint[];
   metrics: PredictiveMetrics;
@@ -1091,13 +1092,13 @@ export function computePredictiveTrend(
 
   // Identify recurring / fixed expenses that already happened in pastTransactions to isolate variable velocity
   let recurringPastExpense = 0;
-  const activeRules = recurringRules || [];
+  const effectiveAll = getEffectiveRecurringItems(transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
 
-  activeRules.forEach(rule => {
-    if (rule.type === 'EXPENSE') {
+  effectiveAll.forEach(item => {
+    if (item.type === 'EXPENSE') {
       const match = pastTransactions.find(t => 
         t.type === 'EXPENSE' && 
-        t.title?.toLowerCase().includes(rule.title.split(' ')[0].toLowerCase())
+        (t.title?.toLowerCase().includes(item.cleanTitle.toLowerCase()) || normalizeCleanTitle(t.title || '').toLowerCase() === item.cleanTitle.toLowerCase())
       );
       if (match) {
         recurringPastExpense += convertCurrency(match.amount, match.currency, displayCurrency, usdArsRate, match.date, transactions);
@@ -1126,25 +1127,10 @@ export function computePredictiveTrend(
     }
   });
 
-  // 2. Unlogged recurring rules scheduled for future days of this month that haven't been matched
-  activeRules.forEach(rule => {
-    const ruleDay = rule.dayOfMonth || 15;
-    if (ruleDay >= currentDayOfMonth) {
-      // Check if any transaction in current month already matches this rule
-      const exists = currentMonthTransactions.some(t => 
-        t.type === rule.type && 
-        t.title?.toLowerCase().includes(rule.title.split(' ')[0].toLowerCase())
-      );
-      if (!exists) {
-        const amt = convertCurrency(rule.amount, rule.currency, displayCurrency, usdArsRate);
-        if (rule.type === 'INCOME') {
-          pendingRecurringIncome += amt;
-        } else if (rule.type === 'EXPENSE') {
-          pendingRecurringExpense += amt;
-        }
-      }
-    }
-  });
+  // 2. Unlogged non-excluded recurring items (auto-detected + manual rules + cuotas) for current month
+  const pendingThisMonth = getPendingRecurringForMonth(currentMonthKey, transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
+  pendingRecurringIncome += pendingThisMonth.pendingIncome;
+  pendingRecurringExpense += pendingThisMonth.pendingExpense;
 
   const projectedEOMIncome = currentActualIncome + pendingRecurringIncome;
   const projectedEOMExpense = currentActualExpense + projectedRemainingVariableExpense + pendingRecurringExpense;
@@ -1238,14 +1224,9 @@ export function computePredictiveTrend(
   const nextMonthNum = monthIdx === 12 ? 1 : monthIdx + 1;
   const nextMonthKey = `${nextMonthYear}-${nextMonthNum < 10 ? '0' : ''}${nextMonthNum}`;
 
-  let nextMonthIncome = 0;
-  let nextMonthExpense = 0;
-
-  recurringRules.forEach(rule => {
-    const amt = convertCurrency(rule.amount, rule.currency, displayCurrency, usdArsRate);
-    if (rule.type === 'INCOME') nextMonthIncome += amt;
-    if (rule.type === 'EXPENSE') nextMonthExpense += amt;
-  });
+  const nextMonthPending = getPendingRecurringForMonth(nextMonthKey, transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
+  let nextMonthIncome = nextMonthPending.pendingIncome;
+  let nextMonthExpense = nextMonthPending.pendingExpense;
 
   const past3Months = pastMonths.slice(-3);
   const avgPastExpense = past3Months.length > 0
@@ -1641,17 +1622,262 @@ export function detectInstallmentPlans(
   });
 }
 
+export interface EffectiveRecurringItem {
+  id: string;
+  title: string;
+  cleanTitle: string;
+  category: string;
+  account: string;
+  amount: number;
+  currency: string;
+  type: 'EXPENSE' | 'INCOME';
+  dayOfMonth: number;
+  isManualRule: boolean;
+  ruleId?: string;
+  isInstallment?: boolean;
+  installmentInfo?: string;
+  installmentStartDate?: string;
+  installmentEndDate?: string;
+  isExcluded: boolean;
+  isActive: boolean;
+  frequency?: string;
+}
+
+export function getEffectiveRecurringItems(
+  transactions: Transaction[],
+  recurringRules: RecurringRule[] = [],
+  nonRecurringKeys: string[] = [],
+  displayCurrency: DisplayCurrency = 'ARS',
+  usdArsRate: number = 1521
+): EffectiveRecurringItem[] {
+  const result: EffectiveRecurringItem[] = [];
+  const normalizedExclusions = new Set(nonRecurringKeys.map(k => k.toLowerCase().trim()));
+  const coveredManualTitles = new Set<string>();
+
+  // 1. Manual Recurring Rules (highest priority, user explicitly customized)
+  recurringRules.forEach(rule => {
+    if (rule.isActive === false) return;
+    const cleanT = normalizeCleanTitle(rule.title || '').toLowerCase().trim();
+    if (cleanT) coveredManualTitles.add(cleanT);
+    coveredManualTitles.add((rule.title || '').toLowerCase().trim());
+
+    result.push({
+      id: rule.id || `rule-${Math.random().toString(36).substring(2)}`,
+      ruleId: rule.id,
+      title: rule.title,
+      cleanTitle: normalizeCleanTitle(rule.title || ''),
+      category: rule.category || 'General',
+      account: rule.account || 'Default',
+      amount: rule.amount || 0,
+      currency: rule.currency || displayCurrency,
+      type: rule.type || 'EXPENSE',
+      dayOfMonth: rule.dayOfMonth || 15,
+      isManualRule: true,
+      isInstallment: false,
+      isExcluded: false,
+      isActive: true,
+      frequency: rule.frequency || 'MONTHLY',
+    });
+  });
+
+  // 2. Auto-Detected Recurring Items from Transactions
+  const detected = detectRecurringItems(transactions, displayCurrency, usdArsRate);
+  detected.forEach(item => {
+    const rawClean = item.cleanTitle.toLowerCase().trim();
+    const rawTitle = item.title.toLowerCase().trim();
+
+    const isExcluded = normalizedExclusions.has(rawClean) || normalizedExclusions.has(rawTitle);
+    if (isExcluded) return;
+
+    // If already covered by a manual rule, don't duplicate
+    if (coveredManualTitles.has(rawClean) || coveredManualTitles.has(rawTitle)) return;
+
+    result.push({
+      id: `detected-${item.id}`,
+      title: item.title,
+      cleanTitle: item.cleanTitle,
+      category: item.category || 'General',
+      account: item.account || 'Default',
+      amount: item.latestAmount,
+      currency: item.currency || displayCurrency,
+      type: item.type,
+      dayOfMonth: item.dayOfMonth || 15,
+      isManualRule: false,
+      isInstallment: false,
+      isExcluded: false,
+      isActive: true,
+      frequency: 'MONTHLY',
+    });
+  });
+
+  // 3. Active Installment Plans
+  const installments = detectInstallmentPlans(transactions, displayCurrency, usdArsRate);
+  const currentMonthKey = getCurrentMonthKey();
+  installments.forEach(plan => {
+    // Only active installments
+    if (plan.installmentEndDate && plan.installmentEndDate < currentMonthKey) return;
+    if (!plan.installmentEndDate && plan.installmentCurrent !== undefined && plan.installmentTotal !== undefined && plan.installmentCurrent >= plan.installmentTotal) return;
+
+    const rawClean = plan.cleanTitle.toLowerCase().trim();
+    const isExcluded = normalizedExclusions.has(rawClean);
+    if (isExcluded) return;
+
+    result.push({
+      id: `installment-${plan.id}`,
+      title: plan.title,
+      cleanTitle: plan.cleanTitle,
+      category: plan.category || 'Installments',
+      account: plan.account || 'Credit Card',
+      amount: plan.latestAmount,
+      currency: plan.currency || displayCurrency,
+      type: 'EXPENSE',
+      dayOfMonth: plan.dayOfMonth || 25,
+      isManualRule: false,
+      isInstallment: true,
+      installmentInfo: plan.installmentInfo,
+      installmentStartDate: plan.installmentStartDate,
+      installmentEndDate: plan.installmentEndDate,
+      isExcluded: false,
+      isActive: true,
+      frequency: 'MONTHLY',
+    });
+  });
+
+  return result;
+}
+
+export interface MonthPendingRecurringResult {
+  monthKey: string;
+  pendingItems: PendingRecurringItem[];
+  pendingExpenses: PendingRecurringItem[];
+  pendingIncomes: PendingRecurringItem[];
+  matchedItems: PendingRecurringItem[];
+  pendingExpense: number; // in displayCurrency
+  pendingIncome: number; // in displayCurrency
+  totalPendingExpense: number; // in displayCurrency (alias)
+  totalPendingIncome: number; // in displayCurrency (alias)
+  dailyPendingMap: Record<number, PendingRecurringItem[]>;
+}
+
+export function getPendingRecurringForMonth(
+  monthKey: string,
+  transactions: Transaction[],
+  recurringRules: RecurringRule[] = [],
+  nonRecurringKeys: string[] = [],
+  displayCurrency: DisplayCurrency = 'ARS',
+  usdArsRate: number = 1521
+): MonthPendingRecurringResult {
+  const effectiveItems = getEffectiveRecurringItems(transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
+  const monthTransactions = transactions.filter(t => t.date && t.date.substring(0, 7) === monthKey);
+  const currentMonthKey = getCurrentMonthKey();
+  const isPastMonth = monthKey < currentMonthKey;
+
+  const pendingItems: PendingRecurringItem[] = [];
+  const matchedItems: PendingRecurringItem[] = [];
+  const dailyPendingMap: Record<number, PendingRecurringItem[]> = {};
+
+  let pendingExpense = 0;
+  let pendingIncome = 0;
+
+  effectiveItems.forEach(item => {
+    // If it's an installment, check date bounds
+    if (item.isInstallment) {
+      if (item.installmentStartDate && monthKey < item.installmentStartDate) return;
+      if (item.installmentEndDate && monthKey > item.installmentEndDate) return;
+    }
+
+    // Check if an actual transaction in this month matches this recurring item
+    const cleanItemTitle = normalizeCleanTitle(item.title).toLowerCase().trim();
+    const itemTitleLower = item.title.toLowerCase().trim();
+
+    const matchedTx = monthTransactions.find(t => {
+      if (t.type !== item.type) return false;
+      const tTitleClean = normalizeCleanTitle(t.title || '').toLowerCase().trim();
+      const tTitle = (t.title || '').toLowerCase().trim();
+
+      // Check title match or clean title match
+      if (tTitle === itemTitleLower || tTitleClean === cleanItemTitle) return true;
+      if (cleanItemTitle.length >= 4 && (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean))) return true;
+      if (tTitleClean.length >= 4 && (itemTitleLower.includes(tTitleClean) || tTitleClean.includes(itemTitleLower))) return true;
+
+      // For installments: check description or installments tag
+      if (item.isInstallment && t.installments && tTitle.includes(cleanItemTitle)) return true;
+
+      return false;
+    });
+
+    const converted = convertCurrency(item.amount, item.currency, displayCurrency, usdArsRate, `${monthKey}-15`, transactions);
+
+    const pendingItemObj: PendingRecurringItem = {
+      id: `${item.id}-${monthKey}`,
+      title: item.title,
+      category: item.category,
+      account: item.account,
+      amount: item.amount,
+      convertedAmount: converted,
+      currency: item.currency,
+      type: item.type,
+      dayOfMonth: item.dayOfMonth,
+      isManualRule: item.isManualRule,
+      ruleId: item.ruleId,
+      isInstallment: item.isInstallment,
+      installmentInfo: item.installmentInfo,
+      isExcluded: item.isExcluded,
+    };
+
+    if (matchedTx) {
+      matchedItems.push(pendingItemObj);
+      return;
+    }
+
+    // If not matched:
+    // In current month or future month, it is pending / estimated!
+    if (!isPastMonth) {
+      pendingItems.push(pendingItemObj);
+      if (item.type === 'INCOME') {
+        pendingIncome += converted;
+      } else {
+        pendingExpense += converted;
+      }
+
+      const day = item.dayOfMonth || 15;
+      if (!dailyPendingMap[day]) {
+        dailyPendingMap[day] = [];
+      }
+      dailyPendingMap[day].push(pendingItemObj);
+    }
+  });
+
+  const pendingExpenses = pendingItems.filter(i => i.type === 'EXPENSE');
+  const pendingIncomes = pendingItems.filter(i => i.type === 'INCOME');
+
+  return {
+    monthKey,
+    pendingItems,
+    pendingExpenses,
+    pendingIncomes,
+    matchedItems,
+    pendingExpense,
+    pendingIncome,
+    totalPendingExpense: pendingExpense,
+    totalPendingIncome: pendingIncome,
+    dailyPendingMap,
+  };
+}
+
 /**
  * Projects future recurring expenses and incomes for a given number of months.
+ * Fully supports user-defined manual rules (e.g. salary, rent) and exclusions!
  */
 export function computeFutureRecurringProjections(
   transactions: Transaction[],
   displayCurrency: DisplayCurrency,
   usdArsRate: number,
-  months: number = 12
+  months: number = 12,
+  recurringRules: RecurringRule[] = [],
+  nonRecurringKeys: string[] = []
 ): { month: string; expense: number; income: number; net: number }[] {
-  const recurring = detectRecurringItems(transactions, displayCurrency, usdArsRate);
-  const installments = detectInstallmentPlans(transactions, displayCurrency, usdArsRate);
+  const effective = getEffectiveRecurringItems(transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
   
   const projections: { month: string; expense: number; income: number; net: number }[] = [];
   const now = new Date();
@@ -1663,30 +1889,18 @@ export function computeFutureRecurringProjections(
     let monthlyExpense = 0;
     let monthlyIncome = 0;
     
-    // 1. Regular Recurring
-    recurring.forEach(item => {
-      // Logic: If it's a regular recurring item, we assume it continues.
-      // We use the latest amount as the baseline.
-      const amount = convertCurrency(item.latestAmount, item.currency, displayCurrency, usdArsRate, undefined, transactions);
+    effective.forEach(item => {
+      // If it's an installment plan, check date bounds
+      if (item.isInstallment) {
+        if (item.installmentStartDate && mKey < item.installmentStartDate) return;
+        if (item.installmentEndDate && mKey > item.installmentEndDate) return;
+      }
+
+      const amount = convertCurrency(item.amount, item.currency, displayCurrency, usdArsRate, `${mKey}-15`, transactions);
       if (item.type === 'EXPENSE') {
         monthlyExpense += amount;
       } else {
         monthlyIncome += amount;
-      }
-    });
-    
-    // 2. Installment Plans
-    installments.forEach(plan => {
-      // Logic: Only include if the month is within the start and end dates.
-      if (plan.installmentStartDate && plan.installmentEndDate) {
-        if (mKey >= plan.installmentStartDate && mKey <= plan.installmentEndDate) {
-          const amount = convertCurrency(plan.latestAmount, plan.currency, displayCurrency, usdArsRate, undefined, transactions);
-          monthlyExpense += amount;
-        }
-      } else if (plan.installmentCurrent !== undefined && plan.installmentTotal !== undefined) {
-        // Fallback for plans without explicit dates: check if it's still active
-        // But for projection, we really need dates or we assume it's current.
-        // Actually detectInstallmentPlans derivesEndDate if current/total exists.
       }
     });
     
