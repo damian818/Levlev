@@ -173,7 +173,40 @@ export interface TrendPoint {
   projectedExpense?: number;
   projectedNet?: number;
   forecastBalance: number;
+  projectedBalance?: number;
+  actualBalance?: number;
+  pendingRecurringIncome?: number;
+  pendingRecurringExpense?: number;
   fxRate?: number;
+}
+
+export interface ProjectedBalancePoint {
+  month: string;
+  isForecast: boolean;
+  isCurrentMonth: boolean;
+  actualBalance?: number | null;
+  projectedBalance: number;
+  income: number;
+  expense: number;
+  net: number;
+  projectedIncome?: number;
+  projectedExpense?: number;
+  projectedNet?: number;
+  pendingRecurringIncome?: number;
+  pendingRecurringExpense?: number;
+  fxRate?: number;
+}
+
+export interface ProjectedBalanceCalculation {
+  currentLiquidBalance: number;
+  projectedEOMBalance: number;
+  projectedBalances: ProjectedBalancePoint[];
+  upcomingRecurringItems: PendingRecurringItem[];
+  totalUpcomingIncome: number;
+  totalUpcomingExpense: number;
+  netUpcomingDelta: number;
+  dailyExpenseVelocity: number;
+  projectedRemainingVariableExpense: number;
 }
 
 export interface PredictiveMetrics {

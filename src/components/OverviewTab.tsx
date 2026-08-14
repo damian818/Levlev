@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
-import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections, getPendingRecurringForMonth } from '../utils/financeUtils';
+import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, calculateProjectedBalance, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections, getPendingRecurringForMonth } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon, Upload, Sparkle } from 'lucide-react';
 import { MonthlyCategoryDonut } from './MonthlyCategoryDonut';
@@ -128,6 +128,8 @@ export const OverviewTab = React.memo(function OverviewTab({
 
   const accounts = useMemo(() => computeAccountBalances(filteredTransactions, usdArsRate, customBalances), [filteredTransactions, usdArsRate, customBalances]);
   const { trendData, metrics } = useMemo(() => computePredictiveTrend(filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData, nonRecurringKeys), [filteredTransactions, displayCurrency, usdArsRate, recurringRules, customBalances, historyData, nonRecurringKeys]);
+  
+  const projectedBalanceResult = useMemo(() => calculateProjectedBalance(filteredTransactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate, customBalances, 6, historyData), [filteredTransactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate, customBalances, historyData]);
 
   // Apply forecasts if enabled
   const isCurrentMonth = selectedMonth === currentMonthKey;
@@ -541,11 +543,19 @@ export const OverviewTab = React.memo(function OverviewTab({
         <div className="bg-[#11141c] p-4 sm:p-5 rounded-xl border border-slate-800 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-xs sm:text-sm font-semibold text-slate-100 flex items-center gap-2">
-                <span>{t('overview.cash_flow_trend_title')}</span>
-              </h3>
-              <p className="text-[10px] sm:text-xs text-slate-400">
-                {t('overview.cash_flow_trend_desc')}
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-xs sm:text-sm font-semibold text-slate-100 flex items-center gap-2">
+                  <span>{t('overview.cash_flow_trend_title')}</span>
+                </h3>
+                {projectedBalanceResult.upcomingRecurringItems.length > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium" title={t('overview.projected_balance_desc')}>
+                    <Sparkles className="w-3 h-3" />
+                    <span>{projectedBalanceResult.upcomingRecurringItems.length} {t('nav.recurring_short', { defaultValue: 'Recurring' })}</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">
+                {t('overview.projected_balance_desc')}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -586,14 +596,36 @@ export const OverviewTab = React.memo(function OverviewTab({
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
                       return (
-                        <div className="bg-[#161b22] border border-slate-700 p-3 rounded-lg shadow-xl text-xs space-y-1.5">
-                          <p className="font-bold text-slate-200">{label}</p>
+                        <div className="bg-[#161b22] border border-slate-700 p-3 rounded-lg shadow-xl text-xs space-y-1.5 min-w-[200px]">
+                          <p className="font-bold text-slate-200 border-b border-slate-800 pb-1">{label}</p>
                           {payload.map((entry: any, index: number) => (
                             <p key={index} className="flex justify-between gap-4" style={{ color: entry.color }}>
                               <span>{entry.name}:</span>
                               <span className="font-bold">{formatCurrency(entry.value, displayCurrency)}</span>
                             </p>
                           ))}
+                          {data.actualBalance !== undefined && data.actualBalance !== null && (
+                            <p className="flex justify-between gap-4 text-slate-400 text-[11px]">
+                              <span>{t('overview.actual_balance', { defaultValue: 'Actual Balance' })}:</span>
+                              <span className="font-semibold text-slate-300">{formatCurrency(data.actualBalance, displayCurrency)}</span>
+                            </p>
+                          )}
+                          {(data.pendingRecurringIncome > 0 || data.pendingRecurringExpense > 0) && (
+                            <div className="pt-1 mt-1 border-t border-slate-800 space-y-0.5 text-[10px]">
+                              {data.pendingRecurringIncome > 0 && (
+                                <p className="flex justify-between text-emerald-400">
+                                  <span>+ {t('overview.pending_recurring_inflow', { defaultValue: 'Pending Inflow' })}:</span>
+                                  <span>{formatCurrency(data.pendingRecurringIncome, displayCurrency)}</span>
+                                </p>
+                              )}
+                              {data.pendingRecurringExpense > 0 && (
+                                <p className="flex justify-between text-rose-400">
+                                  <span>- {t('overview.pending_recurring_bills', { defaultValue: 'Pending Bills' })}:</span>
+                                  <span>{formatCurrency(data.pendingRecurringExpense, displayCurrency)}</span>
+                                </p>
+                              )}
+                            </div>
+                          )}
                           {data.fxRate && (
                             <div className="pt-1 mt-1 border-t border-slate-800 text-[10px] text-slate-500 font-mono">
                               FX Rate: 1 USD = {data.fxRate.toLocaleString()} ARS
@@ -605,7 +637,7 @@ export const OverviewTab = React.memo(function OverviewTab({
                     return null;
                   }}
                 />
-                <Legend formatter={(value) => t(`common.${value.toLowerCase()}`)} />
+                <Legend formatter={(value) => t(`common.${value.toLowerCase()}`, { defaultValue: value })} />
                 <Bar 
                   yAxisId="left"
                   dataKey="income" 
@@ -643,8 +675,8 @@ export const OverviewTab = React.memo(function OverviewTab({
                 <Line 
                   yAxisId="right"
                   type="monotone" 
-                  dataKey="forecastBalance" 
-                  name={t('overview.predicted_eom_assets')} 
+                  dataKey="projectedBalance" 
+                  name={t('overview.projected_balance', { defaultValue: 'Projected Balance' })} 
                   stroke="#f59e0b" 
                   strokeWidth={2.5} 
                   strokeDasharray="4 4"

@@ -1,4 +1,4 @@
-import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem, AccountCustomBalance } from '../types';
+import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem, AccountCustomBalance, ProjectedBalancePoint, ProjectedBalanceCalculation } from '../types';
 
 export function isCreditCardAccount(
   accountName: string, 
@@ -1014,33 +1014,44 @@ export function analyzeSpending(
   };
 }
 
-export function computePredictiveTrend(
+/**
+ * Calculates 'projected balance' by combining actual transaction history with upcoming non-excluded recurring transactions.
+ * 
+ * 1. Computes starting / current liquid balance from actual past and present transactions (plus any custom initial balances).
+ * 2. Gathers actual historical monthly transaction flows to build the past actual balance trajectory.
+ * 3. Identifies the current month state: actual past transactions up to today, daily spending velocity, and upcoming non-excluded recurring transactions (incomes + expenses).
+ * 4. Combines actual transaction history with upcoming non-excluded recurring transactions (including manual rules, auto-detected recurring patterns, and active installments) to project future monthly balances.
+ * 5. Returns a structured calculation result with month-by-month historical and projected balance points, current balance, projected EOM balance, upcoming recurring breakdown, and net trajectory deltas.
+ */
+export function calculateProjectedBalance(
   transactions: Transaction[],
-  displayCurrency: DisplayCurrency,
-  usdArsRate: number,
   recurringRules: RecurringRule[] = [],
+  nonRecurringKeys: string[] = [],
+  displayCurrency: DisplayCurrency = 'ARS',
+  usdArsRate: number = 1521,
   customBalances?: Record<string, { currentBalance: number; currency: string }>,
-  historyOverride?: InflationPoint[],
-  nonRecurringKeys: string[] = []
-): {
-  trendData: TrendPoint[];
-  metrics: PredictiveMetrics;
-} {
-  // 1. Calculate current liquid assets
+  monthsAhead: number = 6,
+  historyOverride?: InflationPoint[]
+): ProjectedBalanceCalculation {
+  // 1. Calculate current liquid balance from actual transaction history
   const accounts = computeAccountBalances(transactions, usdArsRate, customBalances);
   const currentLiquidBalance = displayCurrency === 'USD'
     ? accounts.reduce((sum, a) => sum + a.balanceUSD, 0)
     : accounts.reduce((sum, a) => sum + a.balanceARS, 0);
 
-  // 2. Map monthly transactions
+  // 2. Map monthly actual transactions
   const monthlyMap: Record<string, { income: number; expense: number }> = {};
-  let latestDateStr = '2026-08-05';
+  const currentMonthKey = getCurrentMonthKey();
+  const todayStr = getTodayString();
+  const now = new Date();
+  const currentDayOfMonth = Math.max(1, now.getDate());
+  const year = parseInt(currentMonthKey.substring(0, 4)) || now.getFullYear();
+  const monthIdx = parseInt(currentMonthKey.substring(5, 7)) || (now.getMonth() + 1);
+  const daysInMonth = new Date(year, monthIdx, 0).getDate();
+  const daysRemaining = Math.max(0, daysInMonth - currentDayOfMonth);
 
   transactions.forEach(tx => {
-    if (tx.date && tx.date > latestDateStr) {
-      latestDateStr = tx.date;
-    }
-    const monthKey = tx.date ? tx.date.substring(0, 7) : '2026-01';
+    const monthKey = tx.date ? tx.date.substring(0, 7) : currentMonthKey;
     if (!monthlyMap[monthKey]) {
       monthlyMap[monthKey] = { income: 0, expense: 0 };
     }
@@ -1053,51 +1064,28 @@ export function computePredictiveTrend(
   });
 
   const sortedMonths = Object.keys(monthlyMap).sort();
-  const currentMonthKey = getCurrentMonthKey();
+  const pastMonths = sortedMonths.filter(m => m < currentMonthKey);
 
-  // Current day details from system date
-  const now = new Date();
-  const currentDayOfMonth = Math.max(1, now.getDate());
-
-  const year = parseInt(currentMonthKey.substring(0, 4)) || now.getFullYear();
-  const monthIdx = parseInt(currentMonthKey.substring(5, 7)) || (now.getMonth() + 1);
-  const daysInMonth = new Date(year, monthIdx, 0).getDate();
-  const daysRemaining = Math.max(0, daysInMonth - currentDayOfMonth);
-
-  const currentDayStr = `${currentMonthKey}-${String(currentDayOfMonth).padStart(2, '0')}`;
-
-  // Filter current month transactions into PAST (<= today) and FUTURE (> today)
+  // Filter current month transactions into past (<= today) and future (> today)
   const currentMonthTransactions = transactions.filter(t => t.date && t.date.substring(0, 7) === currentMonthKey);
-  const pastTransactions = currentMonthTransactions.filter(t => {
-    const tDayStr = t.date.substring(0, 10);
-    return tDayStr <= currentDayStr;
-  });
-  const futureTransactions = currentMonthTransactions.filter(t => {
-    const tDayStr = t.date.substring(0, 10);
-    return tDayStr > currentDayStr;
-  });
+  const pastCurrentMonthTransactions = currentMonthTransactions.filter(t => (t.date?.substring(0, 10) || '') <= todayStr);
+  const futureCurrentMonthTransactions = currentMonthTransactions.filter(t => (t.date?.substring(0, 10) || '') > todayStr);
 
-  // Calculate actual income and expense so far this month
   let currentActualIncome = 0;
   let currentActualExpense = 0;
-
-  pastTransactions.forEach(t => {
+  pastCurrentMonthTransactions.forEach(t => {
     const amt = convertCurrency(t.amount, t.currency, displayCurrency, usdArsRate, t.date, transactions);
-    if (t.type === 'INCOME') {
-      currentActualIncome += amt;
-    } else if (t.type === 'EXPENSE') {
-      currentActualExpense += amt;
-    }
+    if (t.type === 'INCOME') currentActualIncome += amt;
+    else if (t.type === 'EXPENSE') currentActualExpense += amt;
   });
 
-  // Identify recurring / fixed expenses that already happened in pastTransactions to isolate variable velocity
+  // Calculate daily variable velocity
   let recurringPastExpense = 0;
   const effectiveAll = getEffectiveRecurringItems(transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
-
   effectiveAll.forEach(item => {
     if (item.type === 'EXPENSE') {
-      const match = pastTransactions.find(t => 
-        t.type === 'EXPENSE' && 
+      const match = pastCurrentMonthTransactions.find(t =>
+        t.type === 'EXPENSE' &&
         (t.title?.toLowerCase().includes(item.cleanTitle.toLowerCase()) || normalizeCleanTitle(t.title || '').toLowerCase() === item.cleanTitle.toLowerCase())
       );
       if (match) {
@@ -1106,66 +1094,31 @@ export function computePredictiveTrend(
     }
   });
 
-  // Variable expenses so far = past actual expenses minus identified fixed recurring bills
   const variableExpenseSoFar = Math.max(0, currentActualExpense - recurringPastExpense);
-
-  // Daily spending velocity (run-rate of variable expenses per elapsed day)
   const dailyExpenseVelocity = currentDayOfMonth > 0 ? variableExpenseSoFar / currentDayOfMonth : 0;
   const projectedRemainingVariableExpense = dailyExpenseVelocity * daysRemaining;
 
-  // Calculate pending recurring items for the remaining portion of the month:
-  // 1. Explicit future scheduled transactions logged in the dataset
-  let pendingRecurringIncome = 0;
-  let pendingRecurringExpense = 0;
-
-  futureTransactions.forEach(t => {
+  // Upcoming non-excluded recurring transactions for current month:
+  let futureExplicitIncome = 0;
+  let futureExplicitExpense = 0;
+  futureCurrentMonthTransactions.forEach(t => {
     const amt = convertCurrency(t.amount, t.currency, displayCurrency, usdArsRate, t.date, transactions);
-    if (t.type === 'INCOME') {
-      pendingRecurringIncome += amt;
-    } else if (t.type === 'EXPENSE') {
-      pendingRecurringExpense += amt;
-    }
+    if (t.type === 'INCOME') futureExplicitIncome += amt;
+    else if (t.type === 'EXPENSE') futureExplicitExpense += amt;
   });
 
-  // 2. Unlogged non-excluded recurring items (auto-detected + manual rules + cuotas) for current month
   const pendingThisMonth = getPendingRecurringForMonth(currentMonthKey, transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
-  pendingRecurringIncome += pendingThisMonth.pendingIncome;
-  pendingRecurringExpense += pendingThisMonth.pendingExpense;
+  const pendingRecurringIncome = futureExplicitIncome + pendingThisMonth.pendingIncome;
+  const pendingRecurringExpense = futureExplicitExpense + pendingThisMonth.pendingExpense;
 
   const projectedEOMIncome = currentActualIncome + pendingRecurringIncome;
   const projectedEOMExpense = currentActualExpense + projectedRemainingVariableExpense + pendingRecurringExpense;
   const projectedEOMNet = projectedEOMIncome - projectedEOMExpense;
+  const projectedEOMBalance = currentLiquidBalance + (pendingRecurringIncome - pendingRecurringExpense - projectedRemainingVariableExpense);
 
-  const pendingNetDelta = (pendingRecurringIncome - pendingRecurringExpense - projectedRemainingVariableExpense);
-  const projectedEOMBalance = currentLiquidBalance + pendingNetDelta;
-
-  const projectedSavingsRate = projectedEOMIncome > 0
-    ? ((projectedEOMIncome - projectedEOMExpense) / projectedEOMIncome) * 100
-    : 0;
-
-  const metrics: PredictiveMetrics = {
-    currentDayOfMonth,
-    daysInMonth,
-    daysRemaining,
-    dailyExpenseVelocity,
-    projectedRemainingVariableExpense,
-    pendingRecurringIncome,
-    pendingRecurringExpense,
-    currentLiquidBalance,
-    projectedEOMBalance,
-    projectedEOMIncome,
-    projectedEOMExpense,
-    projectedEOMNet,
-    projectedSavingsRate
-  };
-
-  const trendData: TrendPoint[] = [];
-  const pastMonths = sortedMonths.filter(m => m !== currentMonthKey);
-
-  // Compute backwards balances for historical points so the line smoothly connects
+  // Compute backwards actual balances for past months
   let runningBalance = currentLiquidBalance - (currentActualIncome - currentActualExpense);
   const monthBalancesMap: Record<string, number> = {};
-
   for (let i = pastMonths.length - 1; i >= 0; i--) {
     const m = pastMonths[i];
     monthBalancesMap[m] = runningBalance;
@@ -1173,83 +1126,203 @@ export function computePredictiveTrend(
     runningBalance -= mNet;
   }
 
+  const projectedBalances: ProjectedBalancePoint[] = [];
+
   // Add historical points
   pastMonths.forEach(m => {
     const inc = monthlyMap[m].income;
     const exp = monthlyMap[m].expense;
-    trendData.push({
+    const bal = monthBalancesMap[m] || 0;
+    projectedBalances.push({
       month: m,
       isForecast: false,
       isCurrentMonth: false,
+      actualBalance: Math.round(bal),
+      projectedBalance: Math.round(bal),
       income: Math.round(inc),
       expense: Math.round(exp),
       net: Math.round(inc - exp),
-      forecastBalance: Math.round(monthBalancesMap[m] || 0),
       fxRate: getHistoricalFxRate(m, usdArsRate, transactions, historyOverride),
     });
   });
 
   // Add current month point (as of today)
-  trendData.push({
+  projectedBalances.push({
     month: `${currentMonthKey} (Today)`,
     isForecast: false,
     isCurrentMonth: true,
+    actualBalance: Math.round(currentLiquidBalance),
+    projectedBalance: Math.round(currentLiquidBalance),
     income: Math.round(currentActualIncome),
     expense: Math.round(currentActualExpense),
     net: Math.round(currentActualIncome - currentActualExpense),
     projectedIncome: Math.round(projectedEOMIncome),
     projectedExpense: Math.round(projectedEOMExpense),
     projectedNet: Math.round(projectedEOMNet),
-    forecastBalance: Math.round(currentLiquidBalance),
+    pendingRecurringIncome: Math.round(pendingRecurringIncome),
+    pendingRecurringExpense: Math.round(pendingRecurringExpense),
     fxRate: usdArsRate,
   });
 
-  // Add current month end-of-month projection point
-  trendData.push({
+  // Add current month End-Of-Month projection point
+  projectedBalances.push({
     month: `${currentMonthKey} (EOM Est.)`,
     isForecast: true,
     isCurrentMonth: false,
+    actualBalance: null,
+    projectedBalance: Math.round(projectedEOMBalance),
     income: 0,
     expense: 0,
     net: 0,
     projectedIncome: Math.round(projectedEOMIncome),
     projectedExpense: Math.round(projectedEOMExpense),
     projectedNet: Math.round(projectedEOMNet),
-    forecastBalance: Math.round(projectedEOMBalance),
+    pendingRecurringIncome: Math.round(pendingRecurringIncome),
+    pendingRecurringExpense: Math.round(pendingRecurringExpense),
     fxRate: usdArsRate,
   });
 
-  // Next month forecast
-  const nextMonthYear = monthIdx === 12 ? year + 1 : year;
-  const nextMonthNum = monthIdx === 12 ? 1 : monthIdx + 1;
-  const nextMonthKey = `${nextMonthYear}-${nextMonthNum < 10 ? '0' : ''}${nextMonthNum}`;
+  // All upcoming recurring items collected across horizon
+  const allUpcomingRecurring: PendingRecurringItem[] = [...pendingThisMonth.pendingItems];
 
-  const nextMonthPending = getPendingRecurringForMonth(nextMonthKey, transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
-  let nextMonthIncome = nextMonthPending.pendingIncome;
-  let nextMonthExpense = nextMonthPending.pendingExpense;
-
+  // Project future months ahead (1 to monthsAhead)
+  let lastProjectedBalance = projectedEOMBalance;
   const past3Months = pastMonths.slice(-3);
   const avgPastExpense = past3Months.length > 0
     ? past3Months.reduce((s, m) => s + monthlyMap[m].expense, 0) / past3Months.length
     : currentActualExpense * 2;
 
-  nextMonthExpense = Math.max(nextMonthExpense, avgPastExpense);
-  const nextMonthNet = nextMonthIncome - nextMonthExpense;
-  const nextMonthProjectedEOMBalance = projectedEOMBalance + nextMonthNet;
+  let totalUpcomingIncome = pendingRecurringIncome;
+  let totalUpcomingExpense = pendingRecurringExpense;
 
-  trendData.push({
-    month: `${nextMonthKey} (Fcst)`,
-    isForecast: true,
-    isCurrentMonth: false,
-    income: 0,
-    expense: 0,
-    net: 0,
-    projectedIncome: Math.round(nextMonthIncome),
-    projectedExpense: Math.round(nextMonthExpense),
-    projectedNet: Math.round(nextMonthNet),
-    forecastBalance: Math.round(nextMonthProjectedEOMBalance),
-    fxRate: usdArsRate,
-  });
+  for (let step = 1; step <= monthsAhead; step++) {
+    const fDate = new Date(year, monthIdx - 1 + step, 1);
+    const fYear = fDate.getFullYear();
+    const fMonthNum = fDate.getMonth() + 1;
+    const fMonthKey = `${fYear}-${String(fMonthNum).padStart(2, '0')}`;
+
+    const futurePending = getPendingRecurringForMonth(fMonthKey, transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
+    futurePending.pendingItems.forEach(item => {
+      if (!allUpcomingRecurring.some(ex => ex.id === item.id)) {
+        allUpcomingRecurring.push(item);
+      }
+    });
+
+    const fIncome = futurePending.pendingIncome;
+    const fExpense = Math.max(futurePending.pendingExpense, avgPastExpense);
+    const fNet = fIncome - fExpense;
+    lastProjectedBalance += fNet;
+
+    totalUpcomingIncome += fIncome;
+    totalUpcomingExpense += fExpense;
+
+    projectedBalances.push({
+      month: `${fMonthKey} (Fcst)`,
+      isForecast: true,
+      isCurrentMonth: false,
+      actualBalance: null,
+      projectedBalance: Math.round(lastProjectedBalance),
+      income: 0,
+      expense: 0,
+      net: 0,
+      projectedIncome: Math.round(fIncome),
+      projectedExpense: Math.round(fExpense),
+      projectedNet: Math.round(fNet),
+      pendingRecurringIncome: Math.round(futurePending.pendingIncome),
+      pendingRecurringExpense: Math.round(futurePending.pendingExpense),
+      fxRate: usdArsRate,
+    });
+  }
+
+  return {
+    currentLiquidBalance,
+    projectedEOMBalance,
+    projectedBalances,
+    upcomingRecurringItems: allUpcomingRecurring,
+    totalUpcomingIncome,
+    totalUpcomingExpense,
+    netUpcomingDelta: totalUpcomingIncome - totalUpcomingExpense,
+    dailyExpenseVelocity,
+    projectedRemainingVariableExpense,
+  };
+}
+
+export function computePredictiveTrend(
+  transactions: Transaction[],
+  displayCurrency: DisplayCurrency,
+  usdArsRate: number,
+  recurringRules: RecurringRule[] = [],
+  customBalances?: Record<string, { currentBalance: number; currency: string }>,
+  historyOverride?: InflationPoint[],
+  nonRecurringKeys: string[] = []
+): {
+  trendData: TrendPoint[];
+  metrics: PredictiveMetrics;
+} {
+  // 1. Calculate projected balance and trajectory
+  const projection = calculateProjectedBalance(
+    transactions,
+    recurringRules,
+    nonRecurringKeys,
+    displayCurrency,
+    usdArsRate,
+    customBalances,
+    3,
+    historyOverride
+  );
+
+  const currentMonthKey = getCurrentMonthKey();
+  const now = new Date();
+  const currentDayOfMonth = Math.max(1, now.getDate());
+  const year = parseInt(currentMonthKey.substring(0, 4)) || now.getFullYear();
+  const monthIdx = parseInt(currentMonthKey.substring(5, 7)) || (now.getMonth() + 1);
+  const daysInMonth = new Date(year, monthIdx, 0).getDate();
+  const daysRemaining = Math.max(0, daysInMonth - currentDayOfMonth);
+
+  // Map projection points to TrendPoint format
+  const trendData: TrendPoint[] = projection.projectedBalances.map(pb => ({
+    month: pb.month,
+    isForecast: pb.isForecast,
+    isCurrentMonth: pb.isCurrentMonth,
+    income: pb.income,
+    expense: pb.expense,
+    net: pb.net,
+    projectedIncome: pb.projectedIncome,
+    projectedExpense: pb.projectedExpense,
+    projectedNet: pb.projectedNet,
+    forecastBalance: pb.projectedBalance,
+    projectedBalance: pb.projectedBalance,
+    actualBalance: pb.actualBalance !== null && pb.actualBalance !== undefined ? pb.actualBalance : undefined,
+    pendingRecurringIncome: pb.pendingRecurringIncome,
+    pendingRecurringExpense: pb.pendingRecurringExpense,
+    fxRate: pb.fxRate,
+  }));
+
+  const currentPoint = projection.projectedBalances.find(p => p.isCurrentMonth);
+  const eomPoint = projection.projectedBalances.find(p => p.month.includes('EOM Est.'));
+
+  const projectedEOMIncome = eomPoint?.projectedIncome || currentPoint?.projectedIncome || 0;
+  const projectedEOMExpense = eomPoint?.projectedExpense || currentPoint?.projectedExpense || 0;
+  const projectedEOMNet = projectedEOMIncome - projectedEOMExpense;
+  const projectedSavingsRate = projectedEOMIncome > 0
+    ? (projectedEOMNet / projectedEOMIncome) * 100
+    : 0;
+
+  const metrics: PredictiveMetrics = {
+    currentDayOfMonth,
+    daysInMonth,
+    daysRemaining,
+    dailyExpenseVelocity: projection.dailyExpenseVelocity,
+    projectedRemainingVariableExpense: projection.projectedRemainingVariableExpense,
+    pendingRecurringIncome: currentPoint?.pendingRecurringIncome || 0,
+    pendingRecurringExpense: currentPoint?.pendingRecurringExpense || 0,
+    currentLiquidBalance: projection.currentLiquidBalance,
+    projectedEOMBalance: projection.projectedEOMBalance,
+    projectedEOMIncome,
+    projectedEOMExpense,
+    projectedEOMNet,
+    projectedSavingsRate
+  };
 
   return { trendData, metrics };
 }
