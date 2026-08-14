@@ -1888,7 +1888,9 @@ export function getPendingRecurringForMonth(
   const effectiveItems = getEffectiveRecurringItems(transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
   const monthTransactions = transactions.filter(t => t.date && t.date.substring(0, 7) === monthKey);
   const currentMonthKey = getCurrentMonthKey();
+  const todayStr = getTodayString();
   const isPastMonth = monthKey < currentMonthKey;
+  const isCurrentMonth = monthKey === currentMonthKey;
 
   const pendingItems: PendingRecurringItem[] = [];
   const matchedItems: PendingRecurringItem[] = [];
@@ -1907,19 +1909,22 @@ export function getPendingRecurringForMonth(
     // Check if an actual transaction in this month matches this recurring item
     const cleanItemTitle = normalizeCleanTitle(item.title).toLowerCase().trim();
     const itemTitleLower = item.title.toLowerCase().trim();
+    const day = Math.min(31, Math.max(1, item.dayOfMonth || 15));
+    const estimatedDateStr = `${monthKey}-${String(day).padStart(2, '0')}`;
 
+    // 1. Check if an expense/income was recorded in the same period for that title
     const matchedTx = monthTransactions.find(t => {
       if (t.type !== item.type) return false;
       const tTitleClean = normalizeCleanTitle(t.title || '').toLowerCase().trim();
       const tTitle = (t.title || '').toLowerCase().trim();
 
-      // Check title match or clean title match
-      if (tTitle === itemTitleLower || tTitleClean === cleanItemTitle) return true;
-      if (cleanItemTitle.length >= 4 && (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean))) return true;
-      if (tTitleClean.length >= 4 && (itemTitleLower.includes(tTitleClean) || tTitleClean.includes(itemTitleLower))) return true;
+      // Check title match, clean title match, or containment
+      if (tTitle === itemTitleLower || tTitleClean === cleanItemTitle || tTitleClean === itemTitleLower || tTitle === cleanItemTitle) return true;
+      if (cleanItemTitle.length >= 3 && (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean))) return true;
+      if (tTitleClean.length >= 3 && (itemTitleLower.includes(tTitleClean) || tTitleClean.includes(itemTitleLower))) return true;
 
-      // For installments: check description or installments tag
-      if (item.isInstallment && t.installments && tTitle.includes(cleanItemTitle)) return true;
+      // For installments: check description or installments tag or title
+      if (item.isInstallment && t.installments && (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean))) return true;
 
       return false;
     });
@@ -1943,27 +1948,31 @@ export function getPendingRecurringForMonth(
       isExcluded: item.isExcluded,
     };
 
+    // If an expense/income was already recorded in this period for that title -> remove estimation for that period!
     if (matchedTx) {
       matchedItems.push(pendingItemObj);
       return;
     }
 
-    // If not matched:
-    // In current month or future month, it is pending / estimated!
-    if (!isPastMonth) {
-      pendingItems.push(pendingItemObj);
-      if (item.type === 'INCOME') {
-        pendingIncome += converted;
-      } else {
-        pendingExpense += converted;
-      }
-
-      const day = item.dayOfMonth || 15;
-      if (!dailyPendingMap[day]) {
-        dailyPendingMap[day] = [];
-      }
-      dailyPendingMap[day].push(pendingItemObj);
+    // If the recurring estimated date is in the past -> remove estimation for that period!
+    // (If the entire month has passed, or for current month if estimatedDateStr < todayStr)
+    const isEstimatedDateInPast = isPastMonth || (isCurrentMonth && estimatedDateStr < todayStr);
+    if (isEstimatedDateInPast) {
+      return;
     }
+
+    // Otherwise, this is an upcoming pending estimation for this period
+    pendingItems.push(pendingItemObj);
+    if (item.type === 'INCOME') {
+      pendingIncome += converted;
+    } else {
+      pendingExpense += converted;
+    }
+
+    if (!dailyPendingMap[day]) {
+      dailyPendingMap[day] = [];
+    }
+    dailyPendingMap[day].push(pendingItemObj);
   });
 
   const pendingExpenses = pendingItems.filter(i => i.type === 'EXPENSE');
@@ -1995,8 +2004,6 @@ export function computeFutureRecurringProjections(
   recurringRules: RecurringRule[] = [],
   nonRecurringKeys: string[] = []
 ): { month: string; expense: number; income: number; net: number }[] {
-  const effective = getEffectiveRecurringItems(transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
-  
   const projections: { month: string; expense: number; income: number; net: number }[] = [];
   const now = new Date();
   
@@ -2004,29 +2011,13 @@ export function computeFutureRecurringProjections(
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
     const mKey = d.toISOString().substring(0, 7);
     
-    let monthlyExpense = 0;
-    let monthlyIncome = 0;
-    
-    effective.forEach(item => {
-      // If it's an installment plan, check date bounds
-      if (item.isInstallment) {
-        if (item.installmentStartDate && mKey < item.installmentStartDate) return;
-        if (item.installmentEndDate && mKey > item.installmentEndDate) return;
-      }
-
-      const amount = convertCurrency(item.amount, item.currency, displayCurrency, usdArsRate, `${mKey}-15`, transactions);
-      if (item.type === 'EXPENSE') {
-        monthlyExpense += amount;
-      } else {
-        monthlyIncome += amount;
-      }
-    });
+    const monthData = getPendingRecurringForMonth(mKey, transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
     
     projections.push({
       month: mKey,
-      expense: Math.round(monthlyExpense),
-      income: Math.round(monthlyIncome),
-      net: Math.round(monthlyIncome - monthlyExpense)
+      expense: Math.round(monthData.pendingExpense),
+      income: Math.round(monthData.pendingIncome),
+      net: Math.round(monthData.pendingIncome - monthData.pendingExpense)
     });
   }
   
