@@ -17,7 +17,8 @@ import {
   detectRecurringItems, 
   detectInstallmentPlans, 
   computeFutureRecurringProjections,
-  getEffectiveRecurringItems
+  getEffectiveRecurringItems,
+  detectRecurringThresholdAlerts
 } from '../utils/financeUtils';
 import { RecurringTrendModal } from './RecurringTrendModal';
 import { RecurringCategoryTrendModal } from './RecurringCategoryTrendModal';
@@ -61,6 +62,10 @@ interface RecurringTabProps {
   categoriesList?: CategoryItem[];
   nonRecurringKeys?: string[];
   onUpdateNonRecurringKeys?: (keys: string[]) => void;
+  recurringThresholds?: Record<string, number>;
+  globalRecurringThreshold?: number;
+  onSaveRecurringThreshold?: (title: string, threshold: number) => void;
+  onSaveGlobalRecurringThreshold?: (threshold: number) => void;
 }
 
 export function RecurringTab({ 
@@ -74,7 +79,11 @@ export function RecurringTab({
   accountsList = [],
   categoriesList = [],
   nonRecurringKeys: controlledNonRecurringKeys,
-  onUpdateNonRecurringKeys
+  onUpdateNonRecurringKeys,
+  recurringThresholds = {},
+  globalRecurringThreshold = 15,
+  onSaveRecurringThreshold,
+  onSaveGlobalRecurringThreshold
 }: RecurringTabProps) {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
@@ -292,6 +301,10 @@ export function RecurringTab({
     return regularRecurring.filter(item => nonRecurringKeys.includes(item.title.toLowerCase().trim()));
   }, [regularRecurring, nonRecurringKeys]);
 
+  const activeAlerts = useMemo(() => {
+    return detectRecurringThresholdAlerts(regularRecurring, recurringThresholds, globalRecurringThreshold);
+  }, [regularRecurring, recurringThresholds, globalRecurringThreshold]);
+
   // Filter items based on search and type filter
   const filteredItems = useMemo(() => {
     if (typeFilter === 'NON_RECURRING') {
@@ -476,16 +489,36 @@ export function RecurringTab({
 
         {/* Search & Filter Toolbar */}
         <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              id="recurring-search-input"
-              placeholder={`${t('common.search') || 'Search recurring'}...`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-[#0f131a] border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
-            />
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                id="recurring-search-input"
+                placeholder={`${t('common.search') || 'Search recurring'}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-[#0f131a] border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Global Threshold Selector */}
+            <div className="flex items-center space-x-2 bg-slate-50 dark:bg-[#0f131a] border border-slate-200 dark:border-slate-700 rounded-lg py-1.5 px-3 text-xs">
+              <span className="text-slate-500 dark:text-slate-400 font-medium">Alert Deviation:</span>
+              <select
+                value={globalRecurringThreshold}
+                onChange={(e) => onSaveGlobalRecurringThreshold?.(Number(e.target.value))}
+                className="bg-transparent border-none p-0 text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-0 cursor-pointer text-xs"
+              >
+                <option value="5" className="bg-white dark:bg-[#0f131a]">5%</option>
+                <option value="10" className="bg-white dark:bg-[#0f131a]">10%</option>
+                <option value="15" className="bg-white dark:bg-[#0f131a]">15%</option>
+                <option value="20" className="bg-white dark:bg-[#0f131a]">20%</option>
+                <option value="25" className="bg-white dark:bg-[#0f131a]">25%</option>
+                <option value="30" className="bg-white dark:bg-[#0f131a]">30%</option>
+                <option value="50" className="bg-white dark:bg-[#0f131a]">50%</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center space-x-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
@@ -804,6 +837,15 @@ export function RecurringTab({
                             {t('recurring.non_recurring') || 'Non-recurring'}
                           </span>
                         )}
+                        {(() => {
+                          const itemAlert = activeAlerts.find(a => a.id === item.id);
+                          return itemAlert && (
+                            <span className="px-1.5 py-0.5 bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-[10px] font-bold rounded flex items-center gap-0.5 animate-pulse">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                              <span>{itemAlert.deviationPercent.toFixed(0)}% Alert</span>
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center font-medium">
@@ -836,6 +878,19 @@ export function RecurringTab({
                           <span>{t('recurring.view_trend') || 'Trend'} ({item.distinctMonthsCount} mos)</span>
                         </span>
                       </div>
+
+                      {(() => {
+                        const itemAlert = activeAlerts.find(a => a.id === item.id);
+                        return itemAlert && (
+                          <div className="flex justify-between items-center text-[10px] text-rose-500 dark:text-rose-400 font-semibold bg-rose-500/5 dark:bg-rose-500/10 p-1.5 px-2 rounded border border-rose-500/10 dark:border-rose-500/20 mt-1">
+                            <span className="flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 text-rose-500" />
+                              <span>Deviation Alert:</span>
+                            </span>
+                            <span>+{itemAlert.deviationPercent.toFixed(0)}% from avg</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1027,6 +1082,9 @@ export function RecurringTab({
         transactions={transactions}
         historyData={historyData}
         onMarkNonRecurring={handleMarkNonRecurring}
+        recurringThresholds={recurringThresholds}
+        globalRecurringThreshold={globalRecurringThreshold}
+        onSaveRecurringThreshold={onSaveRecurringThreshold}
       />
       
       <RecurringCategoryTrendModal

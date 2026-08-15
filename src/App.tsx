@@ -542,6 +542,18 @@ export default function App() {
               } catch (e) {}
             }
           }
+          if (data.settings.recurringThresholds) {
+            setRecurringThresholds(data.settings.recurringThresholds);
+            try {
+              localStorage.setItem('finance_app_recurring_thresholds', JSON.stringify(data.settings.recurringThresholds));
+            } catch (e) {}
+          }
+          if (data.settings.globalRecurringThreshold !== undefined) {
+            setGlobalRecurringThreshold(data.settings.globalRecurringThreshold);
+            try {
+              localStorage.setItem('finance_app_global_recurring_threshold', String(data.settings.globalRecurringThreshold));
+            } catch (e) {}
+          }
         }
       }
     } catch (err) {
@@ -702,6 +714,41 @@ export default function App() {
     }
   });
 
+  const [recurringThresholds, setRecurringThresholds] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_recurring_thresholds');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [globalRecurringThreshold, setGlobalRecurringThreshold] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_global_recurring_threshold');
+      return saved !== null ? Number(saved) : 15;
+    } catch {
+      return 15;
+    }
+  });
+
+  const handleSaveRecurringThreshold = (title: string, threshold: number) => {
+    setRecurringThresholds(prev => {
+      const next = { ...prev, [title.toLowerCase().trim()]: threshold };
+      try {
+        localStorage.setItem('finance_app_recurring_thresholds', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const handleSaveGlobalRecurringThreshold = (threshold: number) => {
+    setGlobalRecurringThreshold(threshold);
+    try {
+      localStorage.setItem('finance_app_global_recurring_threshold', String(threshold));
+    } catch (e) {}
+  };
+
   const handleSaveRecurringRule = (rule: RecurringRule) => {
     setRecurringRules(prev => {
       const exists = prev.some(r => r.id === rule.id);
@@ -810,11 +857,13 @@ export default function App() {
             isShared: isWorkspaceShared,
             members: workspaceMembers,
           },
+          recurringThresholds,
+          globalRecurringThreshold,
         },
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [transactions, categories, accounts, budgets, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced]);
+  }, [transactions, categories, accounts, budgets, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold]);
 
   if (authLoading) {
     return (
@@ -1016,6 +1065,8 @@ export default function App() {
               currentUserId={authUser?.id}
               showSharedData={showSharedData}
               userTimezone={userTimezone}
+              recurringThresholds={recurringThresholds}
+              globalRecurringThreshold={globalRecurringThreshold}
             />
           )}
           {currentTab === 'transactions' && (
@@ -1099,6 +1150,10 @@ export default function App() {
               historyData={historyData}
               accountsList={accounts}
               categoriesList={categories}
+              recurringThresholds={recurringThresholds}
+              globalRecurringThreshold={globalRecurringThreshold}
+              onSaveRecurringThreshold={handleSaveRecurringThreshold}
+              onSaveGlobalRecurringThreshold={handleSaveGlobalRecurringThreshold}
             />
           )}
           {currentTab === 'inflation' && <InflationVsFxTab historyData={historyData} />}

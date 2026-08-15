@@ -2358,4 +2358,78 @@ export function detectFinancialAnomalies(
   return anomalies.sort((a, b) => (b.currentAmount - b.averageAmount) - (a.currentAmount - a.averageAmount));
 }
 
+export interface RecurringDeviationAlert {
+  id: string;
+  title: string;
+  cleanTitle: string;
+  category: string;
+  account: string;
+  currency: string;
+  latestAmount: number;
+  priorAvgAmount: number;
+  deviationPercent: number;
+  threshold: number;
+  type: 'INCOME' | 'EXPENSE';
+  latestDate?: string;
+  diff: number;
+  isTriggered: boolean;
+}
+
+export function detectRecurringThresholdAlerts(
+  items: IdentifiedRecurringItem[],
+  thresholds: Record<string, number>,
+  globalThreshold: number
+): RecurringDeviationAlert[] {
+  const alerts: RecurringDeviationAlert[] = [];
+
+  items.forEach(item => {
+    // We need at least 2 active months to detect deviation from historical average
+    if (!item.monthlyTrend || item.monthlyTrend.length < 2) {
+      return;
+    }
+
+    const trend = [...item.monthlyTrend].sort((a, b) => a.month.localeCompare(b.month));
+    const latestPt = trend[trend.length - 1];
+    const priorPts = trend.slice(0, -1);
+
+    const priorSum = priorPts.reduce((sum, pt) => sum + pt.amountDisplay, 0);
+    const priorAvg = priorSum / priorPts.length;
+
+    const latestAmount = latestPt.amountDisplay;
+    const diff = latestAmount - priorAvg;
+    
+    // Deviation percentage of the latest occurrence compared to prior average
+    const deviationPercent = priorAvg > 0 ? (Math.abs(diff) / priorAvg) * 100 : 0;
+
+    const key = item.cleanTitle.toLowerCase().trim();
+    const threshold = thresholds[key] ?? globalThreshold;
+
+    const isTriggered = deviationPercent >= threshold;
+
+    if (isTriggered) {
+      const latestOcc = item.history[item.history.length - 1];
+      alerts.push({
+        id: item.id,
+        title: item.title,
+        cleanTitle: item.cleanTitle,
+        category: item.category,
+        account: item.account,
+        currency: item.currency,
+        latestAmount,
+        priorAvgAmount: priorAvg,
+        deviationPercent,
+        threshold,
+        type: item.type,
+        latestDate: latestOcc ? latestOcc.date : undefined,
+        diff,
+        isTriggered
+      });
+    }
+  });
+
+  // Sort by highest absolute deviation percentage
+  return alerts.sort((a, b) => b.deviationPercent - a.deviationPercent);
+}
+
+
 

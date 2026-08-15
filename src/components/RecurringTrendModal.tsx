@@ -13,6 +13,9 @@ interface RecurringTrendModalProps {
   transactions: Transaction[];
   historyData?: InflationPoint[];
   onMarkNonRecurring?: (item: IdentifiedRecurringItem) => void;
+  recurringThresholds?: Record<string, number>;
+  globalRecurringThreshold?: number;
+  onSaveRecurringThreshold?: (title: string, threshold: number) => void;
 }
 
 export function RecurringTrendModal({
@@ -24,6 +27,9 @@ export function RecurringTrendModal({
   transactions,
   historyData,
   onMarkNonRecurring,
+  recurringThresholds = {},
+  globalRecurringThreshold = 15,
+  onSaveRecurringThreshold,
 }: RecurringTrendModalProps) {
   const [useOriginalCurrency, setUseOriginalCurrency] = useState(false);
 
@@ -169,6 +175,36 @@ export function RecurringTrendModal({
             <div className="text-[10px] text-slate-500">
               {percentChange > 0 ? 'Increase' : percentChange < 0 ? 'Decrease' : 'Stable'}
             </div>
+          </div>
+        </div>
+
+        {/* Custom Threshold Alert Configuration */}
+        <div className="bg-[#121620] p-3.5 rounded-xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-rose-500" />
+              <span>Threshold Alert Settings</span>
+            </h4>
+            <p className="text-[10px] text-slate-400">
+              Get notified when this transaction's latest charge deviates from its prior historical average.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-400 font-medium">Alert Threshold:</span>
+            <select
+              value={recurringThresholds[item.cleanTitle.toLowerCase().trim()] ?? globalRecurringThreshold}
+              onChange={(e) => onSaveRecurringThreshold?.(item.title, Number(e.target.value))}
+              className="bg-[#161b22] border border-slate-700 py-1 px-2.5 text-xs text-slate-100 rounded-lg font-semibold focus:outline-none focus:ring-1 focus:ring-rose-500"
+            >
+              <option value="5">5% Deviation</option>
+              <option value="10">10% Deviation</option>
+              <option value="15">15% Deviation</option>
+              <option value="20">20% Deviation</option>
+              <option value="25">25% Deviation</option>
+              <option value="30">30% Deviation</option>
+              <option value="50">50% Deviation</option>
+            </select>
           </div>
         </div>
 

@@ -65,6 +65,8 @@ export interface SupabaseUserData {
       isShared?: boolean;
       members?: SharedMember[];
     };
+    recurringThresholds?: Record<string, number>;
+    globalRecurringThreshold?: number;
   };
 }
 

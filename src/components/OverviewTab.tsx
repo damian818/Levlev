@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
-import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, calculateProjectedBalance, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections, getPendingRecurringForMonth, detectFinancialAnomalies, CategoryAnomaly } from '../utils/financeUtils';
+import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, calculateProjectedBalance, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections, getPendingRecurringForMonth, detectFinancialAnomalies, CategoryAnomaly, detectRecurringItems, detectRecurringThresholdAlerts } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon, Upload, Sparkle } from 'lucide-react';
 import { MonthlyCategoryDonut } from './MonthlyCategoryDonut';
@@ -26,6 +26,8 @@ interface OverviewTabProps {
   currentUserId?: string;
   showSharedData?: boolean;
   userTimezone?: string;
+  recurringThresholds?: Record<string, number>;
+  globalRecurringThreshold?: number;
 }
 
 const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa', '#f43f5e', '#38bdf8', '#818cf8', '#fb7185'];
@@ -45,6 +47,8 @@ export const OverviewTab = React.memo(function OverviewTab({
   currentUserId,
   showSharedData = true,
   userTimezone = 'America/Argentina/Buenos_Aires',
+  recurringThresholds = {},
+  globalRecurringThreshold = 15,
 }: OverviewTabProps) {
   const { t } = useTranslation();
   const [velocityMultiplier, setVelocityMultiplier] = useState<number>(1.0);
@@ -252,6 +256,13 @@ export const OverviewTab = React.memo(function OverviewTab({
     return detectFinancialAnomalies(filteredTransactions, displayCurrency, usdArsRate, selectedMonth);
   }, [filteredTransactions, displayCurrency, usdArsRate, selectedMonth]);
 
+  // Compute active recurring threshold alerts
+  const recurringAlerts = useMemo(() => {
+    const rawItems = detectRecurringItems(filteredTransactions, displayCurrency, usdArsRate);
+    const activeItems = rawItems.filter(item => !effectiveNonRecurringKeys.includes(item.title.toLowerCase().trim()));
+    return detectRecurringThresholdAlerts(activeItems, recurringThresholds, globalRecurringThreshold);
+  }, [filteredTransactions, displayCurrency, usdArsRate, effectiveNonRecurringKeys, recurringThresholds, globalRecurringThreshold]);
+
   return (
     <div className="space-y-6">
       {/* Month Filter Selector Bar */}
@@ -326,6 +337,26 @@ export const OverviewTab = React.memo(function OverviewTab({
           </button>
         </div>
       </div>
+
+      {/* Recurring Deviation Alerts Banner */}
+      {recurringAlerts.length > 0 && (
+        <div 
+          onClick={() => onNavigateTab('recurring')}
+          className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 flex items-start sm:items-center gap-3 cursor-pointer hover:bg-rose-500/20 transition-colors"
+        >
+          <ShieldAlert className="w-5 h-5 text-rose-500 shrink-0 mt-0.5 sm:mt-0" />
+          <div className="flex-1">
+            <h4 className="text-xs sm:text-sm font-bold text-rose-500 flex items-center gap-1.5">
+              <span>Recurring Transaction Deviation Alert</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </h4>
+            <p className="text-[10px] sm:text-xs text-rose-400 mt-0.5">
+              <span className="font-semibold text-rose-300">{recurringAlerts[0].title}</span> has deviated from its historical average by <span className="font-semibold text-rose-300">{recurringAlerts[0].deviationPercent.toFixed(0)}%</span> (Latest: {formatCurrency(recurringAlerts[0].latestAmount, displayCurrency)} vs Avg: {formatCurrency(recurringAlerts[0].priorAvgAmount, displayCurrency)}).
+              {recurringAlerts.length > 1 && ` (+${recurringAlerts.length - 1} other recurring items have significant deviations)`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Financial Anomaly Detector Badge */}
       {anomalies.length > 0 && selectedMonth !== 'ALL' && (
