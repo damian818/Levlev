@@ -1158,6 +1158,7 @@ export default function App() {
             onUpdateTransaction={handleUpdateTransaction}
             editingTx={editingTransaction}
             accountsList={accounts}
+            categoriesList={categories}
             existingAccounts={accounts.map(a => a.name)}
             existingCategories={categories.map(c => c.name)}
             existingTransactions={transactions}

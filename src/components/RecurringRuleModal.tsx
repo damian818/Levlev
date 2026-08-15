@@ -47,13 +47,13 @@ export const RecurringRuleModal: React.FC<RecurringRuleModalProps> = ({
   const [isActive, setIsActive] = useState<boolean>(true);
   const [description, setDescription] = useState('');
 
-  // Default accounts and categories fallback
+  // Visible accounts and categories, filtering out hidden ones unless currently editing a rule that uses them
   const availableAccounts = accountsList.length > 0 
-    ? accountsList.map(a => a.name)
+    ? accountsList.filter(a => a.name === editingRule?.account || !a.isHiddenFromNewTx).map(a => a.name)
     : ['BBVA', 'DollarApp', 'Visa BBVA', 'Efectivo'];
 
   const availableCategories = categoriesList.length > 0
-    ? categoriesList.map(c => c.name)
+    ? categoriesList.filter(c => c.name === editingRule?.category || !c.isHiddenFromNewTx).map(c => c.name)
     : ['Sueldo', 'Facturas y Servicios', 'Hogar', 'Alimentos y Bebidas', 'Suscripciones', 'Inversiones', 'General'];
 
   useEffect(() => {

@@ -34,6 +34,7 @@ export interface AddTransactionModalProps {
   onUpdateTransaction?: (id: string, updates: Partial<Transaction>) => void;
   editingTx?: Transaction | null;
   accountsList?: AccountItem[];
+  categoriesList?: CategoryItem[];
   existingAccounts?: string[];
   existingCategories?: string[];
   existingTransactions?: Transaction[];
@@ -96,6 +97,7 @@ export function AddTransactionModal({
   onUpdateTransaction,
   editingTx,
   accountsList = [],
+  categoriesList: fullCategoriesList = [],
   existingAccounts = DEFAULT_ACCOUNTS,
   existingCategories = DEFAULT_CATEGORIES,
   existingTransactions = [],
@@ -111,6 +113,18 @@ export function AddTransactionModal({
   // Local list state to support dynamic "Add New"
   const [categoriesList, setCategoriesList] = useState<string[]>(existingCategories);
   const [accountItems, setAccountItems] = useState<AccountItem[]>([]);
+
+  // Visible categories for selection (filtering out hidden categories unless currently editing a tx that uses them)
+  const visibleCategories = useMemo(() => {
+    return categoriesList.filter(catName => {
+      // If editing a tx and this is its assigned category, always show it so they don't lose it
+      if (editingTx?.category === catName) return true;
+      
+      const matchedCat = fullCategoriesList.find(c => c.name === catName);
+      if (matchedCat?.isHiddenFromNewTx) return false;
+      return true;
+    });
+  }, [categoriesList, fullCategoriesList, editingTx]);
 
   // Sync incoming accounts & categories
   useEffect(() => {
@@ -1189,7 +1203,7 @@ export function AddTransactionModal({
                   onChange={(e) => handleCategorySelectChange(e.target.value)}
                   className="w-full px-3 py-2 bg-[#0a0c10] border border-slate-700 text-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#22c55e] text-xs font-medium cursor-pointer"
                 >
-                  {categoriesList.map((catName) => (
+                  {visibleCategories.map((catName) => (
                     <option key={catName} value={catName}>
                       {catName}
                     </option>

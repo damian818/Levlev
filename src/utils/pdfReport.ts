@@ -243,8 +243,74 @@ export function generateMonthlyPdfReport({
   doc.setTextColor(185, 28, 28);
   doc.text(`${projectedMonthStr}`, 75, y + 19);
 
-  // --- Footer ---
+  y += 32;
+
   const pageHeight = doc.internal.pageSize.getHeight();
+  // Check if we need a new page
+  if (y > pageHeight - 50) {
+    doc.addPage();
+    y = 20;
+  }
+
+  // --- Section 5: Largest Transactions ---
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(31, 41, 55);
+  doc.text('5. Largest Individual Transactions', 14, y);
+  y += 6;
+
+  doc.setFillColor(241, 245, 249);
+  doc.rect(14, y, pageWidth - 28, 8, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(71, 85, 105);
+
+  doc.text('Date', 18, y + 5.5);
+  doc.text('Title & Category', 45, y + 5.5);
+  doc.text('Converted Amount', 180, y + 5.5, { align: 'right' });
+  y += 8;
+
+  // Sort and find top 5 transactions by converted amount
+  const largestTxs = [...transactions]
+    .filter(tx => tx.type === 'EXPENSE' || tx.type === 'CC_EXPENSE')
+    .map(tx => {
+      const isOriginal = tx.currency === displayCurrency;
+      const converted = isOriginal ? tx.amount : tx.amount / usdArsRate; // simplified conversion for sorting
+      return { ...tx, converted };
+    })
+    .sort((a, b) => b.converted - a.converted)
+    .slice(0, 5);
+
+  if (largestTxs.length === 0) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184);
+    doc.text('No transactions found.', 18, y + 6);
+    y += 10;
+  } else {
+    largestTxs.forEach((tx, idx) => {
+      if (idx % 2 === 1) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(14, y, pageWidth - 28, 7, 'F');
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(tx.date, 18, y + 5);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(30, 41, 59);
+      const titleStr = tx.title.length > 30 ? tx.title.substring(0, 30) + '...' : tx.title;
+      doc.text(`${titleStr} (${tx.category})`, 45, y + 5);
+      
+      doc.text(formatCurrency(tx.converted, displayCurrency), 180, y + 5, { align: 'right' });
+
+      y += 7;
+    });
+  }
+
+  // --- Footer ---
   doc.setDrawColor(226, 232, 240);
   doc.line(14, pageHeight - 14, pageWidth - 14, pageHeight - 14);
 

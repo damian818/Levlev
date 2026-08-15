@@ -118,6 +118,7 @@ export interface CategoryItem {
   name: string;
   type: 'EXPENSE' | 'INCOME' | 'BOTH';
   description?: string;
+  isHiddenFromNewTx?: boolean;
 }
 
 export interface SharedMember {

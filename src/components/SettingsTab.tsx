@@ -13,6 +13,8 @@ import {
 import { 
   Wallet, 
   Tag, 
+  Eye,
+  EyeOff,
   Plus, 
   Edit3, 
   Trash2, 
@@ -695,7 +697,9 @@ export function SettingsTab({
               return (
                 <div 
                   key={cat.id}
-                  className="bg-[#121720] border border-slate-800/90 hover:border-slate-700 rounded-xl p-4 flex flex-col justify-between space-y-3 transition-all"
+                  className={`bg-[#121720] border border-slate-800/90 hover:border-slate-700 rounded-xl p-4 flex flex-col justify-between space-y-3 transition-all ${
+                    cat.isHiddenFromNewTx ? 'opacity-50 grayscale-[0.5]' : ''
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -719,6 +723,17 @@ export function SettingsTab({
                     </div>
 
                     <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => onEditCategory(cat.name, { ...cat, isHiddenFromNewTx: !cat.isHiddenFromNewTx }, false)}
+                        className={`p-1 rounded border transition-colors ${
+                          cat.isHiddenFromNewTx 
+                            ? 'text-amber-500 hover:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/20' 
+                            : 'text-slate-400 hover:text-slate-100 bg-slate-800/60 hover:bg-slate-800 border-slate-700/60'
+                        }`}
+                        title={cat.isHiddenFromNewTx ? t('common.hidden') : t('common.visible')}
+                      >
+                        {cat.isHiddenFromNewTx ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      </button>
                       <button
                         onClick={() => handleOpenEditCategory(cat)}
                         className="p-1 text-slate-400 hover:text-slate-100 bg-slate-800/60 hover:bg-slate-800 rounded border border-slate-700/60 transition-colors"

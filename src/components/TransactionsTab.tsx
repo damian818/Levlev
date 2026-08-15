@@ -927,7 +927,7 @@ export const TransactionsTab = React.memo(function TransactionsTab({
             <p className="text-xs text-slate-400">{t('transactions.selected')}: {selectedIds.size} items</p>
             
             <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-              {categoriesList.map(cat => (
+              {categoriesList.filter(cat => !cat.isHiddenFromNewTx).map(cat => (
                 <button
                   key={cat.id}
                   onClick={() => handleBulkUpdateCategory(cat.name)}

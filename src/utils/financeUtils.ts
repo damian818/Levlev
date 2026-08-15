@@ -900,6 +900,84 @@ export function deriveBudgetsFromTransactions(
   return result;
 }
 
+export function deriveSmartBudgets(
+  transactions: Transaction[],
+  existingBudgets: BudgetGoal[] = [],
+  currentMonthKey: string,
+  usdArsRate: number
+): BudgetGoal[] {
+  const expenseCategories = new Set<string>();
+  const sumsByCatAndMonth: Record<string, Record<string, number>> = {};
+
+  transactions.forEach(t => {
+    if ((t.type === 'EXPENSE' || t.type === 'CC_EXPENSE') && t.category) {
+      expenseCategories.add(t.category);
+      const month = t.date.substring(0, 7);
+      const amtARS = convertCurrency(t.amount, t.currency, 'ARS', usdArsRate, t.date, transactions);
+      if (!sumsByCatAndMonth[t.category]) sumsByCatAndMonth[t.category] = {};
+      sumsByCatAndMonth[t.category][month] = (sumsByCatAndMonth[t.category][month] || 0) + amtARS;
+    }
+  });
+
+  const getPastMonths = (count: number) => {
+    const dates = [];
+    let [year, m] = currentMonthKey.split('-').map(Number);
+    for (let i = 1; i <= count; i++) {
+      m--;
+      if (m === 0) {
+        m = 12;
+        year--;
+      }
+      dates.push(`${year}-${String(m).padStart(2, '0')}`);
+    }
+    return dates;
+  };
+
+  const m3 = getPastMonths(3);
+  const m6 = getPastMonths(6);
+  const m12 = getPastMonths(12);
+
+  const getAvg = (cat: string, months: string[]) => {
+    let sum = 0;
+    months.forEach(m => {
+      sum += sumsByCatAndMonth[cat]?.[m] || 0;
+    });
+    return sum / months.length;
+  };
+
+  const result: BudgetGoal[] = [];
+
+  // For categories we already have a budget for or new ones? Let's do it for all existing budgets or top categories.
+  // Actually, let's keep all existing categories and update them, plus any that might be new? The prompt says "suggest new targets". So we update existing and maybe add new.
+  const categoriesToProcess = new Set([
+    ...existingBudgets.map(b => b.category),
+    ...Array.from(expenseCategories)
+  ]);
+
+  categoriesToProcess.forEach(cat => {
+    const avg3 = getAvg(cat, m3);
+    const avg6 = getAvg(cat, m6);
+    const avg12 = getAvg(cat, m12);
+
+    // Only consider averages > 0 to avoid setting a $0 budget if we didn't spend in those periods
+    const validAvgs = [avg3, avg6, avg12].filter(a => a > 0);
+    
+    if (validAvgs.length > 0) {
+      const bestAlternative = Math.min(...validAvgs); // The prompt says "Select the best alternative. Deduct 10% from it". We pick the lowest non-zero average to be aggressive.
+      const suggestedLimit = bestAlternative * 0.9; // Deduct 10%
+      result.push({ category: cat, monthlyLimitARS: Math.round(suggestedLimit) });
+    } else {
+      // Fallback: keep existing or ignore
+      const existing = existingBudgets.find(b => b.category === cat);
+      if (existing) {
+        result.push(existing);
+      }
+    }
+  });
+
+  return result;
+}
+
 export function analyzeSpending(
   transactions: Transaction[], 
   displayCurrency: DisplayCurrency, 

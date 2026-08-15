@@ -311,7 +311,7 @@ app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res)
 
 app.post(["/api/ai-insights", "/ai-insights"], async (req, res) => {
   try {
-    const { summaryData } = req.body;
+    const { summaryData, customPrompt } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: "Gemini API key is not configured on the server." });
@@ -326,7 +326,7 @@ app.post(["/api/ai-insights", "/ai-insights"], async (req, res) => {
       },
     });
     
-    const prompt = `You are an expert financial advisor analyzing a user's multi-currency (ARS & USD), multi-account personal finance data. 
+    let prompt = customPrompt || `You are an expert financial advisor analyzing a user's multi-currency (ARS & USD), multi-account personal finance data. 
 Here is the financial summary for the period:
 - Total Income: ${summaryData?.totalIncome}
 - Total Expenses: ${summaryData?.totalExpenses}
@@ -335,7 +335,20 @@ Here is the financial summary for the period:
 - Top Accounts: ${JSON.stringify(summaryData?.topAccounts)}
 - Inflation vs FX Context: Argentina peso depreciation and inflation impact.
 
-Provide 3 actionable financial recommendations, 2 key spending risks or anomalies, and a brief overall financial health score (0-100) with a 2-sentence summary. Format your response in clear JSON structure or clean markdown.`;
+Provide 3 actionable financial recommendations, 2 key spending risks or anomalies, and a brief overall financial health score (0-100) with a 2-sentence summary. Format your response in clean markdown.`;
+
+    // Inject data if a custom prompt is used
+    if (customPrompt) {
+      prompt = `You are an expert financial advisor analyzing a user's multi-currency personal finance data. Here is the financial summary for the period:
+- Total Income: ${summaryData?.totalIncome}
+- Total Expenses: ${summaryData?.totalExpenses}
+- Savings Rate: ${summaryData?.savingsRate}%
+- Top Expense Categories: ${JSON.stringify(summaryData?.topCategories)}
+- Top Accounts: ${JSON.stringify(summaryData?.topAccounts)}
+
+Task: ${customPrompt}
+Format your response in clean markdown.`;
+    }
 
     const interaction = await ai.interactions.create({
       model: "gemini-3.6-flash",

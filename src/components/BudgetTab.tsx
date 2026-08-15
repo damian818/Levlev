@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, BudgetGoal, DisplayCurrency } from '../types';
-import { analyzeSpending, formatCurrency, convertCurrency, deriveBudgetsFromTransactions, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth } from '../utils/financeUtils';
+import { analyzeSpending, formatCurrency, convertCurrency, deriveBudgetsFromTransactions, deriveSmartBudgets, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth } from '../utils/financeUtils';
 import { Target, AlertTriangle, CheckCircle, Plus, Calendar, RefreshCw, Sparkles } from 'lucide-react';
 
 interface BudgetTabProps {
@@ -65,6 +65,13 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
     onUpdateBudgets(derived);
   };
 
+  const handleSmartSuggest = () => {
+    const derived = deriveSmartBudgets(transactions, budgetList, currentMonthKey, usdArsRate);
+    setBudgetList(derived);
+    // don't auto-save immediately, let them review it while in edit mode
+    setIsEditing(true);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Bar */}
@@ -98,6 +105,13 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
           <div className="flex-1 sm:flex-none">
             {isEditing ? (
               <div className="flex space-x-2">
+                <button
+                  onClick={handleSmartSuggest}
+                  className="flex-1 sm:flex-none px-3 py-1.5 border border-amber-500/50 rounded-lg text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
+                >
+                  <Sparkles className="w-3.5 h-3.5 inline mr-1" />
+                  Smart Suggest
+                </button>
                 <button
                   onClick={() => setIsEditing(false)}
                   className="flex-1 sm:flex-none px-3 py-1.5 border border-slate-700 rounded-lg text-xs font-medium text-slate-300 bg-[#121620] hover:bg-slate-800"
@@ -136,13 +150,21 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
               {t('budget.no_goals_desc')}
             </p>
           </div>
-          <button
-            onClick={handleAutoGenerate}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition-colors inline-flex items-center space-x-2"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>{t('budget.generate')}</span>
-          </button>
+          <div className="flex items-center justify-center space-x-3">
+            <button
+              onClick={handleAutoGenerate}
+              className="px-4 py-2 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl transition-colors inline-flex items-center space-x-2"
+            >
+              <span>{t('budget.generate')} (Basic)</span>
+            </button>
+            <button
+              onClick={handleSmartSuggest}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition-colors inline-flex items-center space-x-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Smart Suggest Targets</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
