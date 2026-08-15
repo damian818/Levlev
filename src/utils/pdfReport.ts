@@ -272,7 +272,7 @@ export function generateMonthlyPdfReport({
 
   // Sort and find top 5 transactions by converted amount
   const largestTxs = [...transactions]
-    .filter(tx => tx.type === 'EXPENSE' || tx.type === 'CC_EXPENSE')
+    .filter(tx => tx.type === 'EXPENSE')
     .map(tx => {
       const isOriginal = tx.currency === displayCurrency;
       const converted = isOriginal ? tx.amount : tx.amount / usdArsRate; // simplified conversion for sorting

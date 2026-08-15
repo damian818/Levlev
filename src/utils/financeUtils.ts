@@ -910,7 +910,7 @@ export function deriveSmartBudgets(
   const sumsByCatAndMonth: Record<string, Record<string, number>> = {};
 
   transactions.forEach(t => {
-    if ((t.type === 'EXPENSE' || t.type === 'CC_EXPENSE') && t.category) {
+    if (t.type === 'EXPENSE' && t.category) {
       expenseCategories.add(t.category);
       const month = t.date.substring(0, 7);
       const amtARS = convertCurrency(t.amount, t.currency, 'ARS', usdArsRate, t.date, transactions);

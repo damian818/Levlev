@@ -13,8 +13,6 @@ import {
 import { 
   Wallet, 
   Tag, 
-  Eye,
-  EyeOff,
   Plus, 
   Edit3, 
   Trash2, 

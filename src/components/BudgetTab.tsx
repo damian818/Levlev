@@ -50,8 +50,10 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
 
   const spending = analyzeSpending(transactions, displayCurrency, usdArsRate, selectedMonth);
 
-  const handleLimitChange = (category: string, newLimit: number) => {
-    setBudgetList(prev => prev.map(b => b.category === category ? { ...b, monthlyLimitARS: newLimit } : b));
+  const handleLimitChange = (category: string, newLimitDisplay: number) => {
+    // Convert the display currency input back to ARS for storage
+    const limitARS = convertCurrency(newLimitDisplay, displayCurrency, 'ARS', usdArsRate);
+    setBudgetList(prev => prev.map(b => b.category === category ? { ...b, monthlyLimitARS: limitARS } : b));
   };
 
   const handleSave = () => {
@@ -68,7 +70,7 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
   const handleSmartSuggest = () => {
     const derived = deriveSmartBudgets(transactions, budgetList, currentMonthKey, usdArsRate);
     setBudgetList(derived);
-    // don't auto-save immediately, let them review it while in edit mode
+    onUpdateBudgets(derived); // Auto-save when suggesting
     setIsEditing(true);
   };
 
@@ -194,10 +196,10 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
                   <span className="text-slate-400">{t('budget.spent')} ({selectedMonth === 'ALL' ? t('budget.all_time') : selectedMonth}): <strong className="text-slate-100">{formatCurrency(categorySpent, displayCurrency)}</strong></span>
                   {isEditing ? (
                     <div className="flex items-center space-x-1">
-                      <span className="text-slate-400">{t('budget.limit') || 'Limit'} (ARS):</span>
+                      <span className="text-slate-400">{t('budget.limit') || 'Limit'} ({displayCurrency}):</span>
                       <input
                         type="number"
-                        value={budget.monthlyLimitARS}
+                        value={Math.round(limitConverted)}
                         onChange={(e) => handleLimitChange(budget.category, parseFloat(e.target.value) || 0)}
                         className="w-24 px-2 py-1 bg-[#0f131a] border border-slate-700 text-slate-200 rounded text-xs text-right font-semibold focus:outline-none focus:ring-1 focus:ring-slate-500"
                       />
