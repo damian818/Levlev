@@ -46,7 +46,10 @@ import {
   CheckCircle2,
   ShieldCheck,
   Users,
-  Share2
+  Share2,
+  Coins,
+  Landmark,
+  RotateCcw
 } from 'lucide-react';
 import { 
   verifyAccountBalances 
@@ -72,8 +75,12 @@ interface SettingsTabProps {
   transactions: Transaction[];
   budgets: BudgetGoal[];
   usdArsRate: number;
+  localCurrency?: DisplayCurrency;
+  onUpdateLocalCurrency?: (currency: DisplayCurrency) => void;
   displayCurrency?: DisplayCurrency;
   onUpdateDisplayCurrency?: (currency: DisplayCurrency) => void;
+  enabledCurrencies?: string[];
+  onUpdateEnabledCurrencies?: (currencies: string[]) => void;
   userTimezone?: string;
   onUpdateTimezone?: (tz: string) => void;
   privacyMode?: boolean;
@@ -105,8 +112,12 @@ export function SettingsTab({
   transactions,
   budgets,
   usdArsRate,
+  localCurrency = 'ARS',
+  onUpdateLocalCurrency,
   displayCurrency = 'ARS',
   onUpdateDisplayCurrency,
+  enabledCurrencies = ['USD', 'ARS', 'EUR', 'BRL', 'USDT', 'CLP', 'UYU', 'GBP'],
+  onUpdateEnabledCurrencies,
   userTimezone = 'America/Argentina/Buenos_Aires',
   onUpdateTimezone,
   privacyMode = false,
@@ -218,6 +229,36 @@ export function SettingsTab({
   const [accUpdateTxs, setAccUpdateTxs] = useState(true);
 
   const [deletingAccName, setDeletingAccName] = useState<string | null>(null);
+  const [currencyToAdd, setCurrencyToAdd] = useState<string>('');
+
+  const handleAddEnabledCurrency = (code: string) => {
+    if (!code) return;
+    const upper = code.toUpperCase();
+    if (!enabledCurrencies.includes(upper)) {
+      const updated = [...enabledCurrencies, upper];
+      if (onUpdateEnabledCurrencies) {
+        onUpdateEnabledCurrencies(updated);
+      }
+    }
+    setCurrencyToAdd('');
+  };
+
+  const handleRemoveEnabledCurrency = (code: string) => {
+    if (enabledCurrencies.length <= 1) {
+      alert('You must keep at least one currency enabled.');
+      return;
+    }
+    const updated = enabledCurrencies.filter(c => c !== code);
+    if (onUpdateEnabledCurrencies) {
+      onUpdateEnabledCurrencies(updated);
+    }
+  };
+
+  const handleSetPresetCurrencies = (preset: string[]) => {
+    if (onUpdateEnabledCurrencies) {
+      onUpdateEnabledCurrencies(preset);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     const { error } = await signInWithGoogle();
@@ -793,6 +834,53 @@ export function SettingsTab({
             </div>
           </div>
 
+          {/* Local Base Currency Setting Box */}
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 space-y-4 md:col-span-2 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-3 bg-sky-500/10 border border-sky-500/20 rounded-xl text-sky-400 shrink-0 mt-0.5">
+                  <Landmark className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-100">Local Currency (Base Domestic Currency)</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 uppercase tracking-wider font-mono">
+                      {CURRENCY_MAP[localCurrency]?.flag} {localCurrency} ({CURRENCY_MAP[localCurrency]?.symbol || '$'})
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed max-w-2xl">
+                    Your primary domestic base currency (e.g. for local cash, domestic bank accounts, and localized expense reports). Reports calculate dual breakdowns between this local currency and your reporting currency.
+                  </p>
+                </div>
+              </div>
+
+              {onUpdateLocalCurrency && (
+                <div className="shrink-0 w-full sm:w-auto">
+                  <select
+                    value={localCurrency}
+                    onChange={(e) => onUpdateLocalCurrency(e.target.value as DisplayCurrency)}
+                    className="w-full sm:w-64 px-3.5 py-2.5 bg-[#161b22] border border-slate-700 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-sky-500 cursor-pointer shadow-xs"
+                  >
+                    <optgroup label="Popular Currencies">
+                      {WORLD_CURRENCIES.filter(c => c.isPopular).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} - {i18n.language.startsWith('es') ? c.nameEs : c.name} ({c.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="All Global Currencies">
+                      {WORLD_CURRENCIES.filter(c => !c.isPopular).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} - {i18n.language.startsWith('es') ? c.nameEs : c.name} ({c.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Main Reporting Currency Setting Box */}
           <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 space-y-4 md:col-span-2 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -847,6 +935,142 @@ export function SettingsTab({
               <span className="text-[11px] text-slate-500 font-mono">
                 {getFxProviderInfo().currenciesCount}+ global currencies active
               </span>
+            </div>
+          </div>
+
+          {/* Transaction Quick-Currencies Selector Box */}
+          <div className="bg-[#121720] border border-indigo-500/30 rounded-2xl p-6 space-y-5 md:col-span-2 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div className="flex items-start gap-3">
+                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400 shrink-0 mt-0.5">
+                  <Coins className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-100">Transaction Quick-Currencies</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider font-mono">
+                      {enabledCurrencies.length} Enabled
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed max-w-2xl">
+                    Configure which currencies appear in the quick selector when logging or editing transactions. Keep it clean with only your active currencies, or add any of the 170+ world currencies you regularly use.
+                  </p>
+                </div>
+              </div>
+
+              {/* Add Currency Selector */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <select
+                  value={currencyToAdd}
+                  onChange={(e) => {
+                    if (e.target.value) handleAddEnabledCurrency(e.target.value);
+                  }}
+                  className="w-full sm:w-56 px-3 py-2 bg-[#161b22] border border-indigo-500/30 text-indigo-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-400 cursor-pointer"
+                >
+                  <option value="">+ Add World Currency...</option>
+                  <optgroup label="Popular Currencies">
+                    {WORLD_CURRENCIES.filter(c => c.isPopular && !enabledCurrencies.includes(c.code)).map(c => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.code} - {i18n.language.startsWith('es') ? c.nameEs : c.name} ({c.symbol})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="All Global Currencies">
+                    {WORLD_CURRENCIES.filter(c => !c.isPopular && !enabledCurrencies.includes(c.code)).map(c => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.code} - {i18n.language.startsWith('es') ? c.nameEs : c.name} ({c.symbol})
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+
+            {/* Active Currency Badges */}
+            <div className="space-y-3">
+              <div className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                <span>Active Quick-Selector Currencies:</span>
+                <span className="text-[11px] text-slate-500">Click &times; to remove</span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {enabledCurrencies.map((code) => {
+                  const info = CURRENCY_MAP[code];
+                  const isLocal = code === localCurrency;
+                  const isDisplay = code === displayCurrency;
+
+                  return (
+                    <div
+                      key={code}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-2xs ${
+                        isLocal
+                          ? 'bg-sky-500/15 border-sky-500/40 text-sky-200'
+                          : isDisplay
+                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'
+                          : 'bg-[#161b22] border-slate-700 text-slate-200 hover:border-slate-600'
+                      }`}
+                    >
+                      <span className="text-sm">{info?.flag || '🌐'}</span>
+                      <span className="font-mono">{code}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        ({info?.symbol || '$'})
+                      </span>
+                      {isLocal && (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-sky-500/30 text-sky-300 font-mono">
+                          Local
+                        </span>
+                      )}
+                      {isDisplay && !isLocal && (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/30 text-emerald-300 font-mono">
+                          Report
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveEnabledCurrency(code)}
+                        className="ml-1 text-slate-400 hover:text-rose-400 p-0.5 rounded transition-colors"
+                        title={`Remove ${code} from quick selector`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="pt-2 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] text-slate-500 font-medium mr-1">Quick Presets:</span>
+                <button
+                  type="button"
+                  onClick={() => handleSetPresetCurrencies(['USD', 'ARS', 'EUR', 'BRL', 'USDT', 'CLP', 'UYU', 'GBP'])}
+                  className="px-2.5 py-1 bg-[#161b22] hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3 text-slate-400" />
+                  <span>Default Set</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetPresetCurrencies(['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'USDT'])}
+                  className="px-2.5 py-1 bg-[#161b22] hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-[11px] font-semibold transition-all"
+                >
+                  Major Global (G10 + USDT)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetPresetCurrencies(['ARS', 'USD', 'BRL', 'CLP', 'COP', 'MXN', 'PEN', 'UYU', 'USDT'])}
+                  className="px-2.5 py-1 bg-[#161b22] hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-[11px] font-semibold transition-all"
+                >
+                  Latin America (LATAM)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetPresetCurrencies(WORLD_CURRENCIES.map(c => c.code))}
+                  className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-lg text-[11px] font-semibold transition-all"
+                >
+                  Enable All (170+)
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1470,11 +1694,23 @@ export function SettingsTab({
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Currency</label>
                   <select
                     value={accCurrencyInput}
-                    onChange={(e) => setAccCurrencyInput(e.target.value as 'ARS' | 'USD')}
-                    className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500"
+                    onChange={(e) => setAccCurrencyInput(e.target.value)}
+                    className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500 cursor-pointer"
                   >
-                    <option value="ARS">ARS ($)</option>
-                    <option value="USD">USD ($)</option>
+                    <optgroup label="Popular Currencies">
+                      {WORLD_CURRENCIES.filter(c => c.isPopular).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} - {c.name} ({c.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="All Global Currencies">
+                      {WORLD_CURRENCIES.filter(c => !c.isPopular).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} - {c.name} ({c.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -1628,11 +1864,23 @@ export function SettingsTab({
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Currency</label>
                   <select
                     value={accCurrencyInput}
-                    onChange={(e) => setAccCurrencyInput(e.target.value as 'ARS' | 'USD')}
-                    className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500"
+                    onChange={(e) => setAccCurrencyInput(e.target.value)}
+                    className="w-full max-w-full truncate px-3 py-2 bg-[#0f131a] border border-slate-700 rounded-xl text-sm font-semibold text-slate-100 focus:outline-none focus:border-emerald-500 cursor-pointer"
                   >
-                    <option value="ARS">ARS ($)</option>
-                    <option value="USD">USD ($)</option>
+                    <optgroup label="Popular Currencies">
+                      {WORLD_CURRENCIES.filter(c => c.isPopular).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} - {c.name} ({c.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="All Global Currencies">
+                      {WORLD_CURRENCIES.filter(c => !c.isPopular).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} - {c.name} ({c.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
               </div>

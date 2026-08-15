@@ -58,6 +58,9 @@ export interface SupabaseUserData {
     recurringRules?: RecurringRule[];
     nonRecurringKeys?: string[];
     onboardingCompleted?: boolean;
+    localCurrency?: string;
+    displayCurrency?: string;
+    enabledCurrencies?: string[];
     workspaceSharing?: {
       isShared?: boolean;
       members?: SharedMember[];
@@ -526,6 +529,14 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       recurringRules: data.recurringRules || data.settings?.recurringRules || [],
       nonRecurringKeys: data.nonRecurringKeys || data.settings?.nonRecurringKeys || [],
       onboardingCompleted: !!isTourCompleted,
+      localCurrency: data.settings?.localCurrency || (typeof window !== 'undefined' ? localStorage.getItem('finance_app_local_currency') || undefined : undefined),
+      displayCurrency: data.settings?.displayCurrency || (typeof window !== 'undefined' ? localStorage.getItem('finance_app_display_currency') || undefined : undefined),
+      enabledCurrencies: data.settings?.enabledCurrencies || (typeof window !== 'undefined' ? (() => {
+        try {
+          const s = localStorage.getItem('finance_app_enabled_currencies');
+          return s ? JSON.parse(s) : undefined;
+        } catch { return undefined; }
+      })() : undefined),
     };
 
     try {
