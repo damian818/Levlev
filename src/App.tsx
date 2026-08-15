@@ -1059,6 +1059,8 @@ export default function App() {
             <ReportsTab
               transactions={transactions}
               displayCurrency={displayCurrency}
+              localCurrency={localCurrency}
+              enabledCurrencies={enabledCurrencies}
               usdArsRate={usdArsRate}
               recurringRules={recurringRules}
               nonRecurringKeys={nonRecurringKeys}
