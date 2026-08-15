@@ -1851,7 +1851,7 @@ export function getEffectiveRecurringItems(
       cleanTitle: item.cleanTitle,
       category: item.category || 'General',
       account: item.account || 'Default',
-      amount: item.latestAmount,
+      amount: item.avgAmount,
       currency: item.currency || displayCurrency,
       type: item.type,
       dayOfMonth: item.dayOfMonth || 15,
