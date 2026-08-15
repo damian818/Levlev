@@ -62,6 +62,7 @@ import {
 import ImportWizardModal from './ImportWizardModal';
 
 import { TIMEZONE_OPTIONS } from '../utils/timezoneUtils';
+import { WORLD_CURRENCIES, CURRENCY_MAP, getFxProviderInfo, getCurrencyName } from '../utils/currencyUtils';
 
 interface SettingsTabProps {
   authUser: any;
@@ -71,6 +72,8 @@ interface SettingsTabProps {
   transactions: Transaction[];
   budgets: BudgetGoal[];
   usdArsRate: number;
+  displayCurrency?: DisplayCurrency;
+  onUpdateDisplayCurrency?: (currency: DisplayCurrency) => void;
   userTimezone?: string;
   onUpdateTimezone?: (tz: string) => void;
   privacyMode?: boolean;
@@ -102,6 +105,8 @@ export function SettingsTab({
   transactions,
   budgets,
   usdArsRate,
+  displayCurrency = 'ARS',
+  onUpdateDisplayCurrency,
   userTimezone = 'America/Argentina/Buenos_Aires',
   onUpdateTimezone,
   privacyMode = false,
@@ -785,6 +790,63 @@ export function SettingsTab({
                   Transaction imports (Ivy CSV & backup) adjust raw timestamps to this selected timezone.
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Main Reporting Currency Setting Box */}
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 space-y-4 md:col-span-2 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 shrink-0 mt-0.5">
+                  <DollarSign className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-100">Main Reporting Currency</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider font-mono">
+                      {CURRENCY_MAP[displayCurrency]?.flag} {displayCurrency} ({CURRENCY_MAP[displayCurrency]?.symbol || '$'})
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed max-w-2xl">
+                    Every transaction and expense across all accounts is converted into this main currency for comprehensive financial reports, dashboard run-rates, charts, and cashflow projections.
+                  </p>
+                </div>
+              </div>
+
+              {onUpdateDisplayCurrency && (
+                <div className="shrink-0 w-full sm:w-auto">
+                  <select
+                    value={displayCurrency}
+                    onChange={(e) => onUpdateDisplayCurrency(e.target.value as DisplayCurrency)}
+                    className="w-full sm:w-64 px-3.5 py-2.5 bg-[#161b22] border border-slate-700 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-emerald-500 cursor-pointer shadow-xs"
+                  >
+                    <optgroup label="Popular Currencies">
+                      {WORLD_CURRENCIES.filter(c => c.isPopular).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} - {i18n.language.startsWith('es') ? c.nameEs : c.name} ({c.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="All Global Currencies">
+                      {WORLD_CURRENCIES.filter(c => !c.isPopular).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} - {i18n.language.startsWith('es') ? c.nameEs : c.name} ({c.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-[#0f131a] p-3 rounded-xl border border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+              <span className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-emerald-400/80 shrink-0" />
+                <span>Multi-Currency Engine: <strong>{getFxProviderInfo().provider}</strong></span>
+              </span>
+              <span className="text-[11px] text-slate-500 font-mono">
+                {getFxProviderInfo().currenciesCount}+ global currencies active
+              </span>
             </div>
           </div>
 

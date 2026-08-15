@@ -380,6 +380,43 @@ export const ReportsTab = React.memo(function ReportsTab({
       totalExpenseConverted += m.expenseConverted + m.scheduledExpenseConverted + m.sharedExpenseConverted + expPending;
     });
 
+    // Compute dynamic currency distribution across transactions in active period
+    const visibleMonths = new Set(monthlyReportData.map(m => m.month));
+    const incomeByCurrency: Record<string, number> = {};
+    const expenseByCurrency: Record<string, number> = {};
+
+    transactions.forEach(tx => {
+      if (tx.type === 'TRANSFER') return;
+      const mKey = tx.date ? tx.date.substring(0, 7) : '';
+      if (!visibleMonths.has(mKey)) return;
+      if (selectedCategoryFilter !== 'ALL' && tx.category !== selectedCategoryFilter) return;
+
+      const isShared = tx.ownerId && currentUserId && tx.ownerId !== currentUserId;
+      if (isShared && !showSharedData) return;
+
+      const curr = (tx.currency || 'ARS').toUpperCase();
+      const amt = tx.amount || 0;
+
+      if (tx.type === 'INCOME') {
+        incomeByCurrency[curr] = (incomeByCurrency[curr] || 0) + amt;
+      } else if (tx.type === 'EXPENSE') {
+        expenseByCurrency[curr] = (expenseByCurrency[curr] || 0) + amt;
+      }
+    });
+
+    if (includePendingRecurring) {
+      monthlyReportData.forEach(m => {
+        m.pendingRecurringItems.forEach(p => {
+          const curr = (p.currency || 'ARS').toUpperCase();
+          if (p.type === 'INCOME') {
+            incomeByCurrency[curr] = (incomeByCurrency[curr] || 0) + p.amount;
+          } else {
+            expenseByCurrency[curr] = (expenseByCurrency[curr] || 0) + p.amount;
+          }
+        });
+      });
+    }
+
     const netSavingsConverted = totalIncomeConverted - totalExpenseConverted;
     const savingsRate = totalIncomeConverted > 0 ? (netSavingsConverted / totalIncomeConverted) * 100 : 0;
 
@@ -406,6 +443,8 @@ export const ReportsTab = React.memo(function ReportsTab({
       totalIncomeUSD,
       totalExpenseARS,
       totalExpenseUSD,
+      incomeByCurrency,
+      expenseByCurrency,
       totalIncomeConverted,
       totalExpenseConverted,
       totalEstimatedPendingIncomeConverted,
@@ -720,13 +759,23 @@ export const ReportsTab = React.memo(function ReportsTab({
           <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
             {formatCurrency(summaryMetrics.totalIncomeConverted, displayCurrency)}
           </div>
-          <div className="flex items-center gap-2 text-[11px] font-mono pt-1">
-            <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20">
-              ARS: ${Math.round(summaryMetrics.totalIncomeARS).toLocaleString()}
-            </span>
-            <span className="px-2 py-0.5 rounded bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/20">
-              USD: ${Math.round(summaryMetrics.totalIncomeUSD).toLocaleString()}
-            </span>
+          <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-mono pt-1">
+            {Object.keys(summaryMetrics.incomeByCurrency).length > 0 ? (
+              Object.entries(summaryMetrics.incomeByCurrency).map(([curr, amt]) => (
+                <span key={curr} className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20">
+                  {curr}: {formatCurrencyCompact(amt, curr as DisplayCurrency)}
+                </span>
+              ))
+            ) : (
+              <>
+                <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20">
+                  ARS: ${Math.round(summaryMetrics.totalIncomeARS).toLocaleString()}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/20">
+                  USD: ${Math.round(summaryMetrics.totalIncomeUSD).toLocaleString()}
+                </span>
+              </>
+            )}
           </div>
           {includePendingRecurring && summaryMetrics.totalEstimatedPendingIncomeConverted > 0 && (
             <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 pt-1">
@@ -747,13 +796,23 @@ export const ReportsTab = React.memo(function ReportsTab({
           <div className="text-2xl font-extrabold text-rose-600 dark:text-rose-400 font-mono">
             {formatCurrency(summaryMetrics.totalExpenseConverted, displayCurrency)}
           </div>
-          <div className="flex items-center gap-2 text-[11px] font-mono pt-1">
-            <span className="px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/20">
-              ARS: ${Math.round(summaryMetrics.totalExpenseARS).toLocaleString()}
-            </span>
-            <span className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20">
-              USD: ${Math.round(summaryMetrics.totalExpenseUSD).toLocaleString()}
-            </span>
+          <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-mono pt-1">
+            {Object.keys(summaryMetrics.expenseByCurrency).length > 0 ? (
+              Object.entries(summaryMetrics.expenseByCurrency).map(([curr, amt]) => (
+                <span key={curr} className="px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/20">
+                  {curr}: {formatCurrencyCompact(amt, curr as DisplayCurrency)}
+                </span>
+              ))
+            ) : (
+              <>
+                <span className="px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/20">
+                  ARS: ${Math.round(summaryMetrics.totalExpenseARS).toLocaleString()}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20">
+                  USD: ${Math.round(summaryMetrics.totalExpenseUSD).toLocaleString()}
+                </span>
+              </>
+            )}
           </div>
           {includePendingRecurring && summaryMetrics.totalEstimatedPendingExpenseConverted > 0 && (
             <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 pt-1">

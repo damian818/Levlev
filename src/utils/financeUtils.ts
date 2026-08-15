@@ -420,6 +420,11 @@ export function getCreditCardStatements(
   return result.sort((a, b) => b.closeDate.localeCompare(a.closeDate));
 }
 import { historicalInflationAndFX } from '../data/defaultTransactions';
+import { 
+  CURRENCY_MAP, 
+  getActiveGlobalFxRates, 
+  DEFAULT_GLOBAL_FX_RATES 
+} from './currencyUtils';
 
 // Cache for historical rates derived from explicit user transfers
 const transferFxCache = new Map<string, number>();
@@ -427,8 +432,8 @@ const transferFxCache = new Map<string, number>();
 /**
  * Returns the historical USD/ARS rate for a given transaction date or month (YYYY-MM).
  * Prioritizes:
- * 1. Explicit transfer execution rates in user transactions for that month
- * 2. Historical FX rate table (historicalInflationAndFX) for that month
+ * 1. Historical FX rate table (historyOverride or historicalInflationAndFX) for that month
+ * 2. Explicit transfer execution rates in user transactions for that month
  * 3. Fallback to current rate
  */
 export function getHistoricalFxRate(
@@ -449,7 +454,6 @@ export function getHistoricalFxRate(
   }
 
   // 2. Derived from explicit TRANSFER transactions in dataset for that month
-  // This is now second priority as users might prefer the official historicals over bank-specific rates
   if (transactions && transactions.length > 0) {
     if (transferFxCache.has(monthKey)) {
       return transferFxCache.get(monthKey)!;
@@ -494,38 +498,36 @@ export function getHistoricalFxRate(
   return fallbackRate;
 }
 
-const GLOBAL_USD_RATES: Record<string, number> = {
-  USD: 1,
-  USDT: 1,
-  EUR: 0.92,
-  GBP: 0.79,
-  BRL: 5.60,
-  MXN: 18.5,
-  CLP: 950,
-};
-
 export function convertCurrency(
   amount: number,
   fromCurrency: string,
   toCurrency: DisplayCurrency,
-  usdArsRate: number,
+  usdArsRate: number = 1496,
   dateStr?: string,
   transactions?: Transaction[],
-  historyOverride?: InflationPoint[]
+  historyOverride?: InflationPoint[],
+  customRates?: Record<string, number>
 ): number {
-  const fromCode = (fromCurrency || 'ARS').toUpperCase();
-  const toCode = (toCurrency || 'ARS').toUpperCase();
+  if (amount === 0 || isNaN(amount)) return 0;
+
+  const fromCode = (fromCurrency || 'ARS').toUpperCase().trim();
+  const toCode = (toCurrency || 'ARS').toUpperCase().trim();
 
   if (fromCode === toCode) return amount;
 
   const effectiveUsdArsRate = getHistoricalFxRate(dateStr, usdArsRate, transactions, historyOverride);
+  const activeRates = customRates || getActiveGlobalFxRates() || DEFAULT_GLOBAL_FX_RATES;
 
   // Convert 'fromCurrency' amount to USD first
   let amountInUSD = amount;
   if (fromCode === 'ARS') {
     amountInUSD = effectiveUsdArsRate > 0 ? amount / effectiveUsdArsRate : 0;
-  } else if (GLOBAL_USD_RATES[fromCode]) {
-    amountInUSD = amount / GLOBAL_USD_RATES[fromCode];
+  } else if (fromCode === 'USD' || fromCode === 'USDT') {
+    amountInUSD = amount;
+  } else if (activeRates[fromCode] && activeRates[fromCode] > 0) {
+    amountInUSD = amount / activeRates[fromCode];
+  } else {
+    amountInUSD = amount; // Fallback 1:1 if rate unknown
   }
 
   // Convert USD amount to 'toCurrency'
@@ -533,8 +535,8 @@ export function convertCurrency(
     return amountInUSD;
   } else if (toCode === 'ARS') {
     return amountInUSD * effectiveUsdArsRate;
-  } else if (GLOBAL_USD_RATES[toCode]) {
-    return amountInUSD * GLOBAL_USD_RATES[toCode];
+  } else if (activeRates[toCode] && activeRates[toCode] > 0) {
+    return amountInUSD * activeRates[toCode];
   }
 
   return amountInUSD;
@@ -573,42 +575,25 @@ export function formatCurrency(amount: number, currency: DisplayCurrency, forceP
     return '••••••';
   }
 
-  const curr = (currency || 'USD').toUpperCase();
-  const localeMap: Record<string, string> = {
-    ARS: 'es-AR',
-    USD: 'en-US',
-    USDT: 'en-US',
-    EUR: 'de-DE',
-    BRL: 'pt-BR',
-    GBP: 'en-GB',
-    MXN: 'es-MX',
-    CLP: 'es-CL',
-  };
+  const curr = (currency || 'USD').toUpperCase().trim();
+  const meta = CURRENCY_MAP[curr];
 
-  const currencyMap: Record<string, string> = {
-    ARS: 'ARS',
-    USD: 'USD',
-    USDT: 'USD',
-    EUR: 'EUR',
-    BRL: 'BRL',
-    GBP: 'GBP',
-    MXN: 'MXN',
-    CLP: 'CLP',
-  };
-
-  const locale = localeMap[curr] || 'en-US';
-  const currencyCode = currencyMap[curr] || 'USD';
+  const locale = meta?.locale || (curr === 'ARS' ? 'es-AR' : 'en-US');
+  const currencyCode = (curr === 'USDT' || !meta) ? 'USD' : curr;
 
   try {
-    const hasCents = Math.abs(amount % 1) >= 0.001;
+    const isZeroDecimals = (meta?.decimals === 0) || (curr === 'ARS' && Math.abs(amount % 1) < 0.01) || (curr === 'CLP') || (curr === 'JPY');
+    const hasCents = Math.abs(amount % 1) >= 0.005;
+
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: currencyCode,
-      minimumFractionDigits: hasCents ? 2 : ((curr === 'ARS' || curr === 'CLP') ? 0 : 2),
-      maximumFractionDigits: 2,
+      minimumFractionDigits: isZeroDecimals && !hasCents ? 0 : 2,
+      maximumFractionDigits: isZeroDecimals && !hasCents ? 0 : 2,
     }).format(amount);
   } catch (e) {
-    return `${curr} ${amount.toFixed(2)}`;
+    const symbol = meta?.symbol || '$';
+    return `${symbol} ${amount.toFixed(2)}`;
   }
 }
 
@@ -618,35 +603,15 @@ export function formatCurrencyCompact(amount: number, currency: DisplayCurrency,
     return '••••••';
   }
 
-  const curr = (currency || 'USD').toUpperCase();
-  const localeMap: Record<string, string> = {
-    ARS: 'es-AR',
-    USD: 'en-US',
-    USDT: 'en-US',
-    EUR: 'de-DE',
-    BRL: 'pt-BR',
-    GBP: 'en-GB',
-    MXN: 'es-MX',
-    CLP: 'es-CL',
-  };
+  const curr = (currency || 'USD').toUpperCase().trim();
+  const meta = CURRENCY_MAP[curr];
 
-  const currencyMap: Record<string, string> = {
-    ARS: 'ARS',
-    USD: 'USD',
-    USDT: 'USD',
-    EUR: 'EUR',
-    BRL: 'BRL',
-    GBP: 'GBP',
-    MXN: 'MXN',
-    CLP: 'CLP',
-  };
-
-  const locale = localeMap[curr] || 'en-US';
-  const currencyCode = currencyMap[curr] || 'USD';
-  
   if (Math.abs(amount) < 1000) {
     return formatCurrency(amount, currency, forcePrivacy);
   }
+
+  const locale = meta?.locale || (curr === 'ARS' ? 'es-AR' : 'en-US');
+  const currencyCode = (curr === 'USDT' || !meta) ? 'USD' : curr;
 
   try {
     const formatter = new Intl.NumberFormat(locale, {
@@ -658,7 +623,8 @@ export function formatCurrencyCompact(amount: number, currency: DisplayCurrency,
     });
     return formatter.format(amount);
   } catch (e) {
-    return `${curr} ${(amount / 1000).toFixed(1)}k`;
+    const symbol = meta?.symbol || '$';
+    return `${symbol} ${(amount / 1000).toFixed(1)}k`;
   }
 }
 

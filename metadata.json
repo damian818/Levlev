@@ -1,6 +1,6 @@
 {
   "name": "LevLev",
-  "description": "Personal finance with heart. Multi-currency and inflation intelligence tracker for ARS and USD with live exchange rates and inflation analytics.",
+  "description": "Personal finance with heart. Multi-currency and inflation intelligence tracker with global live exchange rates, custom reporting currency, and financial forecasting.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 } 

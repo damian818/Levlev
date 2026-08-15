@@ -172,7 +172,7 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
                   <span className="text-slate-400">{t('budget.spent')} ({selectedMonth === 'ALL' ? t('budget.all_time') : selectedMonth}): <strong className="text-slate-100">{formatCurrency(categorySpent, displayCurrency)}</strong></span>
                   {isEditing ? (
                     <div className="flex items-center space-x-1">
-                      <span className="text-slate-400">{t('budget.limit')} (ARS):</span>
+                      <span className="text-slate-400">{t('budget.limit') || 'Limit'} (ARS):</span>
                       <input
                         type="number"
                         value={budget.monthlyLimitARS}
@@ -181,7 +181,7 @@ export function BudgetTab({ transactions, budgets, onUpdateBudgets, displayCurre
                       />
                     </div>
                   ) : (
-                    <span className="text-slate-400">{t('budget.limit')}: <strong className="text-slate-100">{formatCurrency(limitConverted, displayCurrency)}</strong></span>
+                    <span className="text-slate-400">{t('budget.limit') || 'Limit'}: <strong className="text-slate-100">{formatCurrency(limitConverted, displayCurrency)}</strong></span>
                   )}
                 </div>
 

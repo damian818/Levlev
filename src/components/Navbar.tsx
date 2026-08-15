@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from '../lib/supabase';
 import { LevLevLogo } from './LevLevLogo';
+import { WORLD_CURRENCIES } from '../utils/currencyUtils';
 
 // Helper for mobile tactile haptic feedback
 const triggerHaptic = (pattern: number | number[] = 12) => {
@@ -233,14 +234,20 @@ export function Navbar({
                   className="bg-[#0f131a] text-slate-200 text-xs font-bold px-2.5 py-2 rounded-lg border border-slate-700 focus:outline-none cursor-pointer hover:border-slate-600 transition-colors min-h-[36px]"
                   title={t('nav.display_currency_label')}
                 >
-                  <option value="ARS">ARS ($)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="BRL">BRL (R$)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="MXN">MXN ($)</option>
-                  <option value="CLP">CLP ($)</option>
-                  <option value="USDT">USDT (₮)</option>
+                  <optgroup label="Popular">
+                    {WORLD_CURRENCIES.filter(c => c.isPopular).map(c => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.code} ({c.symbol})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="All Global Currencies">
+                    {WORLD_CURRENCIES.filter(c => !c.isPopular).map(c => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.code} ({c.symbol})
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 
@@ -417,14 +424,20 @@ export function Navbar({
                     }}
                     className="bg-[#161b22] text-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none cursor-pointer"
                   >
-                    <option value="ARS">ARS ($)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="BRL">BRL (R$)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="MXN">MXN ($)</option>
-                    <option value="CLP">CLP ($)</option>
-                    <option value="USDT">USDT (₮)</option>
+                    <optgroup label="Popular">
+                      {WORLD_CURRENCIES.filter(c => c.isPopular).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} ({c.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="All Global Currencies">
+                      {WORLD_CURRENCIES.filter(c => !c.isPopular).map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} ({c.symbol})
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
 

@@ -8,6 +8,7 @@ import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
 import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount } from './utils/financeUtils';
+import { initializeGlobalFxRates } from './utils/currencyUtils';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
 import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase } from './services/supabaseSync';
 import { Navbar } from './components/Navbar';
@@ -388,6 +389,15 @@ export default function App() {
   }, []);
 
   const [usdArsRate, setUsdArsRate] = useState<number>(1521);
+
+  // Fetch live global FX rates and MEP rate on mount
+  useEffect(() => {
+    initializeGlobalFxRates((rates, mep) => {
+      if (mep && mep > 0) {
+        setUsdArsRate(mep);
+      }
+    });
+  }, []);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -1011,6 +1021,8 @@ export default function App() {
               transactions={transactions}
               displayCurrency={displayCurrency}
               usdArsRate={usdArsRate}
+              recurringRules={recurringRules}
+              nonRecurringKeys={nonRecurringKeys}
               currentUserId={authUser?.id}
               showSharedData={showSharedData}
             />
@@ -1052,6 +1064,8 @@ export default function App() {
               transactions={transactions}
               budgets={budgets}
               usdArsRate={usdArsRate}
+              displayCurrency={displayCurrency}
+              onUpdateDisplayCurrency={setDisplayCurrency}
               userTimezone={userTimezone}
               onUpdateTimezone={setUserTimezone}
               privacyMode={privacyMode}
