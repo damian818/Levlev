@@ -366,6 +366,25 @@ export default function App() {
     return 'ARS';
   });
 
+  const [localCurrency, setLocalCurrency] = useState<DisplayCurrency>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_local_currency');
+      if (saved) return saved as DisplayCurrency;
+    } catch (e) {}
+    return 'ARS';
+  });
+
+  const [enabledCurrencies, setEnabledCurrencies] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_enabled_currencies');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return ['USD', 'ARS', 'EUR', 'BRL', 'USDT', 'CLP', 'UYU', 'GBP'];
+  });
+
   // Sync display currency to localStorage
   useEffect(() => {
     try {
@@ -374,6 +393,20 @@ export default function App() {
       console.warn('Failed to save display currency to localStorage');
     }
   }, [displayCurrency]);
+
+  // Sync local currency to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('finance_app_local_currency', localCurrency);
+    } catch (e) {}
+  }, [localCurrency]);
+
+  // Sync enabled currencies to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('finance_app_enabled_currencies', JSON.stringify(enabledCurrencies));
+    } catch (e) {}
+  }, [enabledCurrencies]);
 
   // Restore persistent language preference on mount
   useEffect(() => {
@@ -461,6 +494,12 @@ export default function App() {
         }
 
         if (data.settings) {
+          if (data.settings.localCurrency) {
+            setLocalCurrency(data.settings.localCurrency as DisplayCurrency);
+          }
+          if (Array.isArray(data.settings.enabledCurrencies) && data.settings.enabledCurrencies.length > 0) {
+            setEnabledCurrencies(data.settings.enabledCurrencies);
+          }
           if (data.settings.ccPeriodStatuses) {
             setPeriodStatusOverrides(data.settings.ccPeriodStatuses);
             try {
@@ -1087,6 +1126,10 @@ export default function App() {
               onOpenImportModal={() => setIsImportModalOpen(true)}
               onRecalculateBalances={handleRecalculateAllBalances}
               onLogout={handleLogout}
+              localCurrency={localCurrency}
+              onUpdateLocalCurrency={setLocalCurrency}
+              enabledCurrencies={enabledCurrencies}
+              onUpdateEnabledCurrencies={setEnabledCurrencies}
             />
           )}
         </Suspense>
@@ -1110,6 +1153,8 @@ export default function App() {
             onAddCategory={handleAddCategory}
             onAddAccount={handleAddAccount}
             usdArsRate={usdArsRate}
+            enabledCurrencies={enabledCurrencies}
+            localCurrency={localCurrency}
           />
         )}
 

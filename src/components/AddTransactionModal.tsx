@@ -25,6 +25,7 @@ import {
   calculateStatementCloseDate,
   formatCurrency 
 } from '../utils/financeUtils';
+import { WORLD_CURRENCIES, CURRENCY_MAP } from '../utils/currencyUtils';
 
 export interface AddTransactionModalProps {
   isOpen: boolean;
@@ -40,6 +41,8 @@ export interface AddTransactionModalProps {
   onAddAccount?: (acc: AccountItem) => void;
   initialAccount?: string;
   usdArsRate?: number;
+  enabledCurrencies?: string[];
+  localCurrency?: string;
 }
 
 const DEFAULT_ACCOUNTS = ['BBVA', 'DollarApp', 'Visa BBVA', 'Master BBVA', 'Visa Santander', 'ICBC/Comafi Visa'];
@@ -99,7 +102,9 @@ export function AddTransactionModal({
   onAddCategory,
   onAddAccount,
   initialAccount,
-  usdArsRate = 1250
+  usdArsRate = 1250,
+  enabledCurrencies = ['USD', 'ARS', 'EUR', 'BRL', 'USDT', 'CLP', 'UYU', 'GBP'],
+  localCurrency = 'ARS'
 }: AddTransactionModalProps) {
   const { t, i18n } = useTranslation();
   
@@ -871,7 +876,7 @@ export function AddTransactionModal({
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
-                  {currency === 'USD' ? '$' : 'ARS'}
+                  {CURRENCY_MAP[currency]?.symbol || '$'}
                 </span>
                 <input
                   type="number"
@@ -890,10 +895,14 @@ export function AddTransactionModal({
                   onChange={(e) => setCurrency(e.target.value)}
                   className="px-3 py-2.5 bg-[#161b22] border border-slate-700 text-slate-200 font-bold rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-xs shrink-0 cursor-pointer"
                 >
-                  <option value="ARS">ARS 🇦🇷</option>
-                  <option value="USD">USD 💵</option>
-                  <option value="EUR">EUR 💶</option>
-                  <option value="USDT">USDT 🪙</option>
+                  {enabledCurrencies.map(code => {
+                    const meta = CURRENCY_MAP[code];
+                    return (
+                      <option key={code} value={code}>
+                        {code} {meta?.flag || ''}
+                      </option>
+                    );
+                  })}
                 </select>
               ) : (
                 <div className="px-3 py-2.5 bg-[#161b22] border border-slate-700 text-slate-300 font-bold rounded-xl text-xs flex items-center gap-1.5 shrink-0">
