@@ -2390,7 +2390,10 @@ export function detectRecurringThresholdAlerts(
 
     const trend = [...item.monthlyTrend].sort((a, b) => a.month.localeCompare(b.month));
     const latestPt = trend[trend.length - 1];
-    const priorPts = trend.slice(0, -1);
+    
+    // Trailing 3 months, excluding the latest.
+    const startIdx = Math.max(0, trend.length - 4);
+    const priorPts = trend.slice(startIdx, trend.length - 1);
 
     const priorSum = priorPts.reduce((sum, pt) => sum + pt.amountDisplay, 0);
     const priorAvg = priorSum / priorPts.length;
