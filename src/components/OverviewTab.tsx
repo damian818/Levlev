@@ -329,10 +329,19 @@ export const OverviewTab = React.memo(function OverviewTab({
 
       {/* Financial Anomaly Detector Badge */}
       {anomalies.length > 0 && selectedMonth !== 'ALL' && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start sm:items-center gap-3">
+        <div 
+          onClick={() => onNavigateToTransactionsWithFilter({ 
+            category: anomalies[0].category,
+            month: selectedMonth !== 'ALL' ? selectedMonth : undefined
+          })}
+          className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start sm:items-center gap-3 cursor-pointer hover:bg-amber-500/20 transition-colors"
+        >
           <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5 sm:mt-0" />
           <div className="flex-1">
-            <h4 className="text-xs sm:text-sm font-bold text-amber-500">Anomaly Detected</h4>
+            <h4 className="text-xs sm:text-sm font-bold text-amber-500 flex items-center">
+              Anomaly Detected
+              <ExternalLink className="w-3 h-3 ml-2 opacity-60" />
+            </h4>
             <p className="text-[10px] sm:text-xs text-amber-400 mt-0.5">
               Spending in <span className="font-semibold text-amber-300">{anomalies[0].category}</span> is {anomalies[0].percentageIncrease.toFixed(0)}% higher than your 3-month average.
               {anomalies.length > 1 && ` (+${anomalies.length - 1} other anomalies)`}

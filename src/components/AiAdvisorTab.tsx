@@ -12,7 +12,7 @@ interface AiAdvisorTabProps {
 }
 
 export function AiAdvisorTab({ transactions, displayCurrency, usdArsRate }: AiAdvisorTabProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [insights, setInsights] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,14 +34,13 @@ export function AiAdvisorTab({ transactions, displayCurrency, usdArsRate }: AiAd
       const res = await fetch('/api/ai-insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summaryData, customPrompt }),
+        body: JSON.stringify({ summaryData, customPrompt, language: i18n.language }),
       });
 
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to fetch AI insights');
       }
-
       setInsights(data.insights);
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
@@ -53,20 +52,20 @@ export function AiAdvisorTab({ transactions, displayCurrency, usdArsRate }: AiAd
   const prompts = [
     {
       id: 'general',
-      title: 'General Health Analysis',
-      description: 'Analyze my overall spending and savings habits for this period.',
+      title: t('ai.prompts.general.title', { defaultValue: 'General Health Analysis' }),
+      description: t('ai.prompts.general.desc', { defaultValue: 'Analyze my overall spending and savings habits for this period.' }),
       promptText: 'Provide a general financial health analysis focusing on savings rate, income vs expenses, and general habits.',
     },
     {
       id: 'anomalies',
-      title: 'Spot Anomalies',
-      description: 'Detect any unusual spending patterns or out-of-ordinary expenses.',
+      title: t('ai.prompts.anomalies.title', { defaultValue: 'Spot Anomalies' }),
+      description: t('ai.prompts.anomalies.desc', { defaultValue: 'Detect any unusual spending patterns or out-of-ordinary expenses.' }),
       promptText: 'Analyze my spending data to spot any anomalies or unusually high expenses compared to typical patterns.',
     },
     {
       id: 'savings',
-      title: 'Savings Optimization',
-      description: 'Get actionable tips on how to improve my savings rate based on my top expenses.',
+      title: t('ai.prompts.savings.title', { defaultValue: 'Savings Optimization' }),
+      description: t('ai.prompts.savings.desc', { defaultValue: 'Get actionable tips on how to improve my savings rate based on my top expenses.' }),
       promptText: 'Provide actionable tips on how I can optimize my top spending categories to increase my savings rate.',
     }
   ];

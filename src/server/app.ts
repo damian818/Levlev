@@ -311,7 +311,7 @@ app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res)
 
 app.post(["/api/ai-insights", "/ai-insights"], async (req, res) => {
   try {
-    const { summaryData, customPrompt } = req.body;
+    const { summaryData, customPrompt, language } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: "Gemini API key is not configured on the server." });
@@ -350,6 +350,10 @@ Task: ${customPrompt}
 Format your response in clean markdown.`;
     }
 
+    if (language) {
+      prompt += `\n\nCRITICAL INSTRUCTION: You MUST provide your entire response in the following language code: ${language}. Do not use English unless the language code is 'en'.`;
+    }
+
     const interaction = await ai.interactions.create({
       model: "gemini-3.6-flash",
       input: prompt,
@@ -377,7 +381,7 @@ Format your response in clean markdown.`;
 
 app.post(["/api/ai-chat", "/ai-chat"], async (req, res) => {
   try {
-    const { messages, financialContext } = req.body;
+    const { messages, financialContext, language } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: "Gemini API key is not configured on the server." });
@@ -392,7 +396,7 @@ app.post(["/api/ai-chat", "/ai-chat"], async (req, res) => {
       },
     });
 
-    const systemInstruction = `You are an expert AI financial assistant integrated into a multi-currency personal finance tracker (handling ARS and USD in Argentina). 
+    let systemInstruction = `You are an expert AI financial assistant integrated into a multi-currency personal finance tracker (handling ARS and USD in Argentina). 
 Here is the user's current financial context:
 - Summary: ${JSON.stringify(financialContext?.summary || {})}
 - Monthly Trends: ${JSON.stringify(financialContext?.monthlyTrend || [])}
@@ -400,6 +404,10 @@ Here is the user's current financial context:
 - Recent Transactions: ${JSON.stringify(financialContext?.recentTransactions || [])}
 
 Answer the user's questions clearly, accurately, and concisely. Use the provided context to give personalized advice.`;
+
+    if (language) {
+      systemInstruction += `\n\nCRITICAL INSTRUCTION: You MUST provide your entire response in the following language code: ${language}. Do not use English unless the language code is 'en'.`;
+    }
 
     const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1].content : '';
     

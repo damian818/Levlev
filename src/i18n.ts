@@ -697,6 +697,20 @@ export const resources = {
         generate: 'Generate AI Financial Audit',
         report_title: 'Gemini Advisory Report',
         chat_intro: 'Hello! I am your AI financial assistant. Ask me anything about your spending, trends, or comparisons (e.g., "Where am I spending more?", "Am I spending more in restaurants than before?").',
+        prompts: {
+          general: {
+            title: 'General Health Analysis',
+            desc: 'Analyze my overall spending and savings habits for this period.'
+          },
+          anomalies: {
+            title: 'Spot Anomalies',
+            desc: 'Detect any unusual spending patterns or out-of-ordinary expenses.'
+          },
+          savings: {
+            title: 'Savings Optimization',
+            desc: 'Get actionable tips on how to improve my savings rate based on my top expenses.'
+          }
+        },
         ask_assistant: 'Ask AI Financial Assistant',
         chat_title: 'AI Financial Assistant',
         powered_by: 'Powered by Gemini',
@@ -1450,6 +1464,20 @@ export const resources = {
         generate: 'Generar Auditoría Financiera IA',
         report_title: 'Informe de Asesoría Gemini',
         chat_intro: '¡Hola! Soy tu asistente financiero IA. Pregúntame lo que quieras sobre tus gastos, tendencias o comparaciones (ej. "¿Dónde estoy gastando más?", "¿Estoy gastando más en restaurantes que antes?").',
+        prompts: {
+          general: {
+            title: 'Análisis General de Salud',
+            desc: 'Analiza mis hábitos generales de gasto y ahorro para este período.'
+          },
+          anomalies: {
+            title: 'Detectar Anomalías',
+            desc: 'Detecta cualquier patrón de gasto inusual o gastos fuera de lo común.'
+          },
+          savings: {
+            title: 'Optimización de Ahorro',
+            desc: 'Obtén consejos prácticos sobre cómo mejorar mi tasa de ahorro según mis principales gastos.'
+          }
+        },
         ask_assistant: 'Preguntar al Asistente Financiero IA',
         chat_title: 'Asistente Financiero IA',
         powered_by: 'Impulsado por Gemini',

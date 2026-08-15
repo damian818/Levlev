@@ -21,7 +21,7 @@ export function AiChatWidget({
   displayCurrency,
   usdArsRate,
 }: AiChatWidgetProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -80,6 +80,7 @@ export function AiChatWidget({
         body: JSON.stringify({
           messages: newMessages,
           financialContext,
+          language: i18n.language,
         }),
       });
 
