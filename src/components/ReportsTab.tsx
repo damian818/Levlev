@@ -17,6 +17,8 @@ import { EmptyState } from './EmptyState';
 interface ReportsTabProps {
   transactions: Transaction[];
   displayCurrency: DisplayCurrency;
+  localCurrency?: DisplayCurrency;
+  enabledCurrencies?: string[];
   usdArsRate: number;
   recurringRules?: RecurringRule[];
   nonRecurringKeys?: string[];
@@ -27,6 +29,8 @@ interface ReportsTabProps {
 export const ReportsTab = React.memo(function ReportsTab({
   transactions,
   displayCurrency,
+  localCurrency = 'EUR',
+  enabledCurrencies = ['USD', 'ARS', 'EUR', 'BRL', 'USDT', 'CLP', 'UYU', 'GBP'],
   usdArsRate,
   recurringRules = [],
   nonRecurringKeys = [],
@@ -34,6 +38,8 @@ export const ReportsTab = React.memo(function ReportsTab({
   showSharedData = true,
 }: ReportsTabProps) {
   const { t } = useTranslation();
+  const localCurr = (localCurrency || 'EUR').toUpperCase();
+  const foreignCurr = (displayCurrency !== localCurr ? displayCurrency : ('USD' !== localCurr ? 'USD' : 'ARS')).toUpperCase();
   // Time range state
   const [timeRange, setTimeRange] = useState<'6M' | '12M' | 'ALL'>('12M');
   const [chartMode, setChartMode] = useState<'NATIVE_CURRENCY' | 'CONVERTED'>('NATIVE_CURRENCY');
@@ -115,39 +121,39 @@ export const ReportsTab = React.memo(function ReportsTab({
       month: string;
       isFuture: boolean;
       isCurrent: boolean;
-      incomeARS: number;
-      incomeUSD: number;
-      expenseARS: number;
-      expenseUSD: number;
-      sharedIncomeARS: number;
-      sharedIncomeUSD: number;
-      sharedExpenseARS: number;
-      sharedExpenseUSD: number;
-      scheduledIncomeARS: number;
-      scheduledIncomeUSD: number;
-      scheduledExpenseARS: number;
-      scheduledExpenseUSD: number;
+      incomeLocal: number;
+      incomeForeign: number;
+      expenseLocal: number;
+      expenseForeign: number;
+      sharedIncomeLocal: number;
+      sharedIncomeForeign: number;
+      sharedExpenseLocal: number;
+      sharedExpenseForeign: number;
+      scheduledIncomeLocal: number;
+      scheduledIncomeForeign: number;
+      scheduledExpenseLocal: number;
+      scheduledExpenseForeign: number;
       // Estimated pending recurring
-      estimatedPendingIncomeARS: number;
-      estimatedPendingIncomeUSD: number;
-      estimatedPendingExpenseARS: number;
-      estimatedPendingExpenseUSD: number;
+      estimatedPendingIncomeLocal: number;
+      estimatedPendingIncomeForeign: number;
+      estimatedPendingExpenseLocal: number;
+      estimatedPendingExpenseForeign: number;
       estimatedPendingIncomeConverted: number;
       estimatedPendingExpenseConverted: number;
       pendingRecurringItems: PendingRecurringItem[];
       // Converted values per currency slice (normalized to displayCurrency)
-      incomeARS_Converted: number;
-      incomeUSD_Converted: number;
-      expenseARS_Converted: number;
-      expenseUSD_Converted: number;
-      sharedIncomeARS_Converted: number;
-      sharedIncomeUSD_Converted: number;
-      sharedExpenseARS_Converted: number;
-      sharedExpenseUSD_Converted: number;
-      scheduledIncomeARS_Converted: number;
-      scheduledIncomeUSD_Converted: number;
-      scheduledExpenseARS_Converted: number;
-      scheduledExpenseUSD_Converted: number;
+      incomeLocal_Converted: number;
+      incomeForeign_Converted: number;
+      expenseLocal_Converted: number;
+      expenseForeign_Converted: number;
+      sharedIncomeLocal_Converted: number;
+      sharedIncomeForeign_Converted: number;
+      sharedExpenseLocal_Converted: number;
+      sharedExpenseForeign_Converted: number;
+      scheduledIncomeLocal_Converted: number;
+      scheduledIncomeForeign_Converted: number;
+      scheduledExpenseLocal_Converted: number;
+      scheduledExpenseForeign_Converted: number;
       incomeConverted: number;
       expenseConverted: number;
       scheduledIncomeConverted: number;
@@ -165,37 +171,37 @@ export const ReportsTab = React.memo(function ReportsTab({
           month: m,
           isFuture: m > currentMonthKey,
           isCurrent: m === currentMonthKey,
-          incomeARS: 0,
-          incomeUSD: 0,
-          expenseARS: 0,
-          expenseUSD: 0,
-          sharedIncomeARS: 0,
-          sharedIncomeUSD: 0,
-          sharedExpenseARS: 0,
-          sharedExpenseUSD: 0,
-          scheduledIncomeARS: 0,
-          scheduledIncomeUSD: 0,
-          scheduledExpenseARS: 0,
-          scheduledExpenseUSD: 0,
-          estimatedPendingIncomeARS: 0,
-          estimatedPendingIncomeUSD: 0,
-          estimatedPendingExpenseARS: 0,
-          estimatedPendingExpenseUSD: 0,
+          incomeLocal: 0,
+          incomeForeign: 0,
+          expenseLocal: 0,
+          expenseForeign: 0,
+          sharedIncomeLocal: 0,
+          sharedIncomeForeign: 0,
+          sharedExpenseLocal: 0,
+          sharedExpenseForeign: 0,
+          scheduledIncomeLocal: 0,
+          scheduledIncomeForeign: 0,
+          scheduledExpenseLocal: 0,
+          scheduledExpenseForeign: 0,
+          estimatedPendingIncomeLocal: 0,
+          estimatedPendingIncomeForeign: 0,
+          estimatedPendingExpenseLocal: 0,
+          estimatedPendingExpenseForeign: 0,
           estimatedPendingIncomeConverted: 0,
           estimatedPendingExpenseConverted: 0,
           pendingRecurringItems: [],
-          incomeARS_Converted: 0,
-          incomeUSD_Converted: 0,
-          expenseARS_Converted: 0,
-          expenseUSD_Converted: 0,
-          sharedIncomeARS_Converted: 0,
-          sharedIncomeUSD_Converted: 0,
-          sharedExpenseARS_Converted: 0,
-          sharedExpenseUSD_Converted: 0,
-          scheduledIncomeARS_Converted: 0,
-          scheduledIncomeUSD_Converted: 0,
-          scheduledExpenseARS_Converted: 0,
-          scheduledExpenseUSD_Converted: 0,
+          incomeLocal_Converted: 0,
+          incomeForeign_Converted: 0,
+          expenseLocal_Converted: 0,
+          expenseForeign_Converted: 0,
+          sharedIncomeLocal_Converted: 0,
+          sharedIncomeForeign_Converted: 0,
+          sharedExpenseLocal_Converted: 0,
+          sharedExpenseForeign_Converted: 0,
+          scheduledIncomeLocal_Converted: 0,
+          scheduledIncomeForeign_Converted: 0,
+          scheduledExpenseLocal_Converted: 0,
+          scheduledExpenseForeign_Converted: 0,
           incomeConverted: 0,
           expenseConverted: 0,
           scheduledIncomeConverted: 0,
@@ -222,66 +228,67 @@ export const ReportsTab = React.memo(function ReportsTab({
       const item = ensureMonth(monthKey);
       item.txCount++;
 
-      const isUsd = tx.currency?.toUpperCase().includes('USD');
+      const txCurr = (tx.currency || localCurr).toUpperCase();
+      const isLocal = txCurr === localCurr || txCurr.includes(localCurr);
       const amt = tx.amount || 0;
       const converted = convertCurrency(amt, tx.currency, displayCurrency, usdArsRate, tx.date, transactions);
       const isTxFuture = Boolean(tx.date && tx.date.substring(0, 10) > todayStr);
 
       if (tx.type === 'INCOME') {
         if (isTxFuture) {
-          if (isUsd) {
-            item.scheduledIncomeUSD += amt;
-            item.scheduledIncomeUSD_Converted += converted;
+          if (isLocal) {
+            item.scheduledIncomeLocal += amt;
+            item.scheduledIncomeLocal_Converted += converted;
           } else {
-            item.scheduledIncomeARS += amt;
-            item.scheduledIncomeARS_Converted += converted;
+            item.scheduledIncomeForeign += amt;
+            item.scheduledIncomeForeign_Converted += converted;
           }
           item.scheduledIncomeConverted += converted;
         } else if (isShared) {
-          if (isUsd) {
-            item.sharedIncomeUSD += amt;
-            item.sharedIncomeUSD_Converted += converted;
+          if (isLocal) {
+            item.sharedIncomeLocal += amt;
+            item.sharedIncomeLocal_Converted += converted;
           } else {
-            item.sharedIncomeARS += amt;
-            item.sharedIncomeARS_Converted += converted;
+            item.sharedIncomeForeign += amt;
+            item.sharedIncomeForeign_Converted += converted;
           }
           item.sharedIncomeConverted += converted;
         } else {
-          if (isUsd) {
-            item.incomeUSD += amt;
-            item.incomeUSD_Converted += converted;
+          if (isLocal) {
+            item.incomeLocal += amt;
+            item.incomeLocal_Converted += converted;
           } else {
-            item.incomeARS += amt;
-            item.incomeARS_Converted += converted;
+            item.incomeForeign += amt;
+            item.incomeForeign_Converted += converted;
           }
           item.incomeConverted += converted;
         }
       } else if (tx.type === 'EXPENSE') {
         if (isTxFuture) {
-          if (isUsd) {
-            item.scheduledExpenseUSD += amt;
-            item.scheduledExpenseUSD_Converted += converted;
+          if (isLocal) {
+            item.scheduledExpenseLocal += amt;
+            item.scheduledExpenseLocal_Converted += converted;
           } else {
-            item.scheduledExpenseARS += amt;
-            item.scheduledExpenseARS_Converted += converted;
+            item.scheduledExpenseForeign += amt;
+            item.scheduledExpenseForeign_Converted += converted;
           }
           item.scheduledExpenseConverted += converted;
         } else if (isShared) {
-          if (isUsd) {
-            item.sharedExpenseUSD += amt;
-            item.sharedExpenseUSD_Converted += converted;
+          if (isLocal) {
+            item.sharedExpenseLocal += amt;
+            item.sharedExpenseLocal_Converted += converted;
           } else {
-            item.sharedExpenseARS += amt;
-            item.sharedExpenseARS_Converted += converted;
+            item.sharedExpenseForeign += amt;
+            item.sharedExpenseForeign_Converted += converted;
           }
           item.sharedExpenseConverted += converted;
         } else {
-          if (isUsd) {
-            item.expenseUSD += amt;
-            item.expenseUSD_Converted += converted;
+          if (isLocal) {
+            item.expenseLocal += amt;
+            item.expenseLocal_Converted += converted;
           } else {
-            item.expenseARS += amt;
-            item.expenseARS_Converted += converted;
+            item.expenseForeign += amt;
+            item.expenseForeign_Converted += converted;
           }
           item.expenseConverted += converted;
         }
@@ -324,10 +331,22 @@ export const ReportsTab = React.memo(function ReportsTab({
 
       item.estimatedPendingExpenseConverted = totalPendingExpConv;
       item.estimatedPendingIncomeConverted = totalPendingIncConv;
-      item.estimatedPendingExpenseARS = filteredPendingExpenses.filter(p => !p.currency?.toUpperCase().includes('USD')).reduce((s, p) => s + p.amount, 0);
-      item.estimatedPendingExpenseUSD = filteredPendingExpenses.filter(p => p.currency?.toUpperCase().includes('USD')).reduce((s, p) => s + p.amount, 0);
-      item.estimatedPendingIncomeARS = filteredPendingIncomes.filter(p => !p.currency?.toUpperCase().includes('USD')).reduce((s, p) => s + p.amount, 0);
-      item.estimatedPendingIncomeUSD = filteredPendingIncomes.filter(p => p.currency?.toUpperCase().includes('USD')).reduce((s, p) => s + p.amount, 0);
+      item.estimatedPendingExpenseLocal = filteredPendingExpenses.filter(p => {
+        const c = (p.currency || localCurr).toUpperCase();
+        return c === localCurr || c.includes(localCurr);
+      }).reduce((s, p) => s + p.amount, 0);
+      item.estimatedPendingExpenseForeign = filteredPendingExpenses.filter(p => {
+        const c = (p.currency || localCurr).toUpperCase();
+        return !(c === localCurr || c.includes(localCurr));
+      }).reduce((s, p) => s + p.amount, 0);
+      item.estimatedPendingIncomeLocal = filteredPendingIncomes.filter(p => {
+        const c = (p.currency || localCurr).toUpperCase();
+        return c === localCurr || c.includes(localCurr);
+      }).reduce((s, p) => s + p.amount, 0);
+      item.estimatedPendingIncomeForeign = filteredPendingIncomes.filter(p => {
+        const c = (p.currency || localCurr).toUpperCase();
+        return !(c === localCurr || c.includes(localCurr));
+      }).reduce((s, p) => s + p.amount, 0);
       item.pendingRecurringItems = [...filteredPendingIncomes, ...filteredPendingExpenses];
     });
 
@@ -352,14 +371,14 @@ export const ReportsTab = React.memo(function ReportsTab({
       data.netConverted = effIncome - effExpense;
       return data;
     });
-  }, [transactions, recurringRules, nonRecurringKeys, timeRange, selectedCategoryFilter, displayCurrency, usdArsRate, currentUserId, showSharedData, includePendingRecurring]);
+  }, [transactions, recurringRules, nonRecurringKeys, timeRange, selectedCategoryFilter, displayCurrency, localCurrency, usdArsRate, currentUserId, showSharedData, includePendingRecurring]);
 
   // Total summary metrics over selected time range
   const summaryMetrics = useMemo(() => {
-    let totalIncomeARS = 0;
-    let totalIncomeUSD = 0;
-    let totalExpenseARS = 0;
-    let totalExpenseUSD = 0;
+    let totalIncomeLocal = 0;
+    let totalIncomeForeign = 0;
+    let totalExpenseLocal = 0;
+    let totalExpenseForeign = 0;
     let totalIncomeConverted = 0;
     let totalExpenseConverted = 0;
     let totalEstimatedPendingIncomeConverted = 0;
@@ -372,10 +391,10 @@ export const ReportsTab = React.memo(function ReportsTab({
       totalEstimatedPendingIncomeConverted += m.estimatedPendingIncomeConverted;
       totalEstimatedPendingExpenseConverted += m.estimatedPendingExpenseConverted;
 
-      totalIncomeARS += m.incomeARS + m.scheduledIncomeARS + m.sharedIncomeARS + (includePendingRecurring ? m.estimatedPendingIncomeARS : 0);
-      totalIncomeUSD += m.incomeUSD + m.scheduledIncomeUSD + m.sharedIncomeUSD + (includePendingRecurring ? m.estimatedPendingIncomeUSD : 0);
-      totalExpenseARS += m.expenseARS + m.scheduledExpenseARS + m.sharedExpenseARS + (includePendingRecurring ? m.estimatedPendingExpenseARS : 0);
-      totalExpenseUSD += m.expenseUSD + m.scheduledExpenseUSD + m.sharedExpenseUSD + (includePendingRecurring ? m.estimatedPendingExpenseUSD : 0);
+      totalIncomeLocal += m.incomeLocal + m.scheduledIncomeLocal + m.sharedIncomeLocal + (includePendingRecurring ? m.estimatedPendingIncomeLocal : 0);
+      totalIncomeForeign += m.incomeForeign + m.scheduledIncomeForeign + m.sharedIncomeForeign + (includePendingRecurring ? m.estimatedPendingIncomeForeign : 0);
+      totalExpenseLocal += m.expenseLocal + m.scheduledExpenseLocal + m.sharedExpenseLocal + (includePendingRecurring ? m.estimatedPendingExpenseLocal : 0);
+      totalExpenseForeign += m.expenseForeign + m.scheduledExpenseForeign + m.sharedExpenseForeign + (includePendingRecurring ? m.estimatedPendingExpenseForeign : 0);
       totalIncomeConverted += m.incomeConverted + m.scheduledIncomeConverted + m.sharedIncomeConverted + incPending;
       totalExpenseConverted += m.expenseConverted + m.scheduledExpenseConverted + m.sharedExpenseConverted + expPending;
     });
@@ -439,10 +458,10 @@ export const ReportsTab = React.memo(function ReportsTab({
     });
 
     return {
-      totalIncomeARS,
-      totalIncomeUSD,
-      totalExpenseARS,
-      totalExpenseUSD,
+      totalIncomeLocal,
+      totalIncomeForeign,
+      totalExpenseLocal,
+      totalExpenseForeign,
       incomeByCurrency,
       expenseByCurrency,
       totalIncomeConverted,
@@ -769,10 +788,10 @@ export const ReportsTab = React.memo(function ReportsTab({
             ) : (
               <>
                 <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20">
-                  ARS: ${Math.round(summaryMetrics.totalIncomeARS).toLocaleString()}
+                  {localCurr}: ${Math.round(summaryMetrics.totalIncomeLocal).toLocaleString()}
                 </span>
                 <span className="px-2 py-0.5 rounded bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/20">
-                  USD: ${Math.round(summaryMetrics.totalIncomeUSD).toLocaleString()}
+                  {foreignCurr}: ${Math.round(summaryMetrics.totalIncomeForeign).toLocaleString()}
                 </span>
               </>
             )}
@@ -806,10 +825,10 @@ export const ReportsTab = React.memo(function ReportsTab({
             ) : (
               <>
                 <span className="px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/20">
-                  ARS: ${Math.round(summaryMetrics.totalExpenseARS).toLocaleString()}
+                  {localCurr}: ${Math.round(summaryMetrics.totalExpenseLocal).toLocaleString()}
                 </span>
                 <span className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20">
-                  USD: ${Math.round(summaryMetrics.totalExpenseUSD).toLocaleString()}
+                  {foreignCurr}: ${Math.round(summaryMetrics.totalExpenseForeign).toLocaleString()}
                 </span>
               </>
             )}
@@ -956,22 +975,22 @@ export const ReportsTab = React.memo(function ReportsTab({
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.incomeARS }}></span>
-                <span className="text-slate-700 dark:text-slate-300 font-medium">{t('reports.income_ars') || 'Income (ARS)'}</span>
+                <span className="text-slate-700 dark:text-slate-300 font-medium">Income ({localCurr})</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.incomeUSD }}></span>
-                <span className="text-slate-700 dark:text-slate-300 font-medium">{t('reports.income_usd') || 'Income (USD)'}</span>
+                <span className="text-slate-700 dark:text-slate-300 font-medium">Income ({foreignCurr})</span>
               </div>
             </div>
             <div className="w-px h-3 bg-slate-300 dark:bg-slate-800 hidden sm:block"></div>
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.expenseARS }}></span>
-                <span className="text-slate-700 dark:text-slate-300 font-medium">{t('reports.expense_ars') || 'Expense (ARS)'}</span>
+                <span className="text-slate-700 dark:text-slate-300 font-medium">Expense ({localCurr})</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS.expenseUSD }}></span>
-                <span className="text-slate-700 dark:text-slate-300 font-medium">{t('reports.expense_usd') || 'Expense (USD)'}</span>
+                <span className="text-slate-700 dark:text-slate-300 font-medium">Expense ({foreignCurr})</span>
               </div>
             </div>
           </div>
@@ -1002,10 +1021,10 @@ export const ReportsTab = React.memo(function ReportsTab({
                 />
                 <Tooltip content={<CustomTooltip />} />
                 
-                {/* Scheduled Income ARS */}
+                {/* Scheduled Income Local */}
                 <Bar 
-                  dataKey="scheduledIncomeARS_Converted" 
-                  name={t('reports.scheduled_income_ars') || 'Scheduled Income (ARS)'} 
+                  dataKey="scheduledIncomeLocal_Converted" 
+                  name={`Scheduled Income (${localCurr})`} 
                   fill={COLORS.incomeARS}
                   fillOpacity={0.4}
                   stroke={COLORS.incomeARS}
@@ -1013,10 +1032,10 @@ export const ReportsTab = React.memo(function ReportsTab({
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
                 />
-                {/* Scheduled Income USD */}
+                {/* Scheduled Income Foreign */}
                 <Bar 
-                  dataKey="scheduledIncomeUSD_Converted" 
-                  name={t('reports.scheduled_income_usd') || 'Scheduled Income (USD)'} 
+                  dataKey="scheduledIncomeForeign_Converted" 
+                  name={`Scheduled Income (${foreignCurr})`} 
                   fill={COLORS.incomeUSD} 
                   fillOpacity={0.4}
                   stroke={COLORS.incomeUSD}
@@ -1024,34 +1043,34 @@ export const ReportsTab = React.memo(function ReportsTab({
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={[4, 4, 0, 0]} 
                 />
-                {/* Income ARS */}
+                {/* Income Local */}
                 <Bar 
-                  dataKey="incomeARS_Converted" 
-                  name={t('reports.income_ars') || 'Income (ARS)'} 
+                  dataKey="incomeLocal_Converted" 
+                  name={`Income (${localCurr})`} 
                   fill={COLORS.incomeARS} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
                 />
-                {/* Shared Income ARS */}
+                {/* Shared Income Local */}
                 <Bar 
-                  dataKey="sharedIncomeARS_Converted" 
-                  name={t('reports.shared_income_ars') || 'Shared Income (ARS)'} 
+                  dataKey="sharedIncomeLocal_Converted" 
+                  name={`Shared Income (${localCurr})`} 
                   fill={COLORS.sharedIncomeARS} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
                 />
-                {/* Income USD */}
+                {/* Income Foreign */}
                 <Bar 
-                  dataKey="incomeUSD_Converted" 
-                  name={t('reports.income_usd') || 'Income (USD)'} 
+                  dataKey="incomeForeign_Converted" 
+                  name={`Income (${foreignCurr})`} 
                   fill={COLORS.incomeUSD} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={[4, 4, 0, 0]} 
                 />
-                {/* Shared Income USD */}
+                {/* Shared Income Foreign */}
                 <Bar 
-                  dataKey="sharedIncomeUSD_Converted" 
-                  name={t('reports.shared_income_usd') || 'Shared Income (USD)'} 
+                  dataKey="sharedIncomeForeign_Converted" 
+                  name={`Shared Income (${foreignCurr})`} 
                   fill={COLORS.sharedIncomeUSD} 
                   stackId={barStyle === 'STACKED' ? 'income' : undefined} 
                   radius={[4, 4, 0, 0]} 
@@ -1069,10 +1088,10 @@ export const ReportsTab = React.memo(function ReportsTab({
                     radius={[4, 4, 0, 0]} 
                   />
                 )}
-                {/* Scheduled Expense ARS */}
+                {/* Scheduled Expense Local */}
                 <Bar 
-                  dataKey="scheduledExpenseARS_Converted" 
-                  name={t('reports.scheduled_expense_ars') || 'Scheduled Expense (ARS)'} 
+                  dataKey="scheduledExpenseLocal_Converted" 
+                  name={`Scheduled Expense (${localCurr})`} 
                   fill={COLORS.expenseARS} 
                   fillOpacity={0.4}
                   stroke={COLORS.expenseARS}
@@ -1080,10 +1099,10 @@ export const ReportsTab = React.memo(function ReportsTab({
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
                 />
-                {/* Scheduled Expense USD */}
+                {/* Scheduled Expense Foreign */}
                 <Bar 
-                  dataKey="scheduledExpenseUSD_Converted" 
-                  name={t('reports.scheduled_expense_usd') || 'Scheduled Expense (USD)'} 
+                  dataKey="scheduledExpenseForeign_Converted" 
+                  name={`Scheduled Expense (${foreignCurr})`} 
                   fill={COLORS.expenseUSD} 
                   fillOpacity={0.4}
                   stroke={COLORS.expenseUSD}
@@ -1091,34 +1110,34 @@ export const ReportsTab = React.memo(function ReportsTab({
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={[4, 4, 0, 0]} 
                 />
-                {/* Expense ARS */}
+                {/* Expense Local */}
                 <Bar 
-                  dataKey="expenseARS_Converted" 
-                  name={t('reports.expense_ars') || 'Expense (ARS)'} 
+                  dataKey="expenseLocal_Converted" 
+                  name={`Expense (${localCurr})`} 
                   fill={COLORS.expenseARS} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
                 />
-                {/* Shared Expense ARS */}
+                {/* Shared Expense Local */}
                 <Bar 
-                  dataKey="sharedExpenseARS_Converted" 
-                  name={t('reports.shared_expense_ars') || 'Shared Expense (ARS)'} 
+                  dataKey="sharedExpenseLocal_Converted" 
+                  name={`Shared Expense (${localCurr})`} 
                   fill={COLORS.sharedExpenseARS} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={barStyle === 'GROUPED' ? [4, 4, 0, 0] : [0, 0, 0, 0]} 
                 />
-                {/* Expense USD */}
+                {/* Expense Foreign */}
                 <Bar 
-                  dataKey="expenseUSD_Converted" 
-                  name={t('reports.expense_usd') || 'Expense (USD)'} 
+                  dataKey="expenseForeign_Converted" 
+                  name={`Expense (${foreignCurr})`} 
                   fill={COLORS.expenseUSD} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={[4, 4, 0, 0]} 
                 />
-                {/* Shared Expense USD */}
+                {/* Shared Expense Foreign */}
                 <Bar 
-                  dataKey="sharedExpenseUSD_Converted" 
-                  name={t('reports.shared_expense_usd') || 'Shared Expense (USD)'} 
+                  dataKey="sharedExpenseForeign_Converted" 
+                  name={`Shared Expense (${foreignCurr})`} 
                   fill={COLORS.sharedExpenseUSD} 
                   stackId={barStyle === 'STACKED' ? 'expense' : undefined} 
                   radius={[4, 4, 0, 0]} 

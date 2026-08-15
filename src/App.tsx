@@ -293,6 +293,9 @@ export default function App() {
         accounts: withOrder,
         budgets,
         settings: {
+          localCurrency,
+          displayCurrency,
+          enabledCurrencies,
           ccPeriodStatuses: periodStatusOverrides,
           customBalances,
           workspaceSharing: {
@@ -496,6 +499,9 @@ export default function App() {
         if (data.settings) {
           if (data.settings.localCurrency) {
             setLocalCurrency(data.settings.localCurrency as DisplayCurrency);
+          }
+          if (data.settings.displayCurrency) {
+            setDisplayCurrency(data.settings.displayCurrency as DisplayCurrency);
           }
           if (Array.isArray(data.settings.enabledCurrencies) && data.settings.enabledCurrencies.length > 0) {
             setEnabledCurrencies(data.settings.enabledCurrencies);
@@ -795,6 +801,9 @@ export default function App() {
         accounts,
         budgets,
         settings: {
+          localCurrency,
+          displayCurrency,
+          enabledCurrencies,
           ccPeriodStatuses: periodStatusOverrides,
           customBalances,
           workspaceSharing: {
@@ -805,7 +814,7 @@ export default function App() {
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [transactions, categories, accounts, budgets, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, authUser, hasInitialSynced]);
+  }, [transactions, categories, accounts, budgets, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced]);
 
   if (authLoading) {
     return (
