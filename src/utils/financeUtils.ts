@@ -2193,4 +2193,91 @@ export function recalculateAccountBalancesFromTransactions(
   return recalculated;
 }
 
+export interface CategoryAnomaly {
+  category: string;
+  currentAmount: number;
+  averageAmount: number;
+  percentageIncrease: number;
+}
+
+export function detectFinancialAnomalies(
+  transactions: Transaction[],
+  displayCurrency: DisplayCurrency,
+  usdArsRate: number,
+  targetMonthKey: string
+): CategoryAnomaly[] {
+  // get the past 3 months (not including target month)
+  const pastMonths: string[] = [];
+  const [yearStr, monthStr] = targetMonthKey.split('-');
+  let y = parseInt(yearStr, 10);
+  let m = parseInt(monthStr, 10);
+  
+  for (let i = 0; i < 3; i++) {
+    m--;
+    if (m === 0) {
+      m = 12;
+      y--;
+    }
+    const mKey = `${y}-${m.toString().padStart(2, '0')}`;
+    pastMonths.push(mKey);
+  }
+
+  // gather all transactions in the target month and the past 3 months
+  const expensesByCat: Record<string, { current: number; m1: number; m2: number; m3: number }> = {};
+  
+  transactions.forEach(tx => {
+    if (tx.type !== 'EXPENSE') return;
+    
+    const txMonth = tx.date.substring(0, 7);
+    
+    // Check if it's the target month or one of the 3 past months
+    let timeIndex = -1;
+    if (txMonth === targetMonthKey) timeIndex = 0; // current
+    else if (txMonth === pastMonths[0]) timeIndex = 1;
+    else if (txMonth === pastMonths[1]) timeIndex = 2;
+    else if (txMonth === pastMonths[2]) timeIndex = 3;
+    
+    if (timeIndex === -1) return;
+
+    const cat = tx.category || 'Uncategorized';
+    if (!expensesByCat[cat]) {
+      expensesByCat[cat] = { current: 0, m1: 0, m2: 0, m3: 0 };
+    }
+
+    const amt = convertCurrency(tx.amount, tx.currency, displayCurrency, usdArsRate, tx.date, transactions);
+    
+    if (timeIndex === 0) expensesByCat[cat].current += amt;
+    else if (timeIndex === 1) expensesByCat[cat].m1 += amt;
+    else if (timeIndex === 2) expensesByCat[cat].m2 += amt;
+    else if (timeIndex === 3) expensesByCat[cat].m3 += amt;
+  });
+
+  const anomalies: CategoryAnomaly[] = [];
+  
+  Object.entries(expensesByCat).forEach(([cat, amounts]) => {
+    // Need at least some history to call it an anomaly
+    const pastSum = amounts.m1 + amounts.m2 + amounts.m3;
+    if (pastSum === 0) return; // brand new category, not an anomaly
+    
+    // Average over 3 months
+    const avg = pastSum / 3;
+    
+    // If average is too small, percentage increases look huge, ignore trivial amounts
+    if (avg < 50) return; // e.g. $50 threshold
+    
+    if (amounts.current > avg * 1.5) { // 50% increase threshold
+      const percentageIncrease = ((amounts.current - avg) / avg) * 100;
+      anomalies.push({
+        category: cat,
+        currentAmount: amounts.current,
+        averageAmount: avg,
+        percentageIncrease,
+      });
+    }
+  });
+
+  // Sort by highest deviation amount (absolute difference)
+  return anomalies.sort((a, b) => (b.currentAmount - b.averageAmount) - (a.currentAmount - a.averageAmount));
+}
+
 

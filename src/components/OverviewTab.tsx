@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
-import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, calculateProjectedBalance, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections, getPendingRecurringForMonth } from '../utils/financeUtils';
+import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, calculateProjectedBalance, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections, getPendingRecurringForMonth, detectFinancialAnomalies, CategoryAnomaly } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Layers, Sparkles, Sliders, Calendar, Zap, FileDown, LineChart as ChartIcon, Upload, Sparkle } from 'lucide-react';
 import { MonthlyCategoryDonut } from './MonthlyCategoryDonut';
@@ -247,6 +247,11 @@ export const OverviewTab = React.memo(function OverviewTab({
     ? (displayedSpending.topCategories[0].amount / displayedSpending.totalExpenses) * 100
     : 0;
 
+  const anomalies = useMemo(() => {
+    if (selectedMonth === 'ALL') return [];
+    return detectFinancialAnomalies(filteredTransactions, displayCurrency, usdArsRate, selectedMonth);
+  }, [filteredTransactions, displayCurrency, usdArsRate, selectedMonth]);
+
   return (
     <div className="space-y-6">
       {/* Month Filter Selector Bar */}
@@ -321,6 +326,21 @@ export const OverviewTab = React.memo(function OverviewTab({
           </button>
         </div>
       </div>
+
+      {/* Financial Anomaly Detector Badge */}
+      {anomalies.length > 0 && selectedMonth !== 'ALL' && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start sm:items-center gap-3">
+          <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5 sm:mt-0" />
+          <div className="flex-1">
+            <h4 className="text-xs sm:text-sm font-bold text-amber-500">Anomaly Detected</h4>
+            <p className="text-[10px] sm:text-xs text-amber-400 mt-0.5">
+              Spending in <span className="font-semibold text-amber-300">{anomalies[0].category}</span> is {anomalies[0].percentageIncrease.toFixed(0)}% higher than your 3-month average.
+              {anomalies.length > 1 && ` (+${anomalies.length - 1} other anomalies)`}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Clickable KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Income Card */}
