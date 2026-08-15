@@ -788,10 +788,10 @@ export const ReportsTab = React.memo(function ReportsTab({
             ) : (
               <>
                 <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20">
-                  {localCurr}: ${Math.round(summaryMetrics.totalIncomeLocal).toLocaleString()}
+                  {localCurr}: {formatCurrency(summaryMetrics.totalIncomeLocal, localCurr as DisplayCurrency)}
                 </span>
                 <span className="px-2 py-0.5 rounded bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/20">
-                  {foreignCurr}: ${Math.round(summaryMetrics.totalIncomeForeign).toLocaleString()}
+                  {foreignCurr}: {formatCurrency(summaryMetrics.totalIncomeForeign, foreignCurr as DisplayCurrency)}
                 </span>
               </>
             )}
@@ -825,10 +825,10 @@ export const ReportsTab = React.memo(function ReportsTab({
             ) : (
               <>
                 <span className="px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/20">
-                  {localCurr}: ${Math.round(summaryMetrics.totalExpenseLocal).toLocaleString()}
+                  {localCurr}: {formatCurrency(summaryMetrics.totalExpenseLocal, localCurr as DisplayCurrency)}
                 </span>
                 <span className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20">
-                  {foreignCurr}: ${Math.round(summaryMetrics.totalExpenseForeign).toLocaleString()}
+                  {foreignCurr}: {formatCurrency(summaryMetrics.totalExpenseForeign, foreignCurr as DisplayCurrency)}
                 </span>
               </>
             )}
