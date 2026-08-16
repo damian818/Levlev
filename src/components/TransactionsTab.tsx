@@ -300,8 +300,8 @@ export const TransactionsTab = React.memo(function TransactionsTab({
       let valB: any;
 
       if (sortField === 'date') {
-        valA = new Date(a.date || 0).getTime();
-        valB = new Date(b.date || 0).getTime();
+        valA = new Date(a.timestamp || a.date || 0).getTime();
+        valB = new Date(b.timestamp || b.date || 0).getTime();
       } else if (sortField === 'title') {
         valA = (a.title || '').toLowerCase();
         valB = (b.title || '').toLowerCase();

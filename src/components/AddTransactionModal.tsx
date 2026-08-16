@@ -620,8 +620,10 @@ export function AddTransactionModal({
 
     if (editingTx && onUpdateTransaction && editingTx.id) {
       if (type === 'CC_PAYMENT') {
+        const now = new Date();
         onUpdateTransaction(editingTx.id, {
-          date: new Date(date + 'T12:00:00').toISOString(),
+          date: date, // Assuming date is YYYY-MM-DD
+          timestamp: now.toISOString(),
           title: title || `Pago ${toAccount}`,
           category: 'Tarjetas de Crédito',
           account: account,
@@ -638,10 +640,12 @@ export function AddTransactionModal({
         });
       } else if (type === 'TRANSFER') {
         const parsedReceiveAmt = parseFloat(receiveAmount) || parsedAmount;
+        const now = new Date();
         // In the original, sourceCurrency and destCurrency are used. 
         // We will just use the current account currencies.
         onUpdateTransaction(editingTx.id, {
-          date: new Date(date + 'T12:00:00').toISOString(),
+          date: date,
+          timestamp: now.toISOString(),
           title: title || `Transferencia: ${account} → ${toAccount}`,
           category: category || 'Transferencias',
           account: account,
@@ -653,8 +657,10 @@ export function AddTransactionModal({
           description: description || undefined,
         });
       } else {
+        const now = new Date();
         onUpdateTransaction(editingTx.id, {
-          date: new Date(date + 'T12:00:00').toISOString(),
+          date: date,
+          timestamp: now.toISOString(),
           title: title || (type === 'INCOME' ? 'Income' : 'Expense'),
           category: category || 'General',
           account: account,
@@ -673,9 +679,11 @@ export function AddTransactionModal({
     }
 
     if (type === 'CC_PAYMENT') {
+      const now = new Date();
       const paymentTx: Transaction = {
         id: `manual-ccpay-${Date.now()}`,
-        date: new Date(date + 'T12:00:00').toISOString(),
+        date: date,
+        timestamp: now.toISOString(),
         title: title || `Pago ${toAccount}`,
         category: 'Tarjetas de Crédito',
         account: account,
@@ -693,9 +701,11 @@ export function AddTransactionModal({
       onAddTransaction(paymentTx);
     } else if (type === 'TRANSFER') {
       const parsedReceiveAmt = parseFloat(receiveAmount) || parsedAmount;
+      const now = new Date();
       const transferTx: Transaction = {
         id: `manual-transfer-${Date.now()}`,
-        date: new Date(date + 'T12:00:00').toISOString(),
+        date: date,
+        timestamp: now.toISOString(),
         title: title || `Transferencia: ${account} → ${toAccount}`,
         category: category || 'Transferencias',
         account: account,
@@ -714,9 +724,11 @@ export function AddTransactionModal({
       // EXPENSE or INCOME
       if (type === 'EXPENSE' && isCC && numInstallments > 1 && installmentSchedule.length > 0) {
         // Create multiple installment transactions
+        const now = new Date();
         const txList: Transaction[] = installmentSchedule.map((cuota, idx) => ({
           id: `manual-${Date.now()}-${idx + 1}`,
-          date: new Date(`${cuota.instTxDate}T12:00:00`).toISOString(),
+          date: cuota.instTxDate,
+          timestamp: now.toISOString(),
           title: title || 'Expense',
           category: category || 'General',
           account: account,
@@ -732,9 +744,11 @@ export function AddTransactionModal({
         }));
         onAddTransaction(txList);
       } else {
+        const now = new Date();
         const newTx: Transaction = {
           id: `manual-${Date.now()}`,
-          date: new Date(date + 'T12:00:00').toISOString(),
+          date: date,
+          timestamp: now.toISOString(),
           title: title || (type === 'INCOME' ? 'Income' : 'Expense'),
           category: category || 'General',
           account: account,

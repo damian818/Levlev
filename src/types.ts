@@ -2,6 +2,7 @@ export interface Transaction {
   id: string;
   ownerId?: string;
   date: string;
+  timestamp?: string; // ISO 8601 string for ordering
   title: string;
   category: string;
   account: string;
