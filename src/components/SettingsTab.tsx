@@ -102,6 +102,9 @@ interface SettingsTabProps {
   onOpenImportModal?: () => void;
   onRecalculateBalances?: () => void;
   onLogout: () => void;
+  notificationsEnabled?: boolean;
+  onToggleNotifications?: () => void;
+  requestNotificationPermission?: () => Promise<boolean>;
 }
 
 export function SettingsTab({
@@ -139,6 +142,9 @@ export function SettingsTab({
   onOpenImportModal,
   onRecalculateBalances,
   onLogout,
+  notificationsEnabled = false,
+  onToggleNotifications,
+  requestNotificationPermission,
 }: SettingsTabProps) {
   const { t, i18n } = useTranslation();
   const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'categories' | 'preferences' | 'sharing'>('accounts');
@@ -769,6 +775,35 @@ export function SettingsTab({
       {activeSubTab === 'preferences' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
+          {/* Regional & Language Settings Box */}
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 space-y-4 md:col-span-2 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">Notifications</h3>
+                <p className="text-xs text-slate-400">Manage alerts and notifications.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={async () => {
+                   if (!notificationsEnabled && requestNotificationPermission) {
+                     const granted = await requestNotificationPermission();
+                     if (granted && onToggleNotifications) onToggleNotifications();
+                   } else if (onToggleNotifications) {
+                     onToggleNotifications();
+                   }
+                }}
+                className={`w-12 h-6 rounded-full transition-colors ${notificationsEnabled ? 'bg-indigo-600' : 'bg-slate-700'}`}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white transition-transform ${notificationsEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
+              </button>
+              <span className="text-xs text-slate-300">Enable automated notifications for anomalies and budget alerts.</span>
+            </div>
+          </div>
+
           {/* Regional & Language Settings Box */}
           <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 space-y-4 md:col-span-2 shadow-sm">
             <div className="flex items-center gap-3">

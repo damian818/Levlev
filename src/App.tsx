@@ -7,7 +7,8 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember, RecurringRule } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
-import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount } from './utils/financeUtils';
+import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount, detectFinancialAnomalies, getPendingRecurringForMonth, getCurrentMonthKey } from './utils/financeUtils';
+import { useBrowserNotifications } from './hooks/useBrowserNotifications';
 import { initializeGlobalFxRates } from './utils/currencyUtils';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
 import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase } from './services/supabaseSync';
@@ -63,6 +64,15 @@ export default function App() {
       return localStorage.getItem('finance_app_user_timezone') || 'America/Argentina/Buenos_Aires';
     } catch (e) {
       return 'America/Argentina/Buenos_Aires';
+    }
+  });
+
+  const { permission, requestPermission, sendNotification } = useBrowserNotifications();
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('finance_app_notifications_enabled') === 'true';
+    } catch {
+      return false;
     }
   });
 
@@ -169,17 +179,8 @@ export default function App() {
     }
   }, [accounts]);
 
-  // Sync general workspace sharing to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('finance_app_workspace_is_shared', String(isWorkspaceShared));
-      localStorage.setItem('finance_app_workspace_members', JSON.stringify(workspaceMembers));
-      localStorage.setItem('finance_app_show_shared_data', String(showSharedData));
-      localStorage.setItem('finance_app_user_timezone', userTimezone);
-    } catch (e) {
-      console.warn('Failed to save workspace sharing state to localStorage');
-    }
-  }, [isWorkspaceShared, workspaceMembers, showSharedData, userTimezone]);
+  // Trigger notifications
+  // (Moved to after recurringRules declaration)
 
   const handleUpdateWorkspaceSharing = (isShared: boolean, members: SharedMember[]) => {
     setIsWorkspaceShared(isShared);
@@ -732,6 +733,48 @@ export default function App() {
     }
   });
 
+  // Trigger notifications
+  useEffect(() => {
+    if (!notificationsEnabled || permission !== 'granted') return;
+
+    // Check anomalies
+    const anomalies = detectFinancialAnomalies(transactions, displayCurrency, 1, 'ALL');
+    anomalies.forEach(anomaly => {
+        const key = `notified_anomaly_${anomaly.category}`;
+        if (!localStorage.getItem(key)) {
+            sendNotification('Anomaly Detected', `Category "${anomaly.category}" has unusual spending.`);
+            localStorage.setItem(key, 'true');
+        }
+    });
+
+    // Check budget caps
+    budgets.forEach(budget => {
+        const spent = transactions
+            .filter(t => t.category === budget.category)
+            .reduce((sum, t) => sum + t.amount, 0);
+        
+        if (spent > budget.monthlyLimitARS * 0.9) {
+            const key = `notified_budget_${budget.category}`;
+            if (!localStorage.getItem(key)) {
+                sendNotification('Budget Alert', `You have spent over 90% of your ${budget.category} budget.`);
+                localStorage.setItem(key, 'true');
+            }
+        }
+    });
+    
+    // Check pending recurring
+    const currentMonthKey = getCurrentMonthKey();
+    const pendingResult = getPendingRecurringForMonth(currentMonthKey, transactions, recurringRules);
+    pendingResult.pendingItems.forEach(item => {
+        const key = `notified_recurring_${item.title}_${currentMonthKey}`;
+        if (!localStorage.getItem(key)) {
+             sendNotification('Missed Expense', `Expected recurring payment for "${item.title}" hasn't been recorded yet.`);
+             localStorage.setItem(key, 'true');
+        }
+    });
+    
+  }, [transactions, budgets, recurringRules, notificationsEnabled, permission]);
+
   const handleSaveRecurringThreshold = (title: string, threshold: number) => {
     setRecurringThresholds(prev => {
       const next = { ...prev, [title.toLowerCase().trim()]: threshold };
@@ -1196,6 +1239,13 @@ export default function App() {
               onUpdateLocalCurrency={setLocalCurrency}
               enabledCurrencies={enabledCurrencies}
               onUpdateEnabledCurrencies={setEnabledCurrencies}
+              notificationsEnabled={notificationsEnabled}
+              onToggleNotifications={() => {
+                const newValue = !notificationsEnabled;
+                setNotificationsEnabled(newValue);
+                localStorage.setItem('finance_app_notifications_enabled', String(newValue));
+              }}
+              requestNotificationPermission={requestPermission}
             />
           )}
         </Suspense>
