@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
-import { analyzeSpending, formatCurrency, computeAccountBalances, computePredictiveTrend, calculateProjectedBalance, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections, getPendingRecurringForMonth, detectFinancialAnomalies, detectRecurringItems, detectRecurringThresholdAlerts } from '../utils/financeUtils';
+import { analyzeSpending, formatCurrency, convertCurrency, computeAccountBalances, computePredictiveTrend, calculateProjectedBalance, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections, getPendingRecurringForMonth, detectFinancialAnomalies, detectRecurringItems, detectRecurringThresholdAlerts } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, AreaChart, Area } from 'recharts';
 import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Sparkles, Sliders, Calendar, Zap, FileDown, Upload, Sparkle, ShoppingBag, Coffee, Car, Film, ChevronDown, ChevronUp } from 'lucide-react';
 import { MonthlyCategoryDonut } from './MonthlyCategoryDonut';
@@ -700,6 +700,19 @@ export const OverviewTab = React.memo(function OverviewTab({
             <div className="space-y-2">
               {recentTransactions.map((tx) => {
                 const isExpense = tx.type === 'EXPENSE';
+                const txCurr = (tx.currency || 'USD').toUpperCase();
+                const dispCurr = (displayCurrency || 'USD').toUpperCase();
+                const isDifferentCurrency = txCurr !== dispCurr;
+                const convertedAmount = convertCurrency(
+                  tx.amount,
+                  tx.currency,
+                  displayCurrency,
+                  usdArsRate,
+                  tx.date,
+                  transactions,
+                  historyData
+                );
+
                 return (
                   <div
                     key={tx.id}
@@ -711,17 +724,29 @@ export const OverviewTab = React.memo(function OverviewTab({
                         {getMerchantIcon(tx.description || tx.title || '', tx.category)}
                       </div>
                       <div className="truncate">
-                        <p className="font-bold text-slate-200 group-hover:text-emerald-400 transition-colors truncate">
-                          {tx.description || tx.title || tx.category || 'Transaction'}
-                        </p>
+                        <div className="flex items-center gap-1.5 truncate">
+                          <p className="font-bold text-slate-200 group-hover:text-emerald-400 transition-colors truncate">
+                            {tx.description || tx.title || tx.category || 'Transaction'}
+                          </p>
+                          {tx.currency && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[#1c2436] text-slate-300 border border-slate-700/60 shrink-0 font-mono">
+                              {tx.currency}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-slate-400">{tx.date} • {tx.account || 'Account'}</p>
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0 font-mono font-bold">
+                    <div className="text-right shrink-0 font-mono font-bold flex flex-col items-end">
                       <span className={isExpense ? 'text-rose-400' : 'text-emerald-400'}>
-                        {isExpense ? '-' : '+'}{formatCurrency(tx.amount, tx.currency as DisplayCurrency)}
+                        {isExpense ? '-' : '+'}{formatCurrency(convertedAmount, displayCurrency)}
                       </span>
+                      {isDifferentCurrency && (
+                        <span className="text-[10px] font-normal text-slate-400">
+                          ({tx.currency} {formatCurrency(tx.amount, tx.currency as DisplayCurrency)})
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

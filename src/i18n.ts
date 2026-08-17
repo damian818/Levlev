@@ -156,6 +156,9 @@ export const resources = {
         reassigned: 'Reassigned',
         save_installments: 'Save Installments',
         general: 'General',
+        show: 'Show',
+        hide: 'Hide',
+        hidden: 'Hidden',
       },
         overview: {
         total_net_worth: 'Total Net Worth',
@@ -970,6 +973,9 @@ export const resources = {
         reassigned: 'Reasignado',
         save_installments: 'Guardar Cuotas',
         general: 'General',
+        show: 'Mostrar',
+        hide: 'Ocultar',
+        hidden: 'Oculto',
       },
       overview: {
         total_net_worth: 'Patrimonio Neto Total',
