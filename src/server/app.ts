@@ -379,6 +379,110 @@ Format your response in clean markdown.`;
   }
 });
 
+app.post(["/api/ai-budget-optimization", "/ai-budget-optimization"], async (req, res) => {
+  try {
+    const { topCategories, totalSpent30Days, displayCurrency = 'USD', language = 'en' } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      // Return smart fallback suggestions if no key is configured
+      const fallbackSuggestions = (topCategories || []).map((cat: any) => ({
+        category: cat.category,
+        suggestion: `Spending in ${cat.category} reached ${displayCurrency} ${Math.round(cat.totalSpent || 0)} over the last 30 days across ${cat.transactionCount || 1} transactions. Consider auditing recurring charges and setting a strict weekly sub-limit.`,
+        actionItem: `Audit top merchants (${(cat.topMerchants || []).map((m: any) => m.merchant).slice(0, 2).join(', ') || 'transactions'}) and target a 10% reduction next month.`,
+        potentialSavings: "10-15%",
+        impact: cat.percentageOfTotal > 30 ? "HIGH" : cat.percentageOfTotal > 15 ? "MEDIUM" : "LOW"
+      }));
+
+      return res.json({
+        suggestions: fallbackSuggestions,
+        overallTakeaway: "Targeting your highest 2-3 spending categories can free up substantial monthly cash flow.",
+        isFallback: true
+      });
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+
+    const isSpanish = language === 'es' || language?.startsWith('es');
+
+    const prompt = `You are a world-class personal finance and budget optimization advisor.
+Analyze the user's top spending categories over the last 30 days and provide brief, highly actionable, realistic suggestions for each category to optimize their budget and eliminate waste.
+
+DATA (LAST 30 DAYS):
+- Total Spent: ${displayCurrency} ${Math.round(totalSpent30Days || 0)}
+- Top Categories: ${JSON.stringify(topCategories, null, 2)}
+
+INSTRUCTIONS:
+1. For EACH category in the list, write a concise (1-2 sentences), razor-sharp suggestion explaining where spending can be optimized without unnecessary sacrifice.
+2. Provide a single concrete "actionItem" (e.g. "Switch to bi-weekly meal prep", "Review duplicate streaming subscriptions", "Negotiate monthly telecom plan").
+3. Estimate realistic "potentialSavings" (e.g. "8-12%", "15-20%").
+4. Assign an "impact" ('HIGH', 'MEDIUM', or 'LOW').
+5. Include a 1-sentence "overallTakeaway".
+
+CRITICAL LANGUAGE REQUIREMENT:
+You MUST respond strictly in ${isSpanish ? 'SPANISH (Español)' : 'ENGLISH'}. All suggestion texts, action items, and takeaways must be natural and fluent in ${isSpanish ? 'Spanish' : 'English'}.
+
+Respond ONLY with valid JSON in this exact structure:
+{
+  "suggestions": [
+    {
+      "category": "Category Name",
+      "suggestion": "Brief actionable suggestion...",
+      "actionItem": "Concrete next step...",
+      "potentialSavings": "10-15%",
+      "impact": "HIGH"
+    }
+  ],
+  "overallTakeaway": "1 sentence overall summary"
+}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.7-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.3,
+      }
+    });
+
+    const text = response.text?.trim() || "{}";
+    try {
+      const parsed = JSON.parse(text);
+      res.json(parsed);
+    } catch (parseError) {
+      console.warn("Failed to parse Gemini response as JSON, returning formatted fallback:", text);
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const retryParsed = JSON.parse(cleaned);
+      res.json(retryParsed);
+    }
+  } catch (error: any) {
+    console.error("AI Budget Optimization Error:", error);
+    // Provide graceful fallback
+    const { topCategories, displayCurrency = 'USD' } = req.body || {};
+    const fallbackSuggestions = (topCategories || []).map((cat: any) => ({
+      category: cat.category,
+      suggestion: `Review top transactions in ${cat.category} (${displayCurrency} ${Math.round(cat.totalSpent || 0)} in last 30 days) to identify discretionary or avoidable charges.`,
+      actionItem: `Set a weekly cap and review transactions in ${cat.category}.`,
+      potentialSavings: "10%",
+      impact: cat.percentageOfTotal > 25 ? "HIGH" : "MEDIUM"
+    }));
+
+    res.json({
+      suggestions: fallbackSuggestions,
+      overallTakeaway: "Optimizing top spending areas helps maintain healthy financial margins.",
+      isFallback: true,
+      error: error?.message
+    });
+  }
+});
+
 app.post(["/api/ai-parse-tx", "/ai-parse-tx"], async (req, res) => {
   try {
     const { text, accounts, categories } = req.body;

@@ -2434,5 +2434,193 @@ export function detectRecurringThresholdAlerts(
   return alerts.sort((a, b) => b.deviationPercent - a.deviationPercent);
 }
 
+export interface CategoryVelocityPrediction {
+  category: string;
+  monthlyLimit: number;
+  currentSpent: number;
+  dailyVelocity: number;
+  projectedSpending: number;
+  projectedOverrun: number;
+  projectedPercentage: number;
+  willExceed: boolean;
+  daysPassed: number;
+  daysRemaining: number;
+  totalDays: number;
+  exceedsByDay?: number;
+}
+
+/**
+ * Predicts if a category will exceed its monthly limit based on current daily spending velocity.
+ */
+export function predictCategoryBudgetVelocity(
+  category: string,
+  monthlyLimit: number,
+  transactions: Transaction[],
+  displayCurrency: DisplayCurrency,
+  usdArsRate: number,
+  targetMonthKey?: string
+): CategoryVelocityPrediction {
+  const currentKey = getCurrentMonthKey();
+  const monthToEvaluate = targetMonthKey && targetMonthKey !== 'ALL' ? targetMonthKey : currentKey;
+
+  const now = new Date();
+  const year = parseInt(monthToEvaluate.substring(0, 4), 10) || now.getFullYear();
+  const monthIndex = (parseInt(monthToEvaluate.substring(5, 7), 10) || (now.getMonth() + 1)) - 1;
+  const totalDays = new Date(year, monthIndex + 1, 0).getDate();
+
+  const isCurrentMonth = monthToEvaluate === currentKey;
+  const isPastMonth = monthToEvaluate < currentKey;
+
+  let daysPassed = 1;
+  if (isCurrentMonth) {
+    daysPassed = Math.min(totalDays, Math.max(1, now.getDate()));
+  } else if (isPastMonth) {
+    daysPassed = totalDays;
+  } else {
+    daysPassed = 1;
+  }
+
+  const daysRemaining = Math.max(0, totalDays - daysPassed);
+
+  // Calculate actual spending in this category for this month
+  let currentSpent = 0;
+  transactions.forEach(tx => {
+    if (tx.type !== 'EXPENSE') return;
+    if (tx.category !== category) return;
+    if (!tx.date || !tx.date.startsWith(monthToEvaluate)) return;
+
+    // Ignore future transactions if evaluating current month
+    if (isCurrentMonth && tx.date > getTodayString()) return;
+
+    const amt = convertCurrency(tx.amount, tx.currency, displayCurrency, usdArsRate, tx.date, transactions);
+    currentSpent += amt;
+  });
+
+  const dailyVelocity = daysPassed > 0 ? currentSpent / daysPassed : 0;
+
+  const projectedSpending = isPastMonth
+    ? currentSpent
+    : currentSpent + (dailyVelocity * daysRemaining);
+
+  const projectedOverrun = Math.max(0, projectedSpending - monthlyLimit);
+  const projectedPercentage = monthlyLimit > 0 ? (projectedSpending / monthlyLimit) * 100 : 0;
+  const willExceed = monthlyLimit > 0 && (projectedSpending > monthlyLimit || currentSpent > monthlyLimit);
+
+  let exceedsByDay: number | undefined = undefined;
+  if (monthlyLimit > 0 && dailyVelocity > 0) {
+    const day = Math.ceil(monthlyLimit / dailyVelocity);
+    if (day <= totalDays) {
+      exceedsByDay = day;
+    }
+  }
+
+  return {
+    category,
+    monthlyLimit,
+    currentSpent,
+    dailyVelocity,
+    projectedSpending,
+    projectedOverrun,
+    projectedPercentage,
+    willExceed,
+    daysPassed,
+    daysRemaining,
+    totalDays,
+    exceedsByDay,
+  };
+}
+
+export interface RecentSpendingCategory {
+  category: string;
+  totalSpent: number;
+  transactionCount: number;
+  avgPerTx: number;
+  percentageOfTotal: number;
+  topMerchants: { merchant: string; amount: number; count: number }[];
+  dailyAvg: number;
+}
+
+/**
+ * Analyzes top spending categories in the last 30 days for AI budget optimization.
+ */
+export function getTopSpendingCategoriesLast30Days(
+  transactions: Transaction[],
+  displayCurrency: DisplayCurrency,
+  usdArsRate: number,
+  limit: number = 5
+): {
+  categories: RecentSpendingCategory[];
+  totalSpent30Days: number;
+  startDate: string;
+  endDate: string;
+} {
+  const today = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(today.getDate() - 30);
+
+  const startDateStr = thirtyDaysAgo.toISOString().substring(0, 10);
+  const endDateStr = today.toISOString().substring(0, 10);
+
+  const categoryMap: Record<string, {
+    total: number;
+    count: number;
+    merchants: Record<string, { amount: number; count: number }>;
+  }> = {};
+
+  let totalSpent30Days = 0;
+
+  transactions.forEach(tx => {
+    if (tx.type !== 'EXPENSE') return;
+    const txDate = tx.date ? tx.date.substring(0, 10) : '';
+    if (!txDate || txDate < startDateStr || txDate > endDateStr) return;
+
+    const converted = convertCurrency(tx.amount, tx.currency, displayCurrency, usdArsRate, tx.date, transactions);
+    const cat = tx.category || 'General';
+    const merch = tx.title || tx.description || 'Unknown';
+
+    if (!categoryMap[cat]) {
+      categoryMap[cat] = { total: 0, count: 0, merchants: {} };
+    }
+
+    categoryMap[cat].total += converted;
+    categoryMap[cat].count += 1;
+    totalSpent30Days += converted;
+
+    if (!categoryMap[cat].merchants[merch]) {
+      categoryMap[cat].merchants[merch] = { amount: 0, count: 0 };
+    }
+    categoryMap[cat].merchants[merch].amount += converted;
+    categoryMap[cat].merchants[merch].count += 1;
+  });
+
+  const categories: RecentSpendingCategory[] = Object.keys(categoryMap)
+    .map(cat => {
+      const data = categoryMap[cat];
+      const topMerchants = Object.keys(data.merchants)
+        .map(m => ({ merchant: m, amount: data.merchants[m].amount, count: data.merchants[m].count }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 3);
+
+      return {
+        category: cat,
+        totalSpent: data.total,
+        transactionCount: data.count,
+        avgPerTx: data.count > 0 ? data.total / data.count : 0,
+        percentageOfTotal: totalSpent30Days > 0 ? (data.total / totalSpent30Days) * 100 : 0,
+        topMerchants,
+        dailyAvg: data.total / 30,
+      };
+    })
+    .sort((a, b) => b.totalSpent - a.totalSpent)
+    .slice(0, limit);
+
+  return {
+    categories,
+    totalSpent30Days,
+    startDate: startDateStr,
+    endDate: endDateStr,
+  };
+}
+
 
 

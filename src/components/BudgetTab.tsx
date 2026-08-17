@@ -1,9 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, BudgetGoal, DisplayCurrency, InflationPoint, TransactionFilter } from '../types';
-import { analyzeSpending, formatCurrency, convertCurrency, deriveBudgetsFromTransactions, deriveSmartBudgets, getLatestMonth, getCurrentMonthKey, getDefaultSelectedMonth } from '../utils/financeUtils';
-import { Target, AlertTriangle, CheckCircle2, Plus, Calendar, RefreshCw, Sparkles, ChevronRight, ExternalLink, Tag, Layers, TrendingDown, Wallet2 } from 'lucide-react';
+import { 
+  analyzeSpending, 
+  formatCurrency, 
+  convertCurrency, 
+  deriveBudgetsFromTransactions, 
+  deriveSmartBudgets, 
+  getLatestMonth, 
+  getCurrentMonthKey, 
+  getDefaultSelectedMonth,
+  predictCategoryBudgetVelocity
+} from '../utils/financeUtils';
+import { Target, AlertTriangle, CheckCircle2, Plus, Calendar, RefreshCw, Sparkles, ChevronRight, ExternalLink, Tag, Layers, TrendingDown, TrendingUp, Wallet2, Flame } from 'lucide-react';
 import { CategoryTransactionsModal } from './CategoryTransactionsModal';
+import { CircularBudgetGauge } from './CircularBudgetGauge';
+import { BudgetOptimizationSuggestions } from './BudgetOptimizationSuggestions';
 
 interface BudgetTabProps {
   transactions: Transaction[];
@@ -229,30 +241,40 @@ export function BudgetTab({
             </span>
           </div>
 
-          <div className="p-4 bg-[#111622] border border-slate-800/90 rounded-2xl shadow-xs flex flex-col justify-between">
+          <div className="p-4 bg-[#111622] border border-slate-800/90 rounded-2xl shadow-xs flex items-center justify-between">
             <div>
-              <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-1.5">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   {t('budget.status')}
                 </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isOverallOver ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
-                  {isOverallOver ? t('budget.exceeded') : t('budget.on_track')}
-                </span>
               </div>
-              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mt-3">
-                <div
-                  className={`h-full rounded-full transition-all duration-300 ${
-                    isOverallOver ? 'bg-rose-500' : overallPercentage > 85 ? 'bg-amber-500' : 'bg-emerald-400'
-                  }`}
-                  style={{ width: `${Math.min(overallPercentage, 100)}%` }}
-                />
-              </div>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 ${isOverallOver ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                {isOverallOver ? t('budget.exceeded') : t('budget.on_track')}
+              </span>
+              <span className="text-[10px] text-slate-500 block mt-1">
+                {formatCurrency(totalRemaining, displayCurrency)} {t('budget.capacity_remaining')}
+              </span>
             </div>
-            <span className="text-[10px] text-slate-400 mt-2 block">
-              {overallPercentage.toFixed(1)}% of total allocated budget
-            </span>
+
+            <div className="shrink-0">
+              <CircularBudgetGauge
+                percentage={overallPercentage}
+                size={52}
+                strokeWidth={5}
+                isOver={isOverallOver}
+              />
+            </div>
           </div>
         </div>
+      )}
+
+      {/* AI 30-Day Spending Optimization Suggestions */}
+      {transactions.length > 0 && (
+        <BudgetOptimizationSuggestions
+          transactions={transactions}
+          displayCurrency={displayCurrency}
+          usdArsRate={usdArsRate}
+        />
       )}
 
       {budgetList.length === 0 ? (
@@ -289,7 +311,20 @@ export function BudgetTab({
             const limitConverted = convertCurrency(budget.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
             const percentage = limitConverted > 0 ? (categorySpent / limitConverted) * 100 : 0;
             const isOver = percentage > 100;
+            const remainingCapacity = Math.max(limitConverted - categorySpent, 0);
             const txCount = categoryTransactionCounts[budget.category] || 0;
+
+            // Velocity prediction helper calculation
+            const velocityPred = predictCategoryBudgetVelocity(
+              budget.category,
+              limitConverted,
+              transactions,
+              displayCurrency,
+              usdArsRate,
+              selectedMonth
+            );
+
+            const showVelocityWarning = velocityPred.willExceed && !isOver && selectedMonth === currentMonthKey;
 
             return (
               <div 
@@ -299,28 +334,57 @@ export function BudgetTab({
                     setInspectingCategory(budget.category);
                   }
                 }}
-                className={`p-5 rounded-2xl border transition-all duration-200 space-y-3 relative group bg-[#111622] border-slate-800/90 shadow-sm ${!isEditing ? 'hover:border-slate-700 hover:bg-[#141b2a] cursor-pointer' : ''}`}
+                className={`p-5 rounded-2xl border transition-all duration-200 space-y-3.5 relative group bg-[#111622] border-slate-800/90 shadow-sm ${!isEditing ? 'hover:border-slate-700 hover:bg-[#141b2a] cursor-pointer' : ''}`}
                 title={!isEditing ? (t('budget.click_to_inspect') || 'Click to view category transaction details') : undefined}
               >
-                {/* Header */}
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-2.5">
-                    <div className={`p-2 rounded-xl border ${isOver ? 'bg-rose-950/80 border-rose-800/50 text-rose-400' : 'bg-[#182133] border-slate-700/80 text-emerald-400'}`}>
-                      {isOver ? <AlertTriangle className="w-4 h-4" /> : <Tag className="w-4 h-4" />}
+                {/* Header Row: Category, Badges, Circular Gauge */}
+                <div className="flex justify-between items-start gap-3">
+                  <div className="flex items-start space-x-3">
+                    {/* Circular Progress Gauge */}
+                    <div className="shrink-0 mt-0.5">
+                      <CircularBudgetGauge
+                        percentage={percentage}
+                        size={46}
+                        strokeWidth={4.5}
+                        isOver={isOver}
+                      />
                     </div>
+
                     <div>
-                      <h4 className="text-sm font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                        {budget.category}
-                      </h4>
-                      <span className="text-[10px] text-slate-400">
-                        {txCount} {t('budget.tx_count_label', { count: txCount })}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <h4 className="text-sm font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">
+                          {budget.category}
+                        </h4>
+                        
+                        {/* Subtle Pace Warning Icon */}
+                        {showVelocityWarning && (
+                          <div 
+                            className="flex items-center space-x-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-semibold cursor-help"
+                            title={t('budget.velocity_warning', {
+                              overrun: formatCurrency(velocityPred.projectedOverrun, displayCurrency),
+                              percent: Math.round(velocityPred.projectedPercentage),
+                              rate: formatCurrency(velocityPred.dailyVelocity, displayCurrency)
+                            })}
+                          >
+                            <Flame className="w-3 h-3 text-amber-400 animate-pulse" />
+                            <span>Pace Risk</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center space-x-2 text-[10px] text-slate-400 mt-0.5">
+                        <span>{txCount} {t('budget.tx_count_label', { count: txCount })}</span>
+                        <span>•</span>
+                        <span>{percentage.toFixed(0)}% {t('budget.capacity_utilized')}</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 shrink-0">
                     {isOver ? (
                       <span className="px-2 py-0.5 bg-rose-950/80 border border-rose-800/50 text-rose-300 text-[10px] font-bold rounded-lg">{t('budget.over')}</span>
+                    ) : showVelocityWarning ? (
+                      <span className="px-2 py-0.5 bg-amber-950/80 border border-amber-800/50 text-amber-300 text-[10px] font-bold rounded-lg">{t('budget.warning')}</span>
                     ) : (
                       <span className="px-2 py-0.5 bg-emerald-950/80 border border-emerald-800/50 text-emerald-300 text-[10px] font-bold rounded-lg">{t('budget.on_track')}</span>
                     )}
@@ -345,9 +409,9 @@ export function BudgetTab({
                 </div>
 
                 {/* Spending Numbers */}
-                <div className="flex justify-between items-baseline text-xs">
+                <div className="flex justify-between items-baseline text-xs pt-1">
                   <span className="text-slate-400">
-                    {t('budget.spent')} ({selectedMonth === 'ALL' ? t('budget.all_time') : selectedMonth}): <strong className="text-slate-100 font-mono">{formatCurrency(categorySpent, displayCurrency)}</strong>
+                    {t('budget.spent')}: <strong className="text-slate-100 font-mono">{formatCurrency(categorySpent, displayCurrency)}</strong>
                   </span>
                   {isEditing ? (
                     <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
@@ -367,16 +431,42 @@ export function BudgetTab({
                 </div>
 
                 {/* Progress bar */}
-                <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-300 ${isOver ? 'bg-rose-500' : percentage > 85 ? 'bg-amber-500' : 'bg-emerald-400'}`}
+                    className={`h-full rounded-full transition-all duration-300 ${isOver ? 'bg-rose-500' : showVelocityWarning ? 'bg-amber-500' : percentage > 85 ? 'bg-amber-400' : 'bg-emerald-400'}`}
                     style={{ width: `${Math.min(percentage, 100)}%` }}
                   />
                 </div>
 
-                {/* Bottom Row with remaining & quick view transactions link */}
-                <div className="flex justify-between items-center text-[11px] text-slate-400 pt-1">
-                  <span>{percentage.toFixed(1)}% {t('budget.used')}</span>
+                {/* Velocity Warning Banner (Subtle and informative) */}
+                {showVelocityWarning && (
+                  <div className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-800/40 text-[11px] text-amber-200 flex items-start space-x-2">
+                    <TrendingUp className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-amber-300">
+                        {t('budget.velocity_forecast')}:
+                      </span>{' '}
+                      <span>
+                        {t('budget.velocity_warning', {
+                          overrun: formatCurrency(velocityPred.projectedOverrun, displayCurrency),
+                          percent: Math.round(velocityPred.projectedPercentage),
+                          rate: formatCurrency(velocityPred.dailyVelocity, displayCurrency)
+                        })}
+                      </span>
+                      {velocityPred.exceedsByDay && (
+                        <span className="block text-[10px] text-amber-400 font-medium mt-0.5">
+                          {t('budget.velocity_breach_day', { day: velocityPred.exceedsByDay })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Bottom Row: Remaining capacity & Inspect link */}
+                <div className="flex justify-between items-center text-[11px] text-slate-400 pt-0.5">
+                  <span>
+                    {t('budget.remaining')}: <strong className={`font-mono ${isOver ? 'text-rose-400' : 'text-emerald-400'}`}>{formatCurrency(remainingCapacity, displayCurrency)}</strong>
+                  </span>
 
                   {!isEditing ? (
                     <button
@@ -390,7 +480,7 @@ export function BudgetTab({
                       <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                     </button>
                   ) : (
-                    <span>{t('budget.remaining')}: {formatCurrency(Math.max(limitConverted - categorySpent, 0), displayCurrency)}</span>
+                    <span>{percentage.toFixed(1)}% {t('budget.capacity_utilized')}</span>
                   )}
                 </div>
               </div>
@@ -418,4 +508,5 @@ export function BudgetTab({
     </div>
   );
 }
+
 
