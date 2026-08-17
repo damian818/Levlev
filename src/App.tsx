@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember, RecurringRule } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
@@ -440,6 +440,83 @@ export default function App() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [historyData, setHistoryData] = useState<InflationPoint[]>(historicalInflationAndFX);
+  const hasHandledShareRef = useRef(false);
+  const lastAddedTxRef = useRef<{ txHash: string; time: number } | null>(null);
+
+  // Parse incoming data from Web Share Target API
+  useEffect(() => {
+    if (hasHandledShareRef.current) return;
+    const handleSharedData = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const title = params.get('title');
+        const text = params.get('text');
+        const url = params.get('url');
+
+        if (title || text || url) {
+          hasHandledShareRef.current = true;
+          const sharedText = [title, text, url].filter(Boolean).join(' - ');
+          
+          // Show the modal immediately with the text as title as a fallback
+          setEditingTransaction({
+            id: '',
+            title: sharedText,
+            amount: 0,
+            date: new Date().toISOString().substring(0, 10),
+            type: 'EXPENSE',
+            category: 'General',
+            account: accounts[0]?.name || 'BBVA',
+            currency: 'ARS',
+            timestamp: new Date().toISOString()
+          } as Transaction);
+          setIsAddModalOpen(true);
+          
+          // Try to use AI to parse it in the background
+          try {
+            const accNames = accounts.map(a => a.name);
+            const catNames = categories.map(c => c.name);
+            const res = await fetch('/api/ai-parse-tx', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: sharedText, accounts: accNames, categories: catNames })
+            });
+            if (res.ok) {
+              const parsed = await res.json();
+              setEditingTransaction(prev => ({
+                ...(prev || {} as Transaction),
+                id: '',
+                title: parsed.title || sharedText,
+                amount: parsed.amount || 0,
+                type: parsed.type || 'EXPENSE',
+                category: parsed.category || 'General',
+                account: parsed.account || accounts[0]?.name || 'BBVA',
+                currency: parsed.currency || 'ARS',
+                date: parsed.date || new Date().toISOString().substring(0, 10),
+              }));
+            }
+          } catch (apiErr) {
+            console.warn('AI parsing failed, falling back to basic parsing', apiErr);
+            // Fallback parsing
+            let guessedAmount = 0;
+            const amountMatch = sharedText.match(/(?:\$|ARS|USD)?\s*(\d+(?:[.,]\d{1,2})?)/);
+            if (amountMatch && amountMatch[1]) {
+              guessedAmount = parseFloat(amountMatch[1].replace(',', '.'));
+            }
+            setEditingTransaction(prev => ({
+              ...(prev || {} as Transaction),
+              amount: guessedAmount || 0,
+            }));
+          }
+
+          // Clean URL to prevent re-opening on reload
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (e) {
+        console.warn('Error handling share target params', e);
+      }
+    };
+    handleSharedData();
+  }, [accounts, categories]);
 
   // Sync transactions to localStorage on update
   useEffect(() => {
@@ -1040,11 +1117,33 @@ export default function App() {
   };
 
   const handleAddTransaction = (newTx: Transaction | Transaction[]) => {
-    if (Array.isArray(newTx)) {
-      setTransactions(prev => [...newTx, ...prev]);
-    } else {
-      setTransactions(prev => [newTx, ...prev]);
+    const txArray = Array.isArray(newTx) ? newTx : [newTx];
+    if (txArray.length === 0) return;
+
+    const now = Date.now();
+    // Guard against rapid duplicate submission of identical transactions
+    const firstTx = txArray[0];
+    const txHash = `${firstTx.title}|${firstTx.amount}|${firstTx.date}|${firstTx.account}|${firstTx.type}|${firstTx.currency}`;
+    if (
+      lastAddedTxRef.current &&
+      lastAddedTxRef.current.txHash === txHash &&
+      now - lastAddedTxRef.current.time < 2500
+    ) {
+      console.warn('Blocked rapid duplicate transaction submission:', txHash);
+      return;
     }
+    lastAddedTxRef.current = { txHash, time: now };
+
+    setTransactions(prev => {
+      const existingIds = new Set(prev.map(t => t.id));
+      const filtered = txArray.filter(t => !existingIds.has(t.id));
+      if (filtered.length === 0) return prev;
+      const updated = [...filtered, ...prev];
+      try {
+        localStorage.setItem('finance_app_transactions', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
   };
 
   const handleLogout = async () => {
@@ -1178,6 +1277,9 @@ export default function App() {
               onUpdateBudgets={setBudgets}
               displayCurrency={displayCurrency}
               usdArsRate={usdArsRate}
+              historyData={historyData}
+              onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
+              onEditTransaction={handleEditTransaction}
             />
           )}
           {currentTab === 'recurring' && (

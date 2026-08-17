@@ -176,6 +176,21 @@ export function Navbar({
             {/* Right Controls Container */}
             <div className="flex items-center gap-1.5 sm:gap-3">
               
+              {/* LIVE USD/ARS RATE TICKER (Matching Landing Page Mockup) */}
+              <div className="hidden md:flex items-center gap-2 bg-[#121722]/90 border border-slate-800 hover:border-emerald-500/40 px-3 py-1.5 rounded-xl text-xs transition-all shadow-xs">
+                <span className="text-base" role="img" aria-label="Argentina">🇦🇷</span>
+                <div className="flex items-center gap-1.5 font-mono">
+                  <span className="text-slate-400 font-sans font-medium text-[11px]">USD/ARS:</span>
+                  <span className="font-bold text-slate-100 font-sans">1 USD =</span>
+                  <span className="font-bold text-emerald-400">{usdArsRate.toLocaleString()} ARS</span>
+                </div>
+                <span className="flex h-2 w-2 relative ml-0.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[10px] text-slate-500 font-sans hidden xl:inline">(live)</span>
+              </div>
+
               {/* Language Switcher Segmented Control - Desktop Only */}
               <div className="hidden lg:flex items-center bg-[#161b22] p-1 rounded-xl border border-slate-700/80 shrink-0 min-h-[44px]">
                 <Globe className="w-3.5 h-3.5 text-emerald-400 ml-2 mr-1" />
@@ -587,12 +602,15 @@ export function Navbar({
                   }}
                   className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer min-h-[44px] min-w-[44px] shrink-0 active:scale-95 ${
                     isActive
-                      ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
-                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                      ? 'bg-[#131b26] text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.12)] border border-emerald-500/40'
+                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
                   }`}
                 >
-                  <span className={isActive ? 'text-white' : 'text-slate-400'}>{tab.icon}</span>
+                  <span className={isActive ? 'text-emerald-400' : 'text-slate-400'}>{tab.icon}</span>
                   <span>{tab.label}</span>
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] ml-0.5" />
+                  )}
                 </button>
               );
             })}

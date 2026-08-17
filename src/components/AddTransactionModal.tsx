@@ -113,6 +113,10 @@ export function AddTransactionModal({
   // Local list state to support dynamic "Add New"
   const [categoriesList, setCategoriesList] = useState<string[]>(existingCategories);
   const [accountItems, setAccountItems] = useState<AccountItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const prevIsOpenRef = useRef(false);
+  const prevEditingTxRef = useRef<Transaction | null | undefined>(undefined);
 
   // Visible categories for selection (filtering out hidden categories unless currently editing a tx that uses them)
   const visibleCategories = useMemo(() => {
@@ -296,7 +300,25 @@ export function AddTransactionModal({
 
   // Sync form fields when modal opens or editingTx changes
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      prevIsOpenRef.current = false;
+      prevEditingTxRef.current = undefined;
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+      return;
+    }
+
+    const isJustOpening = !prevIsOpenRef.current;
+    const isEditingTxChanged = prevEditingTxRef.current !== editingTx;
+    prevIsOpenRef.current = true;
+    prevEditingTxRef.current = editingTx;
+    isSubmittingRef.current = false;
+    setIsSubmitting(false);
+
+    // Only populate/reset fields if the modal just opened or the editing transaction reference changed
+    if (!isJustOpening && !isEditingTxChanged) {
+      return;
+    }
 
     if (editingTx) {
       // Populating from transaction being edited or duplicated
@@ -373,7 +395,7 @@ export function AddTransactionModal({
       setDescription('');
       setNumInstallments(1);
     }
-  }, [isOpen, editingTx, initialAccount, accountNames]);
+  }, [isOpen, editingTx]);
 
   // Handle type change when clicking tab pills
   const handleTypeChange = (newType: 'EXPENSE' | 'INCOME' | 'TRANSFER' | 'CC_PAYMENT') => {
@@ -615,8 +637,13 @@ export function AddTransactionModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
+
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) return;
+
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
     if (editingTx && onUpdateTransaction && editingTx.id) {
       if (type === 'CC_PAYMENT') {
@@ -678,10 +705,12 @@ export function AddTransactionModal({
       return;
     }
 
+    const uniqueId = `tx-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
     if (type === 'CC_PAYMENT') {
       const now = new Date();
       const paymentTx: Transaction = {
-        id: `manual-ccpay-${Date.now()}`,
+        id: `ccpay-${uniqueId}`,
         date: date,
         timestamp: now.toISOString(),
         title: title || `Pago ${toAccount}`,
@@ -703,7 +732,7 @@ export function AddTransactionModal({
       const parsedReceiveAmt = parseFloat(receiveAmount) || parsedAmount;
       const now = new Date();
       const transferTx: Transaction = {
-        id: `manual-transfer-${Date.now()}`,
+        id: `transfer-${uniqueId}`,
         date: date,
         timestamp: now.toISOString(),
         title: title || `Transferencia: ${account} → ${toAccount}`,
@@ -726,7 +755,7 @@ export function AddTransactionModal({
         // Create multiple installment transactions
         const now = new Date();
         const txList: Transaction[] = installmentSchedule.map((cuota, idx) => ({
-          id: `manual-${Date.now()}-${idx + 1}`,
+          id: `${uniqueId}-${idx + 1}`,
           date: cuota.instTxDate,
           timestamp: now.toISOString(),
           title: title || 'Expense',
@@ -746,7 +775,7 @@ export function AddTransactionModal({
       } else {
         const now = new Date();
         const newTx: Transaction = {
-          id: `manual-${Date.now()}`,
+          id: uniqueId,
           date: date,
           timestamp: now.toISOString(),
           title: title || (type === 'INCOME' ? 'Income' : 'Expense'),
@@ -1378,7 +1407,10 @@ export function AddTransactionModal({
             </button>
             <button
               type="submit"
+              disabled={isSubmitting}
               className={`px-5 py-2 rounded-xl font-bold text-white shadow-lg transition-all text-xs flex items-center gap-1.5 ${
+                isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+              } ${
                 type === 'EXPENSE' ? 'bg-rose-600 hover:bg-rose-500 border border-rose-500 shadow-rose-900/20' :
                 type === 'INCOME' ? 'bg-emerald-600 hover:bg-emerald-500 border border-emerald-500 shadow-emerald-900/20' :
                 type === 'TRANSFER' ? 'bg-sky-600 hover:bg-sky-500 border border-sky-500 shadow-sky-900/20' :

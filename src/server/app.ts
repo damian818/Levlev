@@ -379,6 +379,67 @@ Format your response in clean markdown.`;
   }
 });
 
+app.post(["/api/ai-parse-tx", "/ai-parse-tx"], async (req, res) => {
+  try {
+    const { text, accounts, categories } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Gemini API key is not configured on the server." });
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: { 'User-Agent': 'aistudio-build' },
+      },
+    });
+
+    const systemInstruction = `You are a financial transaction parser. Extract the transaction details from the provided text (e.g. an SMS or copy-pasted message).
+Available Accounts: ${accounts.join(', ')}
+Available Categories: ${categories.join(', ')}
+
+Return ONLY a JSON object with the following fields:
+- title (string): A short description or title of the transaction.
+- amount (number): The parsed amount as a positive number.
+- type (string): "EXPENSE", "INCOME", or "TRANSFER". Default to EXPENSE unless it's clearly income/deposit or transfer.
+- account (string): The closest matching account name from the available accounts.
+- category (string): The closest matching category name from the available categories.
+- currency (string): "ARS" or "USD". Default to ARS.
+- date (string): "YYYY-MM-DD" if mentioned, otherwise omit.
+
+Do NOT include markdown formatting or backticks in the response. Return raw JSON.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        { role: "user", parts: [{ text: text }] }
+      ],
+      config: {
+        systemInstruction: {
+          role: "system",
+          parts: [{ text: systemInstruction }],
+        },
+        temperature: 0.2,
+      }
+    });
+
+    const outputText = response.text?.trim() || "{}";
+    const cleanedText = outputText.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+    
+    try {
+      const parsedData = JSON.parse(cleanedText);
+      res.json(parsedData);
+    } catch (parseError) {
+      console.error("Error parsing AI response as JSON:", parseError);
+      res.status(500).json({ error: "Failed to parse AI response as JSON", rawResponse: outputText });
+    }
+
+  } catch (error: any) {
+    console.error("AI parse API Error:", error);
+    res.status(500).json({ error: "Failed to process AI request", details: error.message });
+  }
+});
+
 app.post(["/api/ai-chat", "/ai-chat"], async (req, res) => {
   try {
     const { messages, financialContext, language } = req.body;

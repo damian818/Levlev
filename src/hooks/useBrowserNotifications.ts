@@ -22,11 +22,11 @@ export function useBrowserNotifications() {
 
   const sendNotification = (title: string, body: string) => {
     if (permission === 'granted' && 'Notification' in window) {
-      try{
+      try {
         new Notification(title, { body });
       } catch (e) {
         console.warn('Native notification failed, likely restricted context:', e);
-      } 
+      }
     }
   };
 

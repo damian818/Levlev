@@ -19,6 +19,15 @@ export default defineConfig(() => {
           theme_color: '#0f172a',
           background_color: '#0f172a',
           display: 'standalone',
+          share_target: {
+            action: '/',
+            method: 'GET',
+            params: {
+              title: 'title',
+              text: 'text',
+              url: 'url'
+            }
+          },
           icons: [
             {
               src: 'pwa-192x192.png',

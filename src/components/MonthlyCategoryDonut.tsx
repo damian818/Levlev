@@ -15,16 +15,16 @@ interface MonthlyCategoryDonutProps {
 }
 
 const CATEGORY_COLORS = [
-  '#34d399', // Emerald
-  '#60a5fa', // Blue
+  '#10b981', // Emerald
+  '#3b82f6', // Blue
   '#f59e0b', // Amber
-  '#a78bfa', // Purple
+  '#8b5cf6', // Purple
   '#f43f5e', // Rose
-  '#38bdf8', // Sky
-  '#fb7185', // Pink
-  '#818cf8', // Indigo
-  '#2dd4bf', // Teal
-  '#c084fc', // Violet
+  '#06b6d4', // Cyan
+  '#ec4899', // Pink
+  '#6366f1', // Indigo
+  '#14b8a6', // Teal
+  '#a855f7', // Violet
 ];
 
 export function MonthlyCategoryDonut({
@@ -141,30 +141,30 @@ export function MonthlyCategoryDonut({
   const monthLabel = localMonth === 'ALL' ? 'All Time' : localMonth;
 
   return (
-    <div className="bg-[#11141c] p-4 sm:p-5 rounded-xl border border-slate-800 shadow-sm space-y-4">
+    <div className="bg-[#111622] p-5 rounded-2xl border border-slate-800/90 shadow-sm space-y-4">
       {/* Header with Month Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
         <div className="flex items-center space-x-2.5">
-          <div className="p-1.5 sm:p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg">
+          <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
             <PieIcon className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-xs sm:text-sm font-bold text-slate-100">Monthly Spending by Category</h3>
-            <p className="text-[10px] sm:text-xs text-slate-400">Interactive category breakdown.</p>
+            <h3 className="text-sm font-bold text-slate-100">Monthly Spending by Category</h3>
+            <p className="text-xs text-slate-400">Interactive category breakdown and expenditure distribution.</p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 bg-[#121620] px-3 py-1.5 rounded-lg border border-slate-800 text-xs w-full sm:w-auto justify-center">
+        <div className="flex items-center space-x-2 bg-[#161d2b] px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs w-full sm:w-auto justify-center">
           <Calendar className="w-3.5 h-3.5 text-slate-400" />
           <span className="text-slate-400">Month:</span>
           <select
             value={localMonth}
             onChange={(e) => setLocalMonth(e.target.value)}
-            className="bg-transparent border-none py-0 text-xs text-slate-200 font-semibold focus:outline-none"
+            className="bg-transparent border-none py-0 text-xs text-slate-200 font-bold focus:outline-none cursor-pointer"
           >
-            <option value="ALL">All Months</option>
+            <option value="ALL" className="bg-[#161d2b] text-slate-100">All Months</option>
             {availableMonths.map((m) => (
-              <option key={m} value={m}>
+              <option key={m} value={m} className="bg-[#161d2b] text-slate-100">
                 {m}
               </option>
             ))}

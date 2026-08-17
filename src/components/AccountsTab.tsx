@@ -369,41 +369,41 @@ export const AccountsTab = React.memo(function AccountsTab({
 
       {/* Financial Overview Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm flex items-center justify-between">
+        <div className="bg-[#111622] p-5 rounded-2xl border border-slate-800/90 shadow-sm flex items-center justify-between hover:border-emerald-500/40 transition-all">
           <div>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t('accounts.liquid_bank_cash')}</p>
-            <h3 className="text-xl font-bold text-emerald-400 mt-1">
+            <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest">{t('accounts.liquid_bank_cash')}</p>
+            <h3 className="text-2xl font-black text-emerald-400 mt-1 font-mono">
               {formatCurrency(displayCurrency === 'USD' ? totalLiquidUSD : totalLiquidARS, displayCurrency)}
             </h3>
             <span className="text-[10px] text-slate-500 mt-1 block">{t('accounts.available_funds')}</span>
           </div>
-          <div className="p-3 bg-emerald-950/80 border border-emerald-800/60 text-emerald-300 rounded-xl shadow-inner">
+          <div className="p-3.5 bg-emerald-950/80 border border-emerald-800/60 text-emerald-300 rounded-2xl shadow-inner">
             <Landmark className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm flex items-center justify-between">
+        <div className="bg-[#111622] p-5 rounded-2xl border border-slate-800/90 shadow-sm flex items-center justify-between hover:border-amber-500/40 transition-all">
           <div>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t('accounts.card_statement_debt')}</p>
-            <h3 className="text-xl font-bold text-amber-400 mt-1">
+            <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest">{t('accounts.card_statement_debt')}</p>
+            <h3 className="text-2xl font-black text-amber-400 mt-1 font-mono">
               {formatCurrency(displayCurrency === 'USD' ? totalCcDebtUSD : totalCcDebtARS, displayCurrency)}
             </h3>
             <span className="text-[10px] text-slate-500 mt-1 block">{t('accounts.pending_liabilities')}</span>
           </div>
-          <div className="p-3 bg-amber-950/80 border border-amber-800/60 text-amber-300 rounded-xl shadow-inner">
+          <div className="p-3.5 bg-amber-950/80 border border-amber-800/60 text-amber-300 rounded-2xl shadow-inner">
             <CreditCard className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-[#161b22] p-5 rounded-xl border border-slate-800 shadow-sm flex items-center justify-between">
+        <div className="bg-[#0e1622]/90 p-5 rounded-2xl border border-emerald-500/50 ring-1 ring-emerald-500/20 shadow-[0_0_28px_rgba(16,185,129,0.12)] flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t('accounts.net_liquid_wealth')}</p>
-            <h3 className={`text-xl font-bold mt-1 ${netWorthARS >= 0 ? 'text-slate-100' : 'text-rose-400'}`}>
+            <p className="text-[11px] font-extrabold text-emerald-400/90 uppercase tracking-widest">{t('accounts.net_liquid_wealth')}</p>
+            <h3 className={`text-2xl font-black mt-1 font-mono ${netWorthARS >= 0 ? 'text-slate-50' : 'text-rose-400'}`}>
               {formatCurrency(displayCurrency === 'USD' ? netWorthUSD : netWorthARS, displayCurrency)}
             </h3>
-            <span className="text-[10px] text-slate-500 mt-1 block">{t('accounts.liquid_minus_debt')}</span>
+            <span className="text-[10px] text-slate-400 mt-1 block">{t('accounts.liquid_minus_debt')}</span>
           </div>
-          <div className="p-3 bg-slate-800 border border-slate-700 text-white rounded-xl shadow-inner">
+          <div className="p-3.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-2xl shadow-inner">
             <Wallet className="w-5 h-5" />
           </div>
         </div>
