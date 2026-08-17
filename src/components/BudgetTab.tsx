@@ -12,7 +12,25 @@ import {
   getDefaultSelectedMonth,
   predictCategoryBudgetVelocity
 } from '../utils/financeUtils';
-import { Target, AlertTriangle, CheckCircle2, Plus, Calendar, RefreshCw, Sparkles, ChevronRight, ExternalLink, Tag, Layers, TrendingDown, TrendingUp, Wallet2, Flame } from 'lucide-react';
+import { 
+  Target, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Plus, 
+  Calendar, 
+  RefreshCw, 
+  Sparkles, 
+  ChevronRight, 
+  ExternalLink, 
+  Tag, 
+  Layers, 
+  TrendingDown, 
+  TrendingUp, 
+  Wallet2, 
+  Flame,
+  Trash2,
+  X
+} from 'lucide-react';
 import { CategoryTransactionsModal } from './CategoryTransactionsModal';
 import { CircularBudgetGauge } from './CircularBudgetGauge';
 import { BudgetOptimizationSuggestions } from './BudgetOptimizationSuggestions';
@@ -41,7 +59,9 @@ export function BudgetTab({
   const { t } = useTranslation();
   const [budgetList, setBudgetList] = useState<BudgetGoal[]>(budgets);
   const [isEditing, setIsEditing] = useState(false);
+  const [draftLimits, setDraftLimits] = useState<Record<string, string>>({});
   const [inspectingCategory, setInspectingCategory] = useState<string | null>(null);
+  const [addingCategory, setAddingCategory] = useState<string>('');
 
   const currentMonthKey = useMemo(() => getCurrentMonthKey(), []);
 
@@ -63,16 +83,17 @@ export function BudgetTab({
     }
   }, [availableMonths]);
 
-  // Sync budgetList when budgets prop changes or if empty
+  // Sync budgetList when budgets prop changes or if empty, BUT only when not actively editing
   useEffect(() => {
+    if (isEditing) return; // Prevent overwriting user's active inputs while editing
     if (budgets && budgets.length > 0) {
       setBudgetList(budgets);
-    } else if (transactions.length > 0) {
+    } else if (transactions.length > 0 && budgetList.length === 0) {
       const derived = deriveBudgetsFromTransactions(transactions, []);
       setBudgetList(derived);
       onUpdateBudgets(derived);
     }
-  }, [budgets, transactions]);
+  }, [budgets, transactions, isEditing]);
 
   const spending = analyzeSpending(transactions, displayCurrency, usdArsRate, selectedMonth);
 
@@ -89,12 +110,27 @@ export function BudgetTab({
     return countMap;
   }, [transactions, selectedMonth]);
 
-  // Calculate overall totals
+  // Available categories not yet in budget list
+  const unbudgetedCategories = useMemo(() => {
+    const budgetedSet = new Set(budgetList.map(b => b.category.toLowerCase()));
+    const allCatSet = new Set<string>();
+    transactions.forEach(t => {
+      if (t.type === 'EXPENSE' && t.category) {
+        allCatSet.add(t.category);
+      }
+    });
+    return Array.from(allCatSet).filter(c => !budgetedSet.has(c.toLowerCase())).sort();
+  }, [budgetList, transactions]);
+
+  // Calculate overall totals based on active or draft values
   const totalBudgeted = useMemo(() => {
     return budgetList.reduce((sum, b) => {
+      if (isEditing && draftLimits[b.category] !== undefined) {
+        return sum + (parseFloat(draftLimits[b.category]) || 0);
+      }
       return sum + convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
     }, 0);
-  }, [budgetList, displayCurrency, usdArsRate]);
+  }, [budgetList, isEditing, draftLimits, displayCurrency, usdArsRate]);
 
   const totalSpentAcrossBudgets = useMemo(() => {
     return budgetList.reduce((sum, b) => {
@@ -107,27 +143,95 @@ export function BudgetTab({
   const overallPercentage = totalBudgeted > 0 ? (totalSpentAcrossBudgets / totalBudgeted) * 100 : 0;
   const isOverallOver = overallPercentage > 100;
 
-  const handleLimitChange = (category: string, newLimitDisplay: number) => {
-    // Convert the display currency input back to ARS for storage
-    const limitARS = convertCurrency(newLimitDisplay, displayCurrency, 'ARS', usdArsRate);
-    setBudgetList(prev => prev.map(b => b.category === category ? { ...b, monthlyLimitARS: limitARS } : b));
+  // Initialize draft values when entering edit mode
+  const handleStartEdit = () => {
+    const drafts: Record<string, string> = {};
+    budgetList.forEach(b => {
+      const limitConverted = convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+      drafts[b.category] = String(Math.round(limitConverted));
+    });
+    setDraftLimits(drafts);
+    setIsEditing(true);
+  };
+
+  const handleDraftChange = (category: string, valueStr: string) => {
+    setDraftLimits(prev => ({
+      ...prev,
+      [category]: valueStr,
+    }));
   };
 
   const handleSave = () => {
-    onUpdateBudgets(budgetList);
+    const updatedList: BudgetGoal[] = budgetList.map(b => {
+      const rawDraft = draftLimits[b.category];
+      const numVal = rawDraft !== undefined 
+        ? (parseFloat(rawDraft) || 0) 
+        : convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+      const limitARS = convertCurrency(numVal, displayCurrency, 'ARS', usdArsRate);
+      return {
+        ...b,
+        monthlyLimitARS: limitARS,
+      };
+    });
+    setBudgetList(updatedList);
+    onUpdateBudgets(updatedList);
     setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setBudgetList(budgets);
+    setDraftLimits({});
+    setIsEditing(false);
+  };
+
+  const handleDeleteGoal = (category: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setBudgetList(prev => prev.filter(b => b.category !== category));
+    setDraftLimits(prev => {
+      const copy = { ...prev };
+      delete copy[category];
+      return copy;
+    });
+  };
+
+  const handleAddCategoryGoal = () => {
+    if (!addingCategory) return;
+    const exists = budgetList.find(b => b.category.toLowerCase() === addingCategory.toLowerCase());
+    if (!exists) {
+      const newGoal: BudgetGoal = {
+        category: addingCategory,
+        monthlyLimitARS: convertCurrency(100, displayCurrency, 'ARS', usdArsRate),
+      };
+      setBudgetList(prev => [...prev, newGoal]);
+      setDraftLimits(prev => ({
+        ...prev,
+        [addingCategory]: '100',
+      }));
+    }
+    setAddingCategory('');
   };
 
   const handleAutoGenerate = () => {
     const derived = deriveBudgetsFromTransactions(transactions, []);
     setBudgetList(derived);
-    onUpdateBudgets(derived);
+    const drafts: Record<string, string> = {};
+    derived.forEach(b => {
+      const limitConverted = convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+      drafts[b.category] = String(Math.round(limitConverted));
+    });
+    setDraftLimits(drafts);
+    setIsEditing(true);
   };
 
   const handleSmartSuggest = () => {
     const derived = deriveSmartBudgets(transactions, budgetList, currentMonthKey, usdArsRate);
     setBudgetList(derived);
-    onUpdateBudgets(derived); // Auto-save when suggesting
+    const drafts: Record<string, string> = {};
+    derived.forEach(b => {
+      const limitConverted = convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+      drafts[b.category] = String(Math.round(limitConverted));
+    });
+    setDraftLimits(drafts);
     setIsEditing(true);
   };
 
@@ -170,20 +274,20 @@ export function BudgetTab({
               <div className="flex space-x-2">
                 <button
                   onClick={handleSmartSuggest}
-                  className="flex-1 sm:flex-none px-3 py-1.5 border border-amber-500/50 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                  className="flex-1 sm:flex-none px-3 py-1.5 border border-amber-500/50 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5 inline mr-1" />
                   Smart Suggest
                 </button>
                 <button
-                  onClick={() => setIsEditing(false)}
-                  className="flex-1 sm:flex-none px-3 py-1.5 border border-slate-700 rounded-xl text-xs font-medium text-slate-300 bg-[#161d2b] hover:bg-slate-800 transition-colors"
+                  onClick={handleCancel}
+                  className="flex-1 sm:flex-none px-3 py-1.5 border border-slate-700 rounded-xl text-xs font-medium text-slate-300 bg-[#161d2b] hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   {t('budget.cancel')}
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex-1 sm:flex-none px-3 py-1.5 bg-emerald-600 border border-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-500 transition-colors shadow-sm"
+                  className="flex-1 sm:flex-none px-3 py-1.5 bg-emerald-600 border border-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-500 transition-colors shadow-sm cursor-pointer"
                 >
                   {t('budget.save')}
                 </button>
@@ -191,8 +295,8 @@ export function BudgetTab({
             ) : (
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex-1 sm:flex-none px-3.5 py-1.5 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 bg-[#161d2b] hover:bg-slate-800 transition-colors"
+                  onClick={handleStartEdit}
+                  className="flex-1 sm:flex-none px-3.5 py-1.5 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 bg-[#161d2b] hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   {t('budget.configure')}
                 </button>
@@ -268,13 +372,46 @@ export function BudgetTab({
         </div>
       )}
 
-      {/* AI 30-Day Spending Optimization Suggestions */}
+      {/* AI 30-Day Spending Optimization Suggestions (With Hide & Dismiss capabilities) */}
       {transactions.length > 0 && (
         <BudgetOptimizationSuggestions
           transactions={transactions}
           displayCurrency={displayCurrency}
           usdArsRate={usdArsRate}
         />
+      )}
+
+      {/* Add New Category Budget Goal in Edit Mode */}
+      {isEditing && unbudgetedCategories.length > 0 && (
+        <div className="p-3.5 bg-[#161d2b] border border-slate-700/80 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center space-x-2">
+            <Plus className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-bold text-slate-200">{t('budget.add_category_budget')}</span>
+          </div>
+
+          <div className="flex items-center space-x-2 flex-1 max-w-sm">
+            <select
+              value={addingCategory}
+              onChange={(e) => setAddingCategory(e.target.value)}
+              className="flex-1 px-3 py-1.5 bg-[#111622] border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+            >
+              <option value="">{t('budget.select_category')}...</option>
+              {unbudgetedCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={handleAddCategoryGoal}
+              disabled={!addingCategory}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            >
+              {t('common.add') || 'Add'}
+            </button>
+          </div>
+        </div>
       )}
 
       {budgetList.length === 0 ? (
@@ -291,13 +428,13 @@ export function BudgetTab({
           <div className="flex items-center justify-center space-x-3">
             <button
               onClick={handleAutoGenerate}
-              className="px-4 py-2 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl transition-colors inline-flex items-center space-x-2"
+              className="px-4 py-2 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl transition-colors inline-flex items-center space-x-2 cursor-pointer"
             >
               <span>{t('budget.generate')} (Basic)</span>
             </button>
             <button
               onClick={handleSmartSuggest}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition-colors inline-flex items-center space-x-2 shadow-sm"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition-colors inline-flex items-center space-x-2 shadow-sm cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
               <span>Smart Suggest Targets</span>
@@ -308,16 +445,22 @@ export function BudgetTab({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {budgetList.map((budget, idx) => {
             const categorySpent = spending.topCategories.find(c => c.category === budget.category)?.amount || 0;
-            const limitConverted = convertCurrency(budget.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
-            const percentage = limitConverted > 0 ? (categorySpent / limitConverted) * 100 : 0;
+            
+            // In edit mode, compute percentage using draft value
+            const draftVal = draftLimits[budget.category];
+            const activeLimitDisplay = isEditing && draftVal !== undefined
+              ? (parseFloat(draftVal) || 0)
+              : convertCurrency(budget.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+
+            const percentage = activeLimitDisplay > 0 ? (categorySpent / activeLimitDisplay) * 100 : 0;
             const isOver = percentage > 100;
-            const remainingCapacity = Math.max(limitConverted - categorySpent, 0);
+            const remainingCapacity = Math.max(activeLimitDisplay - categorySpent, 0);
             const txCount = categoryTransactionCounts[budget.category] || 0;
 
             // Velocity prediction helper calculation
             const velocityPred = predictCategoryBudgetVelocity(
               budget.category,
-              limitConverted,
+              activeLimitDisplay,
               transactions,
               displayCurrency,
               usdArsRate,
@@ -337,7 +480,7 @@ export function BudgetTab({
                 className={`p-5 rounded-2xl border transition-all duration-200 space-y-3.5 relative group bg-[#111622] border-slate-800/90 shadow-sm ${!isEditing ? 'hover:border-slate-700 hover:bg-[#141b2a] cursor-pointer' : ''}`}
                 title={!isEditing ? (t('budget.click_to_inspect') || 'Click to view category transaction details') : undefined}
               >
-                {/* Header Row: Category, Badges, Circular Gauge */}
+                {/* Header Row: Category, Badges, Circular Gauge, Delete in Edit Mode */}
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex items-start space-x-3">
                     {/* Circular Progress Gauge */}
@@ -357,7 +500,7 @@ export function BudgetTab({
                         </h4>
                         
                         {/* Subtle Pace Warning Icon */}
-                        {showVelocityWarning && (
+                        {showVelocityWarning && !isEditing && (
                           <div 
                             className="flex items-center space-x-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-semibold cursor-help"
                             title={t('budget.velocity_warning', {
@@ -389,7 +532,16 @@ export function BudgetTab({
                       <span className="px-2 py-0.5 bg-emerald-950/80 border border-emerald-800/50 text-emerald-300 text-[10px] font-bold rounded-lg">{t('budget.on_track')}</span>
                     )}
 
-                    {onNavigateToTransactionsWithFilter && !isEditing && (
+                    {/* Delete goal button in edit mode */}
+                    {isEditing ? (
+                      <button
+                        onClick={(e) => handleDeleteGoal(budget.category, e)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/50 border border-slate-700/60 hover:border-rose-800/50 transition-colors cursor-pointer ml-1"
+                        title={t('budget.delete_budget_goal')}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    ) : onNavigateToTransactionsWithFilter ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -404,7 +556,7 @@ export function BudgetTab({
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
@@ -414,18 +566,20 @@ export function BudgetTab({
                     {t('budget.spent')}: <strong className="text-slate-100 font-mono">{formatCurrency(categorySpent, displayCurrency)}</strong>
                   </span>
                   {isEditing ? (
-                    <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-slate-400">{t('budget.limit') || 'Limit'} ({displayCurrency}):</span>
+                    <div className="flex items-center space-x-1.5" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-slate-400 font-medium">{t('budget.limit') || 'Limit'} ({displayCurrency}):</span>
                       <input
-                        type="number"
-                        value={Math.round(limitConverted)}
-                        onChange={(e) => handleLimitChange(budget.category, parseFloat(e.target.value) || 0)}
-                        className="w-24 px-2 py-1 bg-[#161d2b] border border-slate-700 text-slate-100 rounded-lg text-xs text-right font-semibold focus:outline-none focus:border-emerald-500 font-mono"
+                        type="text"
+                        inputMode="decimal"
+                        value={draftLimits[budget.category] ?? ''}
+                        onChange={(e) => handleDraftChange(budget.category, e.target.value)}
+                        placeholder="0"
+                        className="w-24 px-2 py-1 bg-[#161d2b] border border-slate-700 text-slate-100 rounded-lg text-xs text-right font-bold focus:outline-none focus:border-emerald-500 font-mono"
                       />
                     </div>
                   ) : (
                     <span className="text-slate-400">
-                      {t('budget.limit') || 'Limit'}: <strong className="text-slate-100 font-mono">{formatCurrency(limitConverted, displayCurrency)}</strong>
+                      {t('budget.limit') || 'Limit'}: <strong className="text-slate-100 font-mono">{formatCurrency(activeLimitDisplay, displayCurrency)}</strong>
                     </span>
                   )}
                 </div>
@@ -439,7 +593,7 @@ export function BudgetTab({
                 </div>
 
                 {/* Velocity Warning Banner (Subtle and informative) */}
-                {showVelocityWarning && (
+                {showVelocityWarning && !isEditing && (
                   <div className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-800/40 text-[11px] text-amber-200 flex items-start space-x-2">
                     <TrendingUp className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                     <div>
@@ -508,5 +662,3 @@ export function BudgetTab({
     </div>
   );
 }
-
-
