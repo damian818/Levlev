@@ -104,6 +104,8 @@ export interface PendingRecurringItem {
   isInstallment?: boolean;
   installmentInfo?: string;
   isExcluded?: boolean;
+  isExpired?: boolean;
+  originalDayOfMonth?: number;
   originalItem?: IdentifiedRecurringItem | RecurringRule;
 }
 
@@ -147,8 +149,25 @@ export interface AccountItem {
   icon?: 'bank' | 'card' | 'cash' | 'wallet' | 'landmark' | 'other';
 }
 
-export type ViewTab = 'overview' | 'transactions' | 'accounts' | 'budgets' | 'recurring' | 'inflation' | 'ai-advisor' | 'settings' | 'reports';
+export type ViewTab = 'overview' | 'transactions' | 'accounts' | 'budgets' | 'recurring' | 'debt-payoff' | 'inflation' | 'ai-advisor' | 'settings' | 'reports';
 export type DisplayCurrency = 'ARS' | 'USD' | 'EUR' | 'BRL' | 'GBP' | 'MXN' | 'CLP' | 'USDT' | string;
+
+export interface DebtItem {
+  id: string;
+  ownerId?: string;
+  name: string;
+  balance: number; // Current principal balance
+  interestRate: number; // Annual Percentage Rate (APR %)
+  minPayment: number; // Minimum monthly payment required
+  currency?: string; // Currency code e.g. ARS or USD
+  category?: 'CREDIT_CARD' | 'PERSONAL_LOAN' | 'AUTO_LOAN' | 'MORTGAGE' | 'STUDENT_LOAN' | 'MEDICAL' | 'OTHER';
+  dueDay?: number;
+  originalBalance?: number;
+  notes?: string;
+  createdAt?: string;
+}
+
+export type DebtPayoffStrategy = 'SNOWBALL' | 'AVALANCHE';
 
 export interface AccountCustomBalance {
   accountName: string;

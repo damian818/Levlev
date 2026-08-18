@@ -1998,14 +1998,24 @@ export function getPendingRecurringForMonth(
       return;
     }
 
-    // If the recurring estimated date is in the past -> remove estimation for that period!
-    // (If the entire month has passed, or for current month if estimatedDateStr < todayStr)
-    const isEstimatedDateInPast = isPastMonth || (isCurrentMonth && estimatedDateStr < todayStr);
-    if (isEstimatedDateInPast) {
+    // If viewing a past month entirely, past unrecorded items are not carried forward
+    if (isPastMonth) {
       return;
     }
 
-    // Otherwise, this is an upcoming pending estimation for this period
+    // For current month: if the scheduled date has passed without being recorded,
+    // we keep it as expired/overdue and adjust the occurrence date forward to today
+    const isPastDueInCurrentMonth = isCurrentMonth && estimatedDateStr < todayStr;
+    const currentDayNum = Math.min(31, Math.max(1, new Date().getDate()));
+    const effectiveDay = isPastDueInCurrentMonth ? currentDayNum : day;
+
+    if (isPastDueInCurrentMonth) {
+      pendingItemObj.isExpired = true;
+      pendingItemObj.originalDayOfMonth = day;
+      pendingItemObj.dayOfMonth = effectiveDay;
+    }
+
+    // This is an active or rolled-over pending estimation for this period
     pendingItems.push(pendingItemObj);
     if (item.type === 'INCOME') {
       pendingIncome += converted;
@@ -2013,10 +2023,10 @@ export function getPendingRecurringForMonth(
       pendingExpense += converted;
     }
 
-    if (!dailyPendingMap[day]) {
-      dailyPendingMap[day] = [];
+    if (!dailyPendingMap[effectiveDay]) {
+      dailyPendingMap[effectiveDay] = [];
     }
-    dailyPendingMap[day].push(pendingItemObj);
+    dailyPendingMap[effectiveDay].push(pendingItemObj);
   });
 
   const pendingExpenses = pendingItems.filter(i => i.type === 'EXPENSE');

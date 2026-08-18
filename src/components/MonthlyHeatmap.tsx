@@ -233,11 +233,16 @@ export function MonthlyHeatmap({
                 <div className="flex items-center gap-1">
                   {hasPending && (
                     <span 
-                      className="px-1 py-0.5 text-[8px] xs:text-[9px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 rounded flex items-center gap-0.5 shrink-0"
-                      title={`${pendingForDay.length} pending estimated recurring item(s)`}
+                      className={`px-1 py-0.5 text-[8px] xs:text-[9px] font-bold rounded flex items-center gap-0.5 shrink-0 ${
+                        pendingForDay.some(p => p.isExpired)
+                          ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/40'
+                          : 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40'
+                      }`}
+                      title={`${pendingForDay.length} pending recurring item(s)${pendingForDay.some(p => p.isExpired) ? ' (includes unrecorded past bills rolled to today)' : ''}`}
                     >
                       <Repeat className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
                       <span>{pendingForDay.length}</span>
+                      {pendingForDay.some(p => p.isExpired) && <span className="text-[7px] text-rose-500 font-black">!</span>}
                     </span>
                   )}
                   {totalSpent > 0 && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-rose-500 shrink-0" />}
@@ -362,6 +367,14 @@ export function MonthlyHeatmap({
                             {item.isInstallment && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                                 {item.installmentInfo || 'Cuotas'}
+                              </span>
+                            )}
+                            {item.isExpired && (
+                              <span 
+                                className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
+                                title={`Originally scheduled for Day ${item.originalDayOfMonth || 'earlier'}, rolled forward to today because not yet recorded.`}
+                              >
+                                Overdue (Day {item.originalDayOfMonth} → Today)
                               </span>
                             )}
                           </div>

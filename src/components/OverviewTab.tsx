@@ -9,6 +9,7 @@ import { EmptyState } from './EmptyState';
 import { generateMonthlyPdfReport } from '../utils/pdfReport';
 import { MonthlyHeatmap } from './MonthlyHeatmap';
 import { CategoryTrendModal } from './CategoryTrendModal';
+import { AnomalyAlertModal, RecurringDeviationModal } from './AlertDetailModals';
 
 interface OverviewTabProps {
   transactions: Transaction[];
@@ -52,6 +53,8 @@ export const OverviewTab = React.memo(function OverviewTab({
   const [showForecasts, setShowForecasts] = useState<boolean>(false);
   const [usdTimeframe, setUsdTimeframe] = useState<'3M' | '6M' | '1Y' | 'ALL'>('6M');
   const [showAdvancedForecasting, setShowAdvancedForecasting] = useState<boolean>(false);
+  const [showAnomalyModal, setShowAnomalyModal] = useState<boolean>(false);
+  const [showRecurringDeviationModal, setShowRecurringDeviationModal] = useState<boolean>(false);
 
   // Filter transactions based on shared data preference
   const filteredTransactions = useMemo(() => {
@@ -557,18 +560,22 @@ export const OverviewTab = React.memo(function OverviewTab({
             <div className="flex items-center gap-2 text-[11px]">
               {anomalies.length > 0 && (
                 <button
-                  onClick={() => onNavigateToTransactionsWithFilter({ category: anomalies[0].category, month: selectedMonth !== 'ALL' ? selectedMonth : undefined })}
-                  className="px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-colors cursor-pointer"
+                  onClick={() => setShowAnomalyModal(true)}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-colors cursor-pointer flex items-center gap-1.5 font-bold"
+                  title="View details of detected anomalies"
                 >
-                  {t('overview.anomalies_detected')} ({anomalies.length})
+                  <span>{t('overview.anomalies_detected')} ({anomalies.length})</span>
+                  <ChevronRight className="w-3 h-3 text-amber-400" />
                 </button>
               )}
               {recurringAlerts.length > 0 && (
                 <button
-                  onClick={() => onNavigateTab('recurring')}
-                  className="px-2 py-0.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 transition-colors cursor-pointer"
+                  onClick={() => setShowRecurringDeviationModal(true)}
+                  className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 transition-colors cursor-pointer flex items-center gap-1.5 font-bold"
+                  title="View details of recurring deviations"
                 >
-                  {t('overview.recurring_deviation')} ({recurringAlerts.length})
+                  <span>{t('overview.recurring_deviation')} ({recurringAlerts.length})</span>
+                  <ChevronRight className="w-3 h-3 text-rose-400" />
                 </button>
               )}
             </div>
@@ -576,18 +583,26 @@ export const OverviewTab = React.memo(function OverviewTab({
           
           <div className="text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
             {anomalies.length > 0 ? (
-              <p className="text-[11px] text-slate-400">
-                {t('overview.anomaly_desc', { category: anomalies[0].category, percent: anomalies[0].percentageIncrease.toFixed(0) })}
-              </p>
+              <button
+                type="button"
+                onClick={() => setShowAnomalyModal(true)}
+                className="text-[11px] text-slate-400 text-left hover:text-amber-300 transition-colors cursor-pointer"
+              >
+                {t('overview.anomaly_desc', { category: anomalies[0].category, percent: anomalies[0].percentageIncrease.toFixed(0) })} <span className="text-amber-400 underline font-medium">Click to inspect</span>
+              </button>
             ) : recurringAlerts.length > 0 ? (
-              <p className="text-[11px] text-slate-400">
+              <button
+                type="button"
+                onClick={() => setShowRecurringDeviationModal(true)}
+                className="text-[11px] text-slate-400 text-left hover:text-rose-300 transition-colors cursor-pointer"
+              >
                 {t('overview.deviation_desc', { 
                   title: recurringAlerts[0].title, 
                   percent: recurringAlerts[0].deviationPercent.toFixed(0),
                   latest: formatCurrency(recurringAlerts[0].latestAmount, displayCurrency),
                   avg: formatCurrency(recurringAlerts[0].priorAvgAmount, displayCurrency)
-                })}
-              </p>
+                })} <span className="text-rose-400 underline font-medium">Click to inspect</span>
+              </button>
             ) : (
               <p className="text-[11px] text-slate-400">
                 {t('overview.top_category_accounts_for', { 
@@ -1044,6 +1059,24 @@ export const OverviewTab = React.memo(function OverviewTab({
         displayCurrency={displayCurrency}
         usdArsRate={usdArsRate}
         historyData={historyData}
+      />
+
+      <AnomalyAlertModal
+        isOpen={showAnomalyModal}
+        onClose={() => setShowAnomalyModal(false)}
+        anomalies={anomalies}
+        selectedMonth={selectedMonth}
+        displayCurrency={displayCurrency}
+        onNavigateToTransactions={onNavigateToTransactionsWithFilter}
+      />
+
+      <RecurringDeviationModal
+        isOpen={showRecurringDeviationModal}
+        onClose={() => setShowRecurringDeviationModal(false)}
+        alerts={recurringAlerts}
+        displayCurrency={displayCurrency}
+        onNavigateTab={onNavigateTab}
+        onNavigateToTransactions={onNavigateToTransactionsWithFilter}
       />
     </div>
   );

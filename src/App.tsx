@@ -21,6 +21,7 @@ const TransactionsTab = lazy(() => import('./components/TransactionsTab').then(m
 const AccountsTab = lazy(() => import('./components/AccountsTab').then(m => ({ default: m.AccountsTab })));
 const BudgetTab = lazy(() => import('./components/BudgetTab').then(m => ({ default: m.BudgetTab })));
 const RecurringTab = lazy(() => import('./components/RecurringTab').then(m => ({ default: m.RecurringTab })));
+const DebtPayoffTab = lazy(() => import('./components/DebtPayoffTab').then(m => ({ default: m.DebtPayoffTab })));
 const InflationVsFxTab = lazy(() => import('./components/InflationVsFxTab').then(m => ({ default: m.InflationVsFxTab })));
 const AiAdvisorTab = lazy(() => import('./components/AiAdvisorTab').then(m => ({ default: m.AiAdvisorTab })));
 const SettingsTab = lazy(() => import('./components/SettingsTab').then(m => ({ default: m.SettingsTab })));
@@ -1378,6 +1379,13 @@ export default function App() {
               globalRecurringThreshold={globalRecurringThreshold}
               onSaveRecurringThreshold={handleSaveRecurringThreshold}
               onSaveGlobalRecurringThreshold={handleSaveGlobalRecurringThreshold}
+            />
+          )}
+          {currentTab === 'debt-payoff' && (
+            <DebtPayoffTab
+              displayCurrency={displayCurrency}
+              usdArsRate={usdArsRate}
+              currentUserId={authUser?.id}
             />
           )}
           {currentTab === 'inflation' && <InflationVsFxTab historyData={historyData} />}
