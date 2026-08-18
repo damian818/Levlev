@@ -189,20 +189,61 @@ export default function App() {
 
   // Category Handlers
   const handleAddCategory = (newCat: CategoryItem) => {
-    setCategories(prev => [...prev, newCat]);
+    setCategories(prev => {
+      const updated = [...prev, newCat];
+      try {
+        localStorage.setItem('finance_app_custom_categories', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
   };
 
   const handleEditCategory = (oldName: string, updatedCat: CategoryItem, updateTransactions: boolean) => {
-    setCategories(prev => prev.map(c => c.name === oldName ? updatedCat : c));
+    let nextCategories: CategoryItem[] = [];
+    setCategories(prev => {
+      nextCategories = prev.map(c => c.name === oldName ? updatedCat : c);
+      try {
+        localStorage.setItem('finance_app_custom_categories', JSON.stringify(nextCategories));
+      } catch (e) {}
+      return nextCategories;
+    });
 
     if (updateTransactions && oldName !== updatedCat.name) {
       setTransactions(prev => prev.map(t => t.category === oldName ? { ...t, category: updatedCat.name } : t));
       setBudgets(prev => prev.map(b => b.category === oldName ? { ...b, category: updatedCat.name } : b));
     }
+
+    if (authUser && hasInitialSynced) {
+      saveAllUserDataToSupabase({
+        transactions,
+        categories: nextCategories.length > 0 ? nextCategories : categories.map(c => c.name === oldName ? updatedCat : c),
+        accounts,
+        budgets,
+        settings: {
+          localCurrency,
+          displayCurrency,
+          enabledCurrencies,
+          ccPeriodStatuses: periodStatusOverrides,
+          customBalances,
+          workspaceSharing: {
+            isShared: isWorkspaceShared,
+            members: workspaceMembers,
+          },
+          recurringThresholds,
+          globalRecurringThreshold,
+        },
+      });
+    }
   };
 
   const handleDeleteCategory = (catName: string, reassignTo?: string) => {
-    setCategories(prev => prev.filter(c => c.name !== catName));
+    setCategories(prev => {
+      const updated = prev.filter(c => c.name !== catName);
+      try {
+        localStorage.setItem('finance_app_custom_categories', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
     setBudgets(prev => prev.filter(b => b.category !== catName));
 
     if (reassignTo) {
@@ -557,7 +598,12 @@ export default function App() {
       const data = await fetchUserDataFromSupabase();
       if (data) {
         setTransactions(data.transactions || []);
-        if (data.categories && data.categories.length > 0) setCategories(data.categories);
+        if (data.categories && data.categories.length > 0) {
+          setCategories(data.categories);
+          try {
+            localStorage.setItem('finance_app_custom_categories', JSON.stringify(data.categories));
+          } catch (e) {}
+        }
         if (data.accounts && data.accounts.length > 0) {
           setAccounts(data.accounts);
           try {

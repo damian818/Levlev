@@ -55,6 +55,8 @@ export interface SupabaseUserData {
     customBalances?: Record<string, AccountCustomBalance>;
     accountConfigs?: Record<string, { order?: number; isHiddenFromNewTx?: boolean; icon?: any }>;
     accountsList?: AccountItem[];
+    categoryConfigs?: Record<string, { isHiddenFromNewTx?: boolean; color?: string; type?: string }>;
+    categoriesList?: CategoryItem[];
     recurringRules?: RecurringRule[];
     nonRecurringKeys?: string[];
     onboardingCompleted?: boolean;
@@ -106,6 +108,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     const ccRulesMap = userSettings?.ccRulesMap || {};
     const ccMap = userSettings?.ccMap || {};
     const accountConfigs = userSettings?.accountConfigs || {};
+    const categoryConfigs = userSettings?.categoryConfigs || {};
 
     // Handle transactions (first page already fetched)
     let rawTxRows: any[] = txResFirstPage.data || [];
@@ -182,13 +185,68 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
         };
       });
 
-    const categories: CategoryItem[] = (catRes.data || []).map((row: any) => ({
-      id: row.id || `cat-${Math.random().toString(36).substring(2)}`,
-      ownerId: row.user_id,
-      name: row.name || 'Category',
-      type: row.type || 'BOTH',
-      description: row.color || '#64748b',
-    }));
+    const categories: CategoryItem[] = (catRes.data || []).map((row: any) => {
+      const config = categoryConfigs[row.name] ||
+                     categoryConfigs[row.name.toLowerCase()] ||
+                     {};
+
+      let isHidden: boolean | undefined = undefined;
+      if (row.is_hidden_from_new_tx !== undefined && row.is_hidden_from_new_tx !== null) {
+        isHidden = !!row.is_hidden_from_new_tx;
+      } else if (row.is_hidden !== undefined && row.is_hidden !== null) {
+        isHidden = !!row.is_hidden;
+      } else if (config.isHiddenFromNewTx !== undefined) {
+        isHidden = !!config.isHiddenFromNewTx;
+      }
+
+      return {
+        id: row.id || `cat-${Math.random().toString(36).substring(2)}`,
+        ownerId: row.user_id,
+        name: row.name || 'Category',
+        type: row.type || 'BOTH',
+        description: row.color || '#64748b',
+        isHiddenFromNewTx: isHidden,
+      };
+    });
+
+    // Merge high-fidelity categoriesList from user_settings if present
+    const existingCategoryNames = new Set(categories.map(c => c.name.toLowerCase()));
+    if (Array.isArray(userSettings?.categoriesList) && userSettings.categoriesList.length > 0) {
+      userSettings.categoriesList.forEach((savedCat) => {
+        const lowerName = (savedCat.name || '').toLowerCase();
+        const found = categories.find(c => c.name.toLowerCase() === lowerName);
+        if (found) {
+          if (savedCat.isHiddenFromNewTx !== undefined) {
+            found.isHiddenFromNewTx = savedCat.isHiddenFromNewTx;
+          }
+          if (savedCat.type) found.type = savedCat.type;
+          if (savedCat.description && (!found.description || found.description === '#64748b')) {
+            found.description = savedCat.description;
+          }
+        } else if (savedCat.name) {
+          categories.push({
+            ...savedCat,
+          });
+          existingCategoryNames.add(lowerName);
+        }
+      });
+    }
+
+    // Also include categories that might only exist in categoryConfigs
+    Object.entries(categoryConfigs).forEach(([name, config]) => {
+      const lowerName = name.toLowerCase();
+      if (!existingCategoryNames.has(lowerName)) {
+        categories.push({
+          id: `cat-cfg-${Math.random().toString(36).substring(2)}`,
+          ownerId: userId,
+          name: name,
+          type: (config.type as any) || 'EXPENSE',
+          description: config.color || '#64748b',
+          isHiddenFromNewTx: !!config.isHiddenFromNewTx,
+        });
+        existingCategoryNames.add(lowerName);
+      }
+    });
 
     const accounts: AccountItem[] = (accRes.data || []).map((row: any) => {
       let closingRule: CreditCardClosingRule | undefined = undefined;
@@ -427,11 +485,20 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           name: c.name,
           type: c.type || 'BOTH',
           color: c.description || '#64748b',
+          is_hidden_from_new_tx: !!c.isHiddenFromNewTx,
         };
       });
 
       const { error: catErr } = await client.from('categories').upsert(catRows, { onConflict: 'id' });
-      if (catErr) console.error('Error upserting categories to Supabase:', catErr);
+      if (catErr) {
+        console.error('Error upserting categories to Supabase:', catErr);
+        // Fallback retry if is_hidden_from_new_tx column does not exist in target database schema
+        if (catErr.code === 'PGRST204' || catErr.message?.includes('is_hidden_from_new_tx')) {
+          const fallbackCatRows = catRows.map(({ is_hidden_from_new_tx, ...rest }) => rest);
+          const { error: fbCatErr } = await client.from('categories').upsert(fallbackCatRows, { onConflict: 'id' });
+          if (fbCatErr) console.error('Fallback categories upsert error:', fbCatErr);
+        }
+      }
     }
 
     // 3. Accounts upsert
@@ -484,7 +551,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       if (delBudErr) console.error('Error clearing budgets in Supabase:', delBudErr);
     }
 
-    // 5. User Settings upsert (CC Rules, CC Classification map, Period Statuses, Custom Balances, Account Configs)
+    // 5. User Settings upsert (CC Rules, CC Classification map, Period Statuses, Custom Balances, Account Configs, Category Configs)
     const ccRulesMapFromAccs: Record<string, CreditCardClosingRule> = {};
     const ccMapFromAccs: Record<string, boolean> = {};
     const accountConfigs: Record<string, { order?: number; isHiddenFromNewTx?: boolean; icon?: any }> = {
@@ -511,6 +578,20 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       }
     });
 
+    const categoryConfigs: Record<string, { isHiddenFromNewTx?: boolean; color?: string; type?: string }> = {
+      ...(data.settings?.categoryConfigs || {})
+    };
+
+    (data.categories || []).forEach(c => {
+      const itemConfig = {
+        isHiddenFromNewTx: !!c.isHiddenFromNewTx,
+        color: c.description,
+        type: c.type,
+      };
+      categoryConfigs[c.name] = itemConfig;
+      categoryConfigs[c.name.toLowerCase()] = itemConfig;
+    });
+
     const isTourCompleted = data.settings?.onboardingCompleted ?? (
       typeof window !== 'undefined' && (
         localStorage.getItem('levlev_onboarding_completed') === 'true' ||
@@ -528,6 +609,8 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       workspaceSharing: data.settings?.workspaceSharing || {},
       accountConfigs: accountConfigs,
       accountsList: data.accounts || [],
+      categoryConfigs: categoryConfigs,
+      categoriesList: data.categories || [],
       recurringRules: data.recurringRules || data.settings?.recurringRules || [],
       nonRecurringKeys: data.nonRecurringKeys || data.settings?.nonRecurringKeys || [],
       onboardingCompleted: !!isTourCompleted,
