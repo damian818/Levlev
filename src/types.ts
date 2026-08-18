@@ -105,6 +105,7 @@ export interface PendingRecurringItem {
   installmentInfo?: string;
   isExcluded?: boolean;
   isExpired?: boolean;
+  isDismissed?: boolean;
   originalDayOfMonth?: number;
   originalItem?: IdentifiedRecurringItem | RecurringRule;
 }

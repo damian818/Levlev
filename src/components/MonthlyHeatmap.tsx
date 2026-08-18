@@ -5,7 +5,10 @@ import {
   convertCurrency, 
   formatCurrency, 
   formatCurrencyCompact, 
-  getPendingRecurringForMonth 
+  getPendingRecurringForMonth,
+  getSavedDismissedRecurring,
+  dismissRecurringOccurrence,
+  undismissRecurringOccurrence
 } from '../utils/financeUtils';
 import { 
   Calendar as CalendarIcon, 
@@ -17,7 +20,9 @@ import {
   CheckCircle2, 
   PlusCircle, 
   Layers,
-  Sparkles
+  Sparkles,
+  EyeOff,
+  RotateCcw
 } from 'lucide-react';
 
 interface MonthlyHeatmapProps {
@@ -44,6 +49,8 @@ export function MonthlyHeatmap({
   const [yearStr, monthStr] = activeMonth.split('-');
   const year = parseInt(yearStr || '2026', 10);
   const month = parseInt(monthStr || '8', 10) - 1; // 0-indexed
+
+  const [dismissedKeys, setDismissedKeys] = useState<string[]>(() => getSavedDismissedRecurring());
 
   const [selectedDayDetails, setSelectedDayDetails] = useState<{
     day: number;
@@ -88,7 +95,8 @@ export function MonthlyHeatmap({
     recurringRules,
     nonRecurringKeys,
     displayCurrency,
-    usdArsRate
+    usdArsRate,
+    dismissedKeys
   );
 
   const dailyPendingMap = monthPendingResult.dailyPendingMap;
@@ -133,6 +141,38 @@ export function MonthlyHeatmap({
     setSelectedDayDetails(null);
   };
 
+  const handleDismissPending = (item: PendingRecurringItem) => {
+    const updated = dismissRecurringOccurrence(item.id, item.title, activeMonth);
+    setDismissedKeys(updated);
+    if (selectedDayDetails) {
+      setSelectedDayDetails(prev => {
+        if (!prev) return null;
+        const updatedPending = prev.pendingRecurringForDay.filter(p => p.id !== item.id);
+        const itemConverted = item.convertedAmount;
+        return {
+          ...prev,
+          pendingRecurringForDay: updatedPending,
+          totalPendingExpense: item.type === 'EXPENSE' ? Math.max(0, prev.totalPendingExpense - itemConverted) : prev.totalPendingExpense,
+          totalPendingIncome: item.type === 'INCOME' ? Math.max(0, prev.totalPendingIncome - itemConverted) : prev.totalPendingIncome,
+        };
+      });
+    }
+  };
+
+  const handleRestoreDismissed = (item: PendingRecurringItem) => {
+    const updated = undismissRecurringOccurrence(item.id, item.title, activeMonth);
+    setDismissedKeys(updated);
+  };
+
+  const handleResetAllDismissedThisMonth = () => {
+    if (monthPendingResult.dismissedItems) {
+      monthPendingResult.dismissedItems.forEach(item => {
+        undismissRecurringOccurrence(item.id, item.title, activeMonth);
+      });
+    }
+    setDismissedKeys(getSavedDismissedRecurring());
+  };
+
   return (
     <div id="monthly-heatmap-calendar" className="bg-white dark:bg-[#11141c] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-3 sm:p-5 shadow-xs space-y-4">
       {/* Header */}
@@ -155,7 +195,7 @@ export function MonthlyHeatmap({
         </div>
         
         {/* Header KPI summary */}
-        <div className="flex items-center gap-3 self-start sm:self-auto text-xs font-mono">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 self-start sm:self-auto text-xs font-mono">
           {monthPendingResult.pendingExpense > 0 && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-[11px]">
               <Repeat className="w-3.5 h-3.5" />
@@ -167,6 +207,17 @@ export function MonthlyHeatmap({
               <Sparkles className="w-3.5 h-3.5" />
               <span>Pending Inflow: <strong>+{formatCurrencyCompact(monthPendingResult.pendingIncome, displayCurrency)}</strong></span>
             </div>
+          )}
+          {monthPendingResult.dismissedItems && monthPendingResult.dismissedItems.length > 0 && (
+            <button
+              type="button"
+              onClick={handleResetAllDismissedThisMonth}
+              title="Click to restore all dismissed recurring estimations for this month"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-[11px] transition-colors cursor-pointer"
+            >
+              <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+              <span>{monthPendingResult.dismissedItems.length} Dismissed (Restore)</span>
+            </button>
           )}
         </div>
       </div>
@@ -383,7 +434,7 @@ export function MonthlyHeatmap({
                           </p>
                         </div>
 
-                        <div className="text-right font-mono shrink-0 flex items-center gap-2">
+                        <div className="text-right font-mono shrink-0 flex items-center gap-1.5 sm:gap-2">
                           <div>
                             <p className={`text-xs font-bold ${isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-300'}`}>
                               {isIncome ? '+' : '-'}{formatCurrency(item.convertedAmount, displayCurrency)}
@@ -401,11 +452,21 @@ export function MonthlyHeatmap({
                               type="button"
                               onClick={() => handleQuickLogPending(item, selectedDayDetails.day)}
                               title="Log as actual transaction"
-                              className="p-1.5 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 transition-colors shadow-xs"
+                              className="p-1.5 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 transition-colors shadow-xs cursor-pointer"
                             >
                               <PlusCircle className="w-4 h-4" />
                             </button>
                           )}
+
+                          {/* Dismiss button */}
+                          <button
+                            type="button"
+                            onClick={() => handleDismissPending(item)}
+                            title="Dismiss this recurring estimate for this month"
+                            className="p-1.5 rounded-lg bg-white dark:bg-slate-800 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-slate-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors shadow-xs cursor-pointer"
+                          >
+                            <EyeOff className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     );
@@ -413,6 +474,47 @@ export function MonthlyHeatmap({
                 </div>
               </div>
             )}
+
+            {/* Dismissed for this Day Section if any */}
+            {(() => {
+              const dismissedForDay = (monthPendingResult.dismissedItems || []).filter(item => 
+                item.dayOfMonth === selectedDayDetails.day || item.originalDayOfMonth === selectedDayDetails.day
+              );
+              if (dismissedForDay.length === 0) return null;
+              return (
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5">
+                      <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Dismissed for this Month ({dismissedForDay.length})</span>
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {dismissedForDay.map(dItem => (
+                      <div key={dItem.id} className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-slate-500 dark:text-slate-400 font-medium truncate line-through">
+                            {dItem.title}
+                          </span>
+                          <span className="text-[10px] text-slate-400 ml-1.5 font-mono">
+                            ({formatCurrency(dItem.convertedAmount, displayCurrency)})
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreDismissed(dItem)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                          title="Restore recurring estimate"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Restore</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Logged Transactions Section */}
             <div className="space-y-2.5">

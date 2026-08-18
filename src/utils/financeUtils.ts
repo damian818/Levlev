@@ -1908,12 +1908,76 @@ export function getEffectiveRecurringItems(
   return result;
 }
 
+export function getSavedDismissedRecurring(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('levlev_dismissed_recurring') || localStorage.getItem('finance_app_dismissed_recurring');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveDismissedRecurring(keys: string[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const serialized = JSON.stringify(keys);
+    localStorage.setItem('levlev_dismissed_recurring', serialized);
+    localStorage.setItem('finance_app_dismissed_recurring', serialized);
+  } catch {}
+}
+
+export function getOccurrenceDismissKey(itemId: string, itemTitle: string, monthKey: string): string {
+  const clean = normalizeCleanTitle(itemTitle || '').toLowerCase().trim();
+  return `${clean}_${monthKey}`;
+}
+
+export function isOccurrenceDismissed(itemId: string, itemTitle: string, monthKey: string, dismissedKeys?: string[]): boolean {
+  const keys = dismissedKeys || getSavedDismissedRecurring();
+  if (!keys || keys.length === 0) return false;
+  
+  const key1 = `${itemId}-${monthKey}`;
+  const key2 = getOccurrenceDismissKey(itemId, itemTitle, monthKey);
+  const key3 = itemId;
+  const cleanTitle = normalizeCleanTitle(itemTitle || '').toLowerCase().trim();
+  
+  return keys.some(k => {
+    const lk = k.toLowerCase().trim();
+    return lk === key1.toLowerCase() || lk === key2 || lk === key3.toLowerCase() || lk === `${cleanTitle}-${monthKey}` || lk === `${itemId}_${monthKey}`;
+  });
+}
+
+export function dismissRecurringOccurrence(itemId: string, itemTitle: string, monthKey: string): string[] {
+  const current = getSavedDismissedRecurring();
+  const newKey = getOccurrenceDismissKey(itemId, itemTitle, monthKey);
+  const compositeKey = `${itemId}-${monthKey}`;
+  const next = Array.from(new Set([...current, newKey, compositeKey]));
+  saveDismissedRecurring(next);
+  return next;
+}
+
+export function undismissRecurringOccurrence(itemId: string, itemTitle: string, monthKey: string): string[] {
+  const current = getSavedDismissedRecurring();
+  const key1 = `${itemId}-${monthKey}`.toLowerCase();
+  const key2 = getOccurrenceDismissKey(itemId, itemTitle, monthKey).toLowerCase();
+  const key3 = itemId.toLowerCase();
+  const cleanTitle = normalizeCleanTitle(itemTitle || '').toLowerCase().trim();
+
+  const next = current.filter(k => {
+    const lk = k.toLowerCase().trim();
+    return lk !== key1 && lk !== key2 && lk !== key3 && lk !== `${cleanTitle}-${monthKey}` && lk !== `${itemId}_${monthKey}`;
+  });
+  saveDismissedRecurring(next);
+  return next;
+}
+
 export interface MonthPendingRecurringResult {
   monthKey: string;
   pendingItems: PendingRecurringItem[];
   pendingExpenses: PendingRecurringItem[];
   pendingIncomes: PendingRecurringItem[];
   matchedItems: PendingRecurringItem[];
+  dismissedItems: PendingRecurringItem[];
   pendingExpense: number; // in displayCurrency
   pendingIncome: number; // in displayCurrency
   totalPendingExpense: number; // in displayCurrency (alias)
@@ -1927,7 +1991,8 @@ export function getPendingRecurringForMonth(
   recurringRules: RecurringRule[] = [],
   nonRecurringKeys: string[] = [],
   displayCurrency: DisplayCurrency = 'ARS',
-  usdArsRate: number = 1521
+  usdArsRate: number = 1521,
+  dismissedKeys?: string[]
 ): MonthPendingRecurringResult {
   const effectiveItems = getEffectiveRecurringItems(transactions, recurringRules, nonRecurringKeys, displayCurrency, usdArsRate);
   const monthTransactions = transactions.filter(t => t.date && t.date.substring(0, 7) === monthKey);
@@ -1935,9 +2000,11 @@ export function getPendingRecurringForMonth(
   const todayStr = getTodayString();
   const isPastMonth = monthKey < currentMonthKey;
   const isCurrentMonth = monthKey === currentMonthKey;
+  const activeDismissedKeys = dismissedKeys || getSavedDismissedRecurring();
 
   const pendingItems: PendingRecurringItem[] = [];
   const matchedItems: PendingRecurringItem[] = [];
+  const dismissedItems: PendingRecurringItem[] = [];
   const dailyPendingMap: Record<number, PendingRecurringItem[]> = {};
 
   let pendingExpense = 0;
@@ -1956,19 +2023,29 @@ export function getPendingRecurringForMonth(
     const day = Math.min(31, Math.max(1, item.dayOfMonth || 15));
     const estimatedDateStr = `${monthKey}-${String(day).padStart(2, '0')}`;
 
-    // 1. Check if an expense/income was recorded in the same period for that title
+    // 1. Check if ANY transaction in this month matches this title (irrelevant from income or expense, and regardless of amount)
     const matchedTx = monthTransactions.find(t => {
-      if (t.type !== item.type) return false;
       const tTitleClean = normalizeCleanTitle(t.title || '').toLowerCase().trim();
       const tTitle = (t.title || '').toLowerCase().trim();
+      const tDescClean = normalizeCleanTitle(t.description || '').toLowerCase().trim();
+      const tDesc = (t.description || '').toLowerCase().trim();
 
-      // Check title match, clean title match, or containment
+      // Check title match, clean title match, or description match
       if (tTitle === itemTitleLower || tTitleClean === cleanItemTitle || tTitleClean === itemTitleLower || tTitle === cleanItemTitle) return true;
-      if (cleanItemTitle.length >= 3 && (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean))) return true;
-      if (tTitleClean.length >= 3 && (itemTitleLower.includes(tTitleClean) || tTitleClean.includes(itemTitleLower))) return true;
+      if (tDesc === itemTitleLower || tDescClean === cleanItemTitle || tDescClean === itemTitleLower || tDesc === cleanItemTitle) return true;
+
+      // Check substring containment if length >= 3
+      if (cleanItemTitle.length >= 3) {
+        if (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitle) || tTitleClean.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean)) return true;
+        if (tDesc.includes(cleanItemTitle) || cleanItemTitle.includes(tDesc) || tDescClean.includes(cleanItemTitle) || cleanItemTitle.includes(tDescClean)) return true;
+      }
+      if (itemTitleLower.length >= 3) {
+        if (tTitle.includes(itemTitleLower) || itemTitleLower.includes(tTitle) || tTitleClean.includes(itemTitleLower) || itemTitleLower.includes(tTitleClean)) return true;
+        if (tDesc.includes(itemTitleLower) || itemTitleLower.includes(tDesc) || tDescClean.includes(itemTitleLower) || itemTitleLower.includes(tDescClean)) return true;
+      }
 
       // For installments: check description or installments tag or title
-      if (item.isInstallment && t.installments && (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean))) return true;
+      if (item.isInstallment && (t.installments || t.description) && (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean) || tDesc.includes(cleanItemTitle))) return true;
 
       return false;
     });
@@ -1992,9 +2069,16 @@ export function getPendingRecurringForMonth(
       isExcluded: item.isExcluded,
     };
 
-    // If an expense/income was already recorded in this period for that title -> remove estimation for that period!
+    // If an actual transaction was already recorded in this period for that title -> remove estimation for that period!
     if (matchedTx) {
       matchedItems.push(pendingItemObj);
+      return;
+    }
+
+    // Check if the user has dismissed this specific recurring item for this month
+    if (isOccurrenceDismissed(item.id, item.title, monthKey, activeDismissedKeys)) {
+      pendingItemObj.isDismissed = true;
+      dismissedItems.push(pendingItemObj);
       return;
     }
 
@@ -2038,6 +2122,7 @@ export function getPendingRecurringForMonth(
     pendingExpenses,
     pendingIncomes,
     matchedItems,
+    dismissedItems,
     pendingExpense,
     pendingIncome,
     totalPendingExpense: pendingExpense,

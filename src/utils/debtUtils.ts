@@ -108,9 +108,9 @@ export function getSavedDebts(): DebtItem[] {
   if (typeof window === 'undefined') return DEFAULT_SAMPLE_DEBTS;
   try {
     const raw = localStorage.getItem('levlev_debts_list') || localStorage.getItem('finance_app_debts');
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {
     console.error('Failed to parse saved debts', e);
@@ -121,8 +121,9 @@ export function getSavedDebts(): DebtItem[] {
 export function saveDebtsToStorage(debts: DebtItem[]): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem('levlev_debts_list', JSON.stringify(debts));
-    localStorage.setItem('finance_app_debts', JSON.stringify(debts));
+    const serialized = JSON.stringify(debts);
+    localStorage.setItem('levlev_debts_list', serialized);
+    localStorage.setItem('finance_app_debts', serialized);
   } catch (e) {
     console.error('Failed to save debts to localStorage', e);
   }

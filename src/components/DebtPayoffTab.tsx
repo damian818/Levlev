@@ -145,16 +145,20 @@ export function DebtPayoffTab({
     }
 
     if (editingDebt) {
-      setDebts(prev => prev.map(d => d.id === editingDebt.id ? {
-        ...d,
-        name: formName.trim(),
-        balance: balanceNum,
-        interestRate: rateNum,
-        minPayment: minPayNum,
-        category: formCategory,
-        dueDay: parseInt(formDueDay, 10) || 15,
-        notes: formNotes.trim(),
-      } : d));
+      setDebts(prev => {
+        const next = prev.map(d => d.id === editingDebt.id ? {
+          ...d,
+          name: formName.trim(),
+          balance: balanceNum,
+          interestRate: rateNum,
+          minPayment: minPayNum,
+          category: formCategory,
+          dueDay: parseInt(formDueDay, 10) || 15,
+          notes: formNotes.trim(),
+        } : d);
+        saveDebtsToStorage(next);
+        return next;
+      });
     } else {
       const newDebt: DebtItem = {
         id: `debt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -167,23 +171,33 @@ export function DebtPayoffTab({
         dueDay: parseInt(formDueDay, 10) || 15,
         notes: formNotes.trim(),
       };
-      setDebts(prev => [...prev, newDebt]);
+      setDebts(prev => {
+        const next = [...prev, newDebt];
+        saveDebtsToStorage(next);
+        return next;
+      });
     }
 
     setIsAddingDebt(false);
   };
 
   const handleDeleteDebt = (id: string) => {
-    setDebts(prev => prev.filter(d => d.id !== id));
+    setDebts(prev => {
+      const next = prev.filter(d => d.id !== id);
+      saveDebtsToStorage(next);
+      return next;
+    });
   };
 
   const handleResetSampleDebts = () => {
     setDebts(DEFAULT_SAMPLE_DEBTS);
+    saveDebtsToStorage(DEFAULT_SAMPLE_DEBTS);
     setExtraPayment(150);
   };
 
   const handleClearAllDebts = () => {
     setDebts([]);
+    saveDebtsToStorage([]);
   };
 
   const exportScheduleCsv = () => {
