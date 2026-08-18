@@ -54,7 +54,7 @@ export interface CreditCardClosingRule {
   fixedDay?: number; // 1-31 (default 25)
   weekday?: number; // 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
   nth?: number; // 1=1st, 2=2nd, 3=3rd, 4=4th
-  dueDaysAfterClose?: number; // default 10
+  dueDaysAfterClose?: number; // default 5
 }
 
 export interface CreditCardAccountConfig {

@@ -56,17 +56,17 @@ export function CreditCardDetailModal({
   const handlePresetChange = (presetKey: string) => {
     setSelectedPreset(presetKey);
     if (presetKey === 'PREVIOUS_THU') {
-      setTempRule({ ruleType: 'PREVIOUS_TO_LAST_WEEKDAY', weekday: 4, dueDaysAfterClose: 10 });
+      setTempRule({ ruleType: 'PREVIOUS_TO_LAST_WEEKDAY', weekday: 4, dueDaysAfterClose: 5 });
     } else if (presetKey === 'LAST_FRI') {
-      setTempRule({ ruleType: 'LAST_WEEKDAY', weekday: 5, dueDaysAfterClose: 10 });
+      setTempRule({ ruleType: 'LAST_WEEKDAY', weekday: 5, dueDaysAfterClose: 5 });
     } else if (presetKey === '3RD_THU') {
-      setTempRule({ ruleType: 'NTH_WEEKDAY', weekday: 4, nth: 3, dueDaysAfterClose: 10 });
+      setTempRule({ ruleType: 'NTH_WEEKDAY', weekday: 4, nth: 3, dueDaysAfterClose: 5 });
     } else if (presetKey === 'PREVIOUS_FRI') {
-      setTempRule({ ruleType: 'PREVIOUS_TO_LAST_WEEKDAY', weekday: 5, dueDaysAfterClose: 10 });
+      setTempRule({ ruleType: 'PREVIOUS_TO_LAST_WEEKDAY', weekday: 5, dueDaysAfterClose: 5 });
     } else if (presetKey === 'FIXED_25') {
-      setTempRule({ ruleType: 'FIXED_DAY', fixedDay: 25, dueDaysAfterClose: 10 });
+      setTempRule({ ruleType: 'FIXED_DAY', fixedDay: 25, dueDaysAfterClose: 5 });
     } else if (presetKey === 'FIXED_20') {
-      setTempRule({ ruleType: 'FIXED_DAY', fixedDay: 20, dueDaysAfterClose: 10 });
+      setTempRule({ ruleType: 'FIXED_DAY', fixedDay: 20, dueDaysAfterClose: 5 });
     }
   };
 
@@ -271,7 +271,7 @@ export function CreditCardDetailModal({
               </div>
 
               {selectedPreset === 'CUSTOM' && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-[#161b22] rounded-lg border border-slate-800">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3 bg-[#161b22] rounded-lg border border-slate-800">
                   <div>
                     <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">{t('cc_modal.pattern')}</label>
                     <select
@@ -334,6 +334,18 @@ export function CreditCardDetailModal({
                       )}
                     </>
                   )}
+
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase font-bold mb-1">Due (Days After)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="60"
+                      value={tempRule.dueDaysAfterClose ?? 5}
+                      onChange={(e) => setTempRule({ ...tempRule, dueDaysAfterClose: parseInt(e.target.value) || 0 })}
+                      className="w-full px-2.5 py-1.5 bg-[#0f131a] border border-slate-700 text-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 font-bold"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -444,7 +456,7 @@ export function CreditCardDetailModal({
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
           {/* Cycle Metrics Header */}
           {activeStatement && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="p-4 rounded-xl bg-[#121620] border border-slate-800 space-y-1">
                 <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">{t('cc_modal.statement_expenses')}</span>
                 <div className="text-xl font-bold text-slate-100">

@@ -299,7 +299,7 @@ export function SettingsTab({
   const [accFixedDayInput, setAccFixedDayInput] = useState<number>(25);
   const [accWeekdayInput, setAccWeekdayInput] = useState<number>(4); // Thursday
   const [accNthInput, setAccNthInput] = useState<number>(4); // 4th
-  const [accDueDaysInput, setAccDueDaysInput] = useState<number>(10);
+  const [accDueDaysInput, setAccDueDaysInput] = useState<number>(5);
   const [accUpdateTxs, setAccUpdateTxs] = useState(true);
 
   const [deletingAccName, setDeletingAccName] = useState<string | null>(null);
@@ -421,7 +421,7 @@ export function SettingsTab({
     setAccFixedDayInput(25);
     setAccWeekdayInput(4);
     setAccNthInput(4);
-    setAccDueDaysInput(10);
+    setAccDueDaysInput(5);
     setIsAddAccOpen(true);
   };
 
@@ -466,13 +466,13 @@ export function SettingsTab({
       setAccFixedDayInput(acc.closingRule.fixedDay || 25);
       setAccWeekdayInput(acc.closingRule.weekday ?? 4);
       setAccNthInput(acc.closingRule.nth || 4);
-      setAccDueDaysInput(acc.closingRule.dueDaysAfterClose || 10);
+      setAccDueDaysInput(acc.closingRule.dueDaysAfterClose || 5);
     } else {
       setAccRuleTypeInput('FIXED_DAY');
       setAccFixedDayInput(25);
       setAccWeekdayInput(4);
       setAccNthInput(4);
-      setAccDueDaysInput(10);
+      setAccDueDaysInput(5);
     }
     setAccUpdateTxs(true);
   };
@@ -2042,6 +2042,18 @@ export function SettingsTab({
                       )}
                     </div>
                   )}
+
+                  <div className="pt-2">
+                    <label className="block text-[11px] text-slate-400 mb-1">Due Date (Days after closing)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={60}
+                      value={accDueDaysInput}
+                      onChange={(e) => setAccDueDaysInput(parseInt(e.target.value) || 0)}
+                      className="w-full px-2.5 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -2212,6 +2224,18 @@ export function SettingsTab({
                       )}
                     </div>
                   )}
+
+                  <div className="pt-2">
+                    <label className="block text-[11px] text-slate-400 mb-1">Due Date (Days after closing)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={60}
+                      value={accDueDaysInput}
+                      onChange={(e) => setAccDueDaysInput(parseInt(e.target.value) || 0)}
+                      className="w-full px-2.5 py-1.5 bg-[#121720] border border-slate-700 rounded-lg text-xs font-semibold text-slate-100"
+                    />
+                  </div>
                 </div>
               )}
 

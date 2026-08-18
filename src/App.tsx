@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
-import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount, detectFinancialAnomalies, getPendingRecurringForMonth, getCurrentMonthKey, getSavedDismissedRecurring, saveDismissedRecurring } from './utils/financeUtils';
+import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount, detectFinancialAnomalies, getCreditCardStatements, getPendingRecurringForMonth, getCurrentMonthKey, getSavedDismissedRecurring, saveDismissedRecurring } from './utils/financeUtils';
 import { TabCustomizationItem, getSavedTabCustomization, saveTabCustomizationToStorage, mergeTabOrder } from './utils/tabUtils';
 import { getSavedSelectedReports, saveSelectedReports } from './utils/reportsCatalog';
 import { getSavedDebts, saveDebtsToStorage, getSavedDebtStrategy, saveDebtStrategyToStorage, getSavedExtraPayment, saveExtraPaymentToStorage } from './utils/debtUtils';
@@ -1005,7 +1005,36 @@ export default function App() {
         }
     });
     
-  }, [transactions, budgets, recurringRules, notificationsEnabled, permission]);
+    // Check credit card due dates
+    const ccAccounts = accounts.filter(acc => isCreditCardAccount(acc.name, accounts));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    ccAccounts.forEach(acc => {
+        const statements = getCreditCardStatements(transactions, acc.name, acc.closingRule, periodStatusOverrides);
+        statements.forEach(stmt => {
+            if (!stmt.isPaid && stmt.netDue > 0 && stmt.dueDate) {
+                const due = new Date(stmt.dueDate + 'T00:00:00'); // parse safely
+                due.setHours(0, 0, 0, 0);
+                const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 3600 * 24));
+                
+                if (diffDays <= 5) {
+                    const key = `notified_cc_due_${acc.name}_${stmt.closeDate}`;
+                    if (!localStorage.getItem(key)) {
+                        let daysText = '';
+                        if (diffDays === 0) daysText = 'today';
+                        else if (diffDays > 0) daysText = `in ${diffDays} day${diffDays === 1 ? '' : 's'}`;
+                        else daysText = `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'} ago`;
+                        
+                        sendNotification('Credit Card Due', `Your ${acc.name} card has a balance due ${daysText}.`);
+                        localStorage.setItem(key, 'true');
+                    }
+                }
+            }
+        });
+    });
+
+  }, [transactions, budgets, recurringRules, accounts, periodStatusOverrides, notificationsEnabled, permission]);
 
   const handleSaveRecurringThreshold = (title: string, threshold: number) => {
     setRecurringThresholds(prev => {

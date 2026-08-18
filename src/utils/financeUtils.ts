@@ -221,7 +221,7 @@ export function getCreditCardStatements(
     ? { ruleType: 'FIXED_DAY', fixedDay: defaultCloseDayOrRule }
     : defaultCloseDayOrRule;
 
-  const dueDaysAfterClose = rule.dueDaysAfterClose ?? 10;
+  const dueDaysAfterClose = rule.dueDaysAfterClose ?? 5;
   const pad = (n: number) => String(n).padStart(2, '0');
 
   // 1. Separate expenses and payments
