@@ -147,6 +147,23 @@ export default function App() {
     return defaultCategoryItems;
   });
 
+  const [hiddenCategoryIds, setHiddenCategoryIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_hidden_category_ids');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return categories.filter(c => c.isHiddenFromNewTx).map(c => c.id || c.name);
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('finance_app_hidden_category_ids', JSON.stringify(hiddenCategoryIds));
+    } catch (e) {}
+  }, [hiddenCategoryIds]);
+
   // Custom accounts list state
   const [accounts, setAccounts] = useState<AccountItem[]>(() => {
     try {
@@ -220,6 +237,11 @@ export default function App() {
         accounts,
         budgets,
         settings: {
+          hiddenCategoryIds: Array.from(new Set([
+            ...hiddenCategoryIds,
+            ...categories.filter(c => c.isHiddenFromNewTx).map(c => c.id),
+            ...categories.filter(c => c.isHiddenFromNewTx).map(c => c.name),
+          ])),
           localCurrency,
           displayCurrency,
           enabledCurrencies,
@@ -602,6 +624,12 @@ export default function App() {
           setCategories(data.categories);
           try {
             localStorage.setItem('finance_app_custom_categories', JSON.stringify(data.categories));
+          } catch (e) {}
+        }
+        if (Array.isArray(data.settings?.hiddenCategoryIds)) {
+          setHiddenCategoryIds(data.settings.hiddenCategoryIds);
+          try {
+            localStorage.setItem('finance_app_hidden_category_ids', JSON.stringify(data.settings.hiddenCategoryIds));
           } catch (e) {}
         }
         if (data.accounts && data.accounts.length > 0) {
@@ -1014,6 +1042,11 @@ export default function App() {
         accounts,
         budgets,
         settings: {
+          hiddenCategoryIds: Array.from(new Set([
+            ...hiddenCategoryIds,
+            ...categories.filter(c => c.isHiddenFromNewTx).map(c => c.id),
+            ...categories.filter(c => c.isHiddenFromNewTx).map(c => c.name),
+          ])),
           localCurrency,
           displayCurrency,
           enabledCurrencies,
@@ -1029,7 +1062,7 @@ export default function App() {
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [transactions, categories, accounts, budgets, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold]);
+  }, [transactions, categories, accounts, budgets, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold, hiddenCategoryIds]);
 
   if (authLoading) {
     return (
@@ -1394,6 +1427,8 @@ export default function App() {
                 localStorage.setItem('finance_app_notifications_enabled', String(newValue));
               }}
               requestNotificationPermission={requestPermission}
+              hiddenCategoryIds={hiddenCategoryIds}
+              onUpdateHiddenCategoryIds={setHiddenCategoryIds}
             />
           )}
         </Suspense>

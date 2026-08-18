@@ -57,6 +57,7 @@ export interface SupabaseUserData {
     accountsList?: AccountItem[];
     categoryConfigs?: Record<string, { isHiddenFromNewTx?: boolean; color?: string; type?: string }>;
     categoriesList?: CategoryItem[];
+    hiddenCategoryIds?: string[];
     recurringRules?: RecurringRule[];
     nonRecurringKeys?: string[];
     onboardingCompleted?: boolean;
@@ -109,6 +110,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     const ccMap = userSettings?.ccMap || {};
     const accountConfigs = userSettings?.accountConfigs || {};
     const categoryConfigs = userSettings?.categoryConfigs || {};
+    const hiddenCategoryIds: string[] = Array.isArray(userSettings?.hiddenCategoryIds) ? userSettings.hiddenCategoryIds : [];
 
     // Handle transactions (first page already fetched)
     let rawTxRows: any[] = txResFirstPage.data || [];
@@ -191,7 +193,9 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
                      {};
 
       let isHidden: boolean | undefined = undefined;
-      if (row.is_hidden_from_new_tx !== undefined && row.is_hidden_from_new_tx !== null) {
+      if (hiddenCategoryIds.includes(row.id) || hiddenCategoryIds.includes(row.name)) {
+        isHidden = true;
+      } else if (row.is_hidden_from_new_tx !== undefined && row.is_hidden_from_new_tx !== null) {
         isHidden = !!row.is_hidden_from_new_tx;
       } else if (row.is_hidden !== undefined && row.is_hidden !== null) {
         isHidden = !!row.is_hidden;
@@ -215,8 +219,11 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
       userSettings.categoriesList.forEach((savedCat) => {
         const lowerName = (savedCat.name || '').toLowerCase();
         const found = categories.find(c => c.name.toLowerCase() === lowerName);
+        const isHiddenInArray = hiddenCategoryIds.includes(savedCat.id) || hiddenCategoryIds.includes(savedCat.name);
         if (found) {
-          if (savedCat.isHiddenFromNewTx !== undefined) {
+          if (isHiddenInArray) {
+            found.isHiddenFromNewTx = true;
+          } else if (savedCat.isHiddenFromNewTx !== undefined) {
             found.isHiddenFromNewTx = savedCat.isHiddenFromNewTx;
           }
           if (savedCat.type) found.type = savedCat.type;
@@ -226,6 +233,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
         } else if (savedCat.name) {
           categories.push({
             ...savedCat,
+            isHiddenFromNewTx: isHiddenInArray ? true : savedCat.isHiddenFromNewTx,
           });
           existingCategoryNames.add(lowerName);
         }
@@ -236,13 +244,14 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     Object.entries(categoryConfigs).forEach(([name, config]) => {
       const lowerName = name.toLowerCase();
       if (!existingCategoryNames.has(lowerName)) {
+        const isHiddenInArray = hiddenCategoryIds.includes(name);
         categories.push({
           id: `cat-cfg-${Math.random().toString(36).substring(2)}`,
           ownerId: userId,
           name: name,
           type: (config.type as any) || 'EXPENSE',
           description: config.color || '#64748b',
-          isHiddenFromNewTx: !!config.isHiddenFromNewTx,
+          isHiddenFromNewTx: isHiddenInArray || !!config.isHiddenFromNewTx,
         });
         existingCategoryNames.add(lowerName);
       }
@@ -611,6 +620,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       accountsList: data.accounts || [],
       categoryConfigs: categoryConfigs,
       categoriesList: data.categories || [],
+      hiddenCategoryIds: data.settings?.hiddenCategoryIds || (data.categories || []).filter(c => c.isHiddenFromNewTx).map(c => c.id || c.name),
       recurringRules: data.recurringRules || data.settings?.recurringRules || [],
       nonRecurringKeys: data.nonRecurringKeys || data.settings?.nonRecurringKeys || [],
       onboardingCompleted: !!isTourCompleted,
