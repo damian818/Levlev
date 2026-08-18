@@ -1397,6 +1397,8 @@ export default function App() {
               historyData={historyData}
               recurringRules={recurringRules}
               nonRecurringKeys={nonRecurringKeys}
+              accountList={accounts}
+              periodStatusOverrides={periodStatusOverrides}
               customBalances={customBalances}
               onNavigateTab={setCurrentTab}
               onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance } from '../types';
+import { Transaction, DisplayCurrency, ViewTab, TransactionFilter, InflationPoint, RecurringRule, AccountCustomBalance, AccountItem } from '../types';
 import { analyzeSpending, formatCurrency, convertCurrency, computeAccountBalances, computePredictiveTrend, calculateProjectedBalance, getCurrentMonthKey, getDefaultSelectedMonth, computeFutureRecurringProjections, getPendingRecurringForMonth, detectFinancialAnomalies, detectRecurringItems, detectRecurringThresholdAlerts } from '../utils/financeUtils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, AreaChart, Area } from 'recharts';
 import { TrendingUp, Wallet, ShieldAlert, ArrowUpRight, ArrowDownRight, Award, ExternalLink, ChevronRight, Sparkles, Sliders, Calendar, Zap, FileDown, Upload, Sparkle, ShoppingBag, Coffee, Car, Film, ChevronDown, ChevronUp } from 'lucide-react';
@@ -18,6 +18,8 @@ interface OverviewTabProps {
   historyData?: InflationPoint[];
   recurringRules?: RecurringRule[];
   nonRecurringKeys?: string[];
+  accountList?: AccountItem[];
+  periodStatusOverrides?: Record<string, 'PAID' | 'OPEN'>;
   customBalances?: Record<string, AccountCustomBalance>;
   onNavigateTab: (tab: ViewTab) => void;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
@@ -37,6 +39,8 @@ export const OverviewTab = React.memo(function OverviewTab({
   historyData,
   recurringRules = [],
   nonRecurringKeys = [],
+  accountList = [],
+  periodStatusOverrides = {},
   customBalances,
   onNavigateTab,
   onNavigateToTransactionsWithFilter,
@@ -1045,6 +1049,8 @@ export const OverviewTab = React.memo(function OverviewTab({
                 usdArsRate={usdArsRate}
                 recurringRules={recurringRules}
                 nonRecurringKeys={nonRecurringKeys}
+                accounts={accountList}
+                periodStatusOverrides={periodStatusOverrides}
                 onAddTransaction={onAddTransaction}
               />
             </div>

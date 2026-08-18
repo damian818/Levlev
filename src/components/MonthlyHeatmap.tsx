@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem } from '../types';
+import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem, AccountItem } from '../types';
 import { 
   convertCurrency, 
   formatCurrency, 
@@ -8,7 +8,9 @@ import {
   getPendingRecurringForMonth,
   getSavedDismissedRecurring,
   dismissRecurringOccurrence,
-  undismissRecurringOccurrence
+  undismissRecurringOccurrence,
+  isCreditCardAccount,
+  getCreditCardStatements
 } from '../utils/financeUtils';
 import { 
   Calendar as CalendarIcon, 
@@ -22,6 +24,7 @@ import {
   Layers,
   Sparkles,
   EyeOff,
+  CreditCard,
   RotateCcw
 } from 'lucide-react';
 
@@ -32,6 +35,8 @@ interface MonthlyHeatmapProps {
   usdArsRate: number;
   recurringRules?: RecurringRule[];
   nonRecurringKeys?: string[];
+  accounts?: AccountItem[];
+  periodStatusOverrides?: Record<string, 'PAID' | 'OPEN'>;
   onAddTransaction?: (tx: Transaction) => void;
 }
 
@@ -42,6 +47,8 @@ export function MonthlyHeatmap({
   usdArsRate,
   recurringRules = [],
   nonRecurringKeys = [],
+  accounts = [],
+  periodStatusOverrides = {},
   onAddTransaction,
 }: MonthlyHeatmapProps) {
   const { t } = useTranslation();
@@ -60,12 +67,33 @@ export function MonthlyHeatmap({
     pendingRecurringForDay: PendingRecurringItem[];
     totalPendingExpense: number;
     totalPendingIncome: number;
+    ccEvents?: { closes: string[], dues: string[] };
   } | null>(null);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = Sun, 1 = Mon...
 
   // Compute actual daily transactions for the active month
+  
+  // Compute credit card events
+  const ccEventsMap: Record<number, { closes: string[], dues: string[] }> = {};
+  const ccAccounts = accounts.filter(acc => isCreditCardAccount(acc.name, accounts));
+  ccAccounts.forEach(acc => {
+    const statements = getCreditCardStatements(transactions, acc.name, acc.closingRule, periodStatusOverrides);
+    statements.forEach(stmt => {
+      if (stmt.closeDate.startsWith(activeMonth)) {
+        const day = parseInt(stmt.closeDate.substring(8, 10), 10);
+        if (!ccEventsMap[day]) ccEventsMap[day] = { closes: [], dues: [] };
+        if (!ccEventsMap[day].closes.includes(acc.name)) ccEventsMap[day].closes.push(acc.name);
+      }
+      if (stmt.dueDate && stmt.dueDate.startsWith(activeMonth)) {
+        const day = parseInt(stmt.dueDate.substring(8, 10), 10);
+        if (!ccEventsMap[day]) ccEventsMap[day] = { closes: [], dues: [] };
+        if (!ccEventsMap[day].dues.includes(acc.name)) ccEventsMap[day].dues.push(acc.name);
+      }
+    });
+  });
+
   const dailyMap: Record<number, { totalSpent: number; totalIncome: number; txs: Transaction[] }> = {};
 
   transactions.forEach(tx => {
@@ -244,9 +272,11 @@ export function MonthlyHeatmap({
           const totalIncome = dayData ? dayData.totalIncome : 0;
           const pendingForDay = dailyPendingMap[dayNum] || [];
           const hasPending = pendingForDay.length > 0;
+          const ccEvents = ccEventsMap[dayNum];
+          const hasCCEvents = !!ccEvents && (ccEvents.closes.length > 0 || ccEvents.dues.length > 0);
           const styleClass = getIntensityColor(totalSpent, pendingForDay.length);
 
-          const isInteractive = totalSpent > 0 || totalIncome > 0 || hasPending;
+          const isInteractive = totalSpent > 0 || totalIncome > 0 || hasPending || hasCCEvents;
 
           const pendingExpenses = pendingForDay.filter(p => p.type === 'EXPENSE');
           const pendingIncomes = pendingForDay.filter(p => p.type === 'INCOME');
@@ -267,6 +297,7 @@ export function MonthlyHeatmap({
                     pendingRecurringForDay: pendingForDay,
                     totalPendingExpense: dayPendingExpTotal,
                     totalPendingIncome: dayPendingIncTotal,
+                    ccEvents: ccEvents,
                   });
                 }
               }}
@@ -294,6 +325,24 @@ export function MonthlyHeatmap({
                       <Repeat className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
                       <span>{pendingForDay.length}</span>
                       {pendingForDay.some(p => p.isExpired) && <span className="text-[7px] text-rose-500 font-black">!</span>}
+                    </span>
+                  )}
+                  {ccEvents?.closes.length > 0 && (
+                    <span 
+                      className="px-1 py-0.5 text-[8px] xs:text-[9px] font-bold rounded flex items-center gap-0.5 shrink-0 bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/40"
+                      title={`Statement Closes: ${ccEvents.closes.join(', ')}`}
+                    >
+                      <CreditCard className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
+                      <span>C</span>
+                    </span>
+                  )}
+                  {ccEvents?.dues.length > 0 && (
+                    <span 
+                      className="px-1 py-0.5 text-[8px] xs:text-[9px] font-bold rounded flex items-center gap-0.5 shrink-0 bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/40"
+                      title={`Payment Due: ${ccEvents.dues.join(', ')}`}
+                    >
+                      <Zap className="w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0" />
+                      <span>D</span>
                     </span>
                   )}
                   {totalSpent > 0 && <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-rose-500 shrink-0" />}
@@ -385,6 +434,40 @@ export function MonthlyHeatmap({
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Credit Card Events Section */}
+            {selectedDayDetails.ccEvents && (selectedDayDetails.ccEvents.closes.length > 0 || selectedDayDetails.ccEvents.dues.length > 0) && (
+              <div className="space-y-2.5">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Credit Card Events</span>
+                </h5>
+                <div className="space-y-2">
+                  {selectedDayDetails.ccEvents.closes.length > 0 && (
+                    <div className="flex items-center justify-between p-2.5 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/40 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Statement Closes</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400">{selectedDayDetails.ccEvents.closes.join(', ')}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {selectedDayDetails.ccEvents.dues.length > 0 && (
+                    <div className="flex items-center justify-between p-2.5 bg-purple-50/50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-800/40 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Payment Due</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400">{selectedDayDetails.ccEvents.dues.join(', ')}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Estimated Pending Recurring Section */}
             {selectedDayDetails.pendingRecurringForDay.length > 0 && (
