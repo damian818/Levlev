@@ -75,6 +75,7 @@ export interface SupabaseUserData {
     debtExtraPayment?: number;
     dismissedRecurring?: string[];
     tabSettings?: TabCustomizationItem[];
+    reportSettings?: string[];
   };
 }
 
@@ -657,6 +658,12 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       tabSettings: data.settings?.tabSettings || (typeof window !== 'undefined' ? (() => {
         try {
           const raw = localStorage.getItem('finance_app_tab_customization') || localStorage.getItem('levlev_tab_customization');
+          return raw ? JSON.parse(raw) : undefined;
+        } catch { return undefined; }
+      })() : undefined),
+      reportSettings: data.settings?.reportSettings || (typeof window !== 'undefined' ? (() => {
+        try {
+          const raw = localStorage.getItem('finance_app_selected_reports') || localStorage.getItem('levlev_selected_reports');
           return raw ? JSON.parse(raw) : undefined;
         } catch { return undefined; }
       })() : undefined),
