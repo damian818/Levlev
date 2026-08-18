@@ -153,6 +153,12 @@ export interface AccountItem {
 export type ViewTab = 'overview' | 'transactions' | 'accounts' | 'budgets' | 'recurring' | 'debt-payoff' | 'inflation' | 'ai-advisor' | 'settings' | 'reports';
 export type DisplayCurrency = 'ARS' | 'USD' | 'EUR' | 'BRL' | 'GBP' | 'MXN' | 'CLP' | 'USDT' | string;
 
+export interface TabCustomizationItem {
+  id: ViewTab;
+  order: number;
+  isHidden?: boolean;
+}
+
 export interface DebtItem {
   id: string;
   ownerId?: string;

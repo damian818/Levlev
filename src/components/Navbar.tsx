@@ -30,6 +30,7 @@ import {
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from '../lib/supabase';
 import { LevLevLogo } from './LevLevLogo';
 import { WORLD_CURRENCIES } from '../utils/currencyUtils';
+import { TabCustomizationItem, getSavedTabCustomization, mergeTabOrder } from '../utils/tabUtils';
 
 // Helper for mobile tactile haptic feedback
 const triggerHaptic = (pattern: number | number[] = 12) => {
@@ -59,6 +60,7 @@ interface NavbarProps {
   onOpenDeleteModal: () => void;
   onLogout?: () => void;
   isOnline?: boolean;
+  tabCustomization?: TabCustomizationItem[];
 }
 
 export function Navbar({
@@ -78,6 +80,7 @@ export function Navbar({
   onOpenDeleteModal,
   onLogout,
   isOnline = true,
+  tabCustomization,
 }: NavbarProps) {
   const { t, i18n } = useTranslation();
   const [user, setUser] = useState<any>(null);
@@ -134,18 +137,33 @@ export function Navbar({
     changeAndPersistLanguage(nextLang);
   };
 
-  const tabs: { id: ViewTab; label: string; shortLabel?: string; icon: React.ReactNode }[] = [
-    { id: 'overview', label: t('nav.overview'), icon: <LayoutDashboard className="w-4 h-4" /> },
-    { id: 'reports', label: t('nav.reports'), icon: <BarChart3 className="w-4 h-4 text-emerald-400" /> },
-    { id: 'transactions', label: t('nav.transactions'), shortLabel: t('nav.transactions_short'), icon: <Receipt className="w-4 h-4" /> },
-    { id: 'accounts', label: t('nav.accounts'), icon: <Wallet className="w-4 h-4" /> },
-    { id: 'budgets', label: t('nav.budgets'), icon: <Target className="w-4 h-4" /> },
-    { id: 'recurring', label: t('nav.recurring'), shortLabel: t('nav.recurring_short'), icon: <Repeat className="w-4 h-4" /> },
-    { id: 'debt-payoff', label: t('nav.debt_payoff') || 'Debt Payoff', shortLabel: t('nav.debt_payoff_short') || 'Debts', icon: <TrendingDown className="w-4 h-4 text-rose-400" /> },
-    { id: 'inflation', label: t('nav.inflation'), shortLabel: t('nav.inflation_short'), icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'ai-advisor', label: t('nav.ai_advisor'), icon: <Sparkles className="w-4 h-4 text-amber-500" /> },
-    { id: 'settings', label: t('nav.settings'), icon: <Sliders className="w-4 h-4 text-slate-400" /> },
-  ];
+  const allTabsMap: Record<ViewTab, { id: ViewTab; label: string; shortLabel?: string; icon: React.ReactNode }> = {
+    overview: { id: 'overview', label: t('nav.overview'), icon: <LayoutDashboard className="w-4 h-4" /> },
+    reports: { id: 'reports', label: t('nav.reports'), icon: <BarChart3 className="w-4 h-4 text-emerald-400" /> },
+    transactions: { id: 'transactions', label: t('nav.transactions'), shortLabel: t('nav.transactions_short'), icon: <Receipt className="w-4 h-4" /> },
+    accounts: { id: 'accounts', label: t('nav.accounts'), icon: <Wallet className="w-4 h-4" /> },
+    budgets: { id: 'budgets', label: t('nav.budgets'), icon: <Target className="w-4 h-4" /> },
+    recurring: { id: 'recurring', label: t('nav.recurring'), shortLabel: t('nav.recurring_short'), icon: <Repeat className="w-4 h-4" /> },
+    'debt-payoff': { id: 'debt-payoff', label: t('nav.debt_payoff') || 'Debt Payoff', shortLabel: t('nav.debt_payoff_short') || 'Debts', icon: <TrendingDown className="w-4 h-4 text-rose-400" /> },
+    inflation: { id: 'inflation', label: t('nav.inflation'), shortLabel: t('nav.inflation_short'), icon: <TrendingUp className="w-4 h-4" /> },
+    'ai-advisor': { id: 'ai-advisor', label: t('nav.ai_advisor'), icon: <Sparkles className="w-4 h-4 text-amber-500" /> },
+    settings: { id: 'settings', label: t('nav.settings'), icon: <Sliders className="w-4 h-4 text-slate-400" /> },
+  };
+
+  const rawTabCustom = tabCustomization || getSavedTabCustomization();
+  const effectiveTabOrder = mergeTabOrder(rawTabCustom);
+
+  // All tabs sorted by user order
+  const tabs = effectiveTabOrder
+    .map(item => ({
+      ...allTabsMap[item.id],
+      isHidden: !!item.isHidden && item.id !== 'settings',
+      order: item.order,
+    }))
+    .filter(t => !!t.id);
+
+  // Desktop visible tabs
+  const visibleDesktopTabs = tabs.filter(t => !t.isHidden || t.id === currentTab || t.id === 'settings');
 
   return (
     <>
@@ -589,7 +607,7 @@ export function Navbar({
 
           {/* DESKTOP NAVIGATION TABS */}
           <nav className="hidden lg:flex space-x-1.5 overflow-x-auto no-scrollbar py-2.5 border-t border-slate-800/80">
-            {tabs.map((tab) => {
+            {visibleDesktopTabs.map((tab) => {
               const isActive = currentTab === tab.id;
               return (
                 <button

@@ -124,6 +124,7 @@ export function saveDebtsToStorage(debts: DebtItem[]): void {
     const serialized = JSON.stringify(debts);
     localStorage.setItem('levlev_debts_list', serialized);
     localStorage.setItem('finance_app_debts', serialized);
+    window.dispatchEvent(new CustomEvent('finance_app_debts_updated', { detail: debts }));
   } catch (e) {
     console.error('Failed to save debts to localStorage', e);
   }
@@ -142,6 +143,7 @@ export function saveDebtStrategyToStorage(strategy: DebtPayoffStrategy): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem('levlev_debt_strategy', strategy);
+    window.dispatchEvent(new CustomEvent('finance_app_debt_strategy_updated', { detail: strategy }));
   } catch {}
 }
 
@@ -161,6 +163,7 @@ export function saveExtraPaymentToStorage(amount: number): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem('levlev_debt_extra_payment', String(amount));
+    window.dispatchEvent(new CustomEvent('finance_app_debt_extra_payment_updated', { detail: amount }));
   } catch {}
 }
 

@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../lib/supabase';
-import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule } from '../types';
+import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, TabCustomizationItem } from '../types';
 
 const DELETED_TX_KEY = 'finance_app_deleted_tx_ids';
 
@@ -70,6 +70,11 @@ export interface SupabaseUserData {
     };
     recurringThresholds?: Record<string, number>;
     globalRecurringThreshold?: number;
+    debts?: DebtItem[];
+    debtStrategy?: DebtPayoffStrategy;
+    debtExtraPayment?: number;
+    dismissedRecurring?: string[];
+    tabSettings?: TabCustomizationItem[];
   };
 }
 
@@ -630,6 +635,29 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
         try {
           const s = localStorage.getItem('finance_app_enabled_currencies');
           return s ? JSON.parse(s) : undefined;
+        } catch { return undefined; }
+      })() : undefined),
+      debts: data.settings?.debts || (typeof window !== 'undefined' ? (() => {
+        try {
+          const raw = localStorage.getItem('levlev_debts_list') || localStorage.getItem('finance_app_debts');
+          return raw ? JSON.parse(raw) : undefined;
+        } catch { return undefined; }
+      })() : undefined),
+      debtStrategy: data.settings?.debtStrategy || (typeof window !== 'undefined' ? localStorage.getItem('levlev_debt_strategy') || undefined : undefined),
+      debtExtraPayment: data.settings?.debtExtraPayment !== undefined ? data.settings.debtExtraPayment : (typeof window !== 'undefined' ? (() => {
+        const raw = localStorage.getItem('levlev_debt_extra_payment');
+        return raw !== null ? parseFloat(raw) : undefined;
+      })() : undefined),
+      dismissedRecurring: data.settings?.dismissedRecurring || (typeof window !== 'undefined' ? (() => {
+        try {
+          const raw = localStorage.getItem('levlev_dismissed_recurring') || localStorage.getItem('finance_app_dismissed_recurring');
+          return raw ? JSON.parse(raw) : undefined;
+        } catch { return undefined; }
+      })() : undefined),
+      tabSettings: data.settings?.tabSettings || (typeof window !== 'undefined' ? (() => {
+        try {
+          const raw = localStorage.getItem('finance_app_tab_customization') || localStorage.getItem('levlev_tab_customization');
+          return raw ? JSON.parse(raw) : undefined;
         } catch { return undefined; }
       })() : undefined),
     };

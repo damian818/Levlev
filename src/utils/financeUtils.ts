@@ -1924,6 +1924,7 @@ export function saveDismissedRecurring(keys: string[]): void {
     const serialized = JSON.stringify(keys);
     localStorage.setItem('levlev_dismissed_recurring', serialized);
     localStorage.setItem('finance_app_dismissed_recurring', serialized);
+    window.dispatchEvent(new CustomEvent('finance_app_dismissed_updated', { detail: keys }));
   } catch {}
 }
 

@@ -49,7 +49,18 @@ import {
   Share2,
   Coins,
   Landmark,
-  RotateCcw
+  RotateCcw,
+  LayoutDashboard,
+  Receipt,
+  Target,
+  Repeat,
+  TrendingDown,
+  TrendingUp,
+  Sparkles,
+  BarChart3,
+  ChevronUp,
+  ChevronDown,
+  GripVertical
 } from 'lucide-react';
 import { 
   verifyAccountBalances 
@@ -63,6 +74,7 @@ import {
   signOutFromSupabase 
 } from '../lib/supabase';
 import ImportWizardModal from './ImportWizardModal';
+import { TabCustomizationItem, getSavedTabCustomization, saveTabCustomizationToStorage, mergeTabOrder, DEFAULT_TAB_ORDER } from '../utils/tabUtils';
 
 import { TIMEZONE_OPTIONS } from '../utils/timezoneUtils';
 import { WORLD_CURRENCIES, CURRENCY_MAP, getFxProviderInfo, getCurrencyName } from '../utils/currencyUtils';
@@ -107,6 +119,8 @@ interface SettingsTabProps {
   requestNotificationPermission?: () => Promise<boolean>;
   hiddenCategoryIds?: string[];
   onUpdateHiddenCategoryIds?: (ids: string[]) => void;
+  tabCustomization?: TabCustomizationItem[];
+  onUpdateTabCustomization?: (tabs: TabCustomizationItem[]) => void;
 }
 
 export function SettingsTab({
@@ -149,9 +163,59 @@ export function SettingsTab({
   requestNotificationPermission,
   hiddenCategoryIds = [],
   onUpdateHiddenCategoryIds,
+  tabCustomization: propsTabCustomization,
+  onUpdateTabCustomization,
 }: SettingsTabProps) {
   const { t, i18n } = useTranslation();
   const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'categories' | 'preferences' | 'sharing'>('accounts');
+
+  // Tab Customization State
+  const [localTabCustom, setLocalTabCustom] = useState<TabCustomizationItem[]>(() => getSavedTabCustomization());
+  const tabList = propsTabCustomization !== undefined ? mergeTabOrder(propsTabCustomization) : mergeTabOrder(localTabCustom);
+
+  const saveTabs = (next: TabCustomizationItem[]) => {
+    const merged = mergeTabOrder(next);
+    if (onUpdateTabCustomization) {
+      onUpdateTabCustomization(merged);
+    } else {
+      setLocalTabCustom(merged);
+      saveTabCustomizationToStorage(merged);
+    }
+  };
+
+  const handleMoveTab = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= tabList.length) return;
+    const next = [...tabList];
+    const item = next[index];
+    next[index] = next[targetIndex];
+    next[targetIndex] = item;
+    const reordered = next.map((tab, idx) => ({ ...tab, order: idx }));
+    saveTabs(reordered);
+  };
+
+  const handleToggleTabVisibility = (id: string) => {
+    if (id === 'settings') return; // Cannot hide settings
+    const next = tabList.map(item => item.id === id ? { ...item, isHidden: !item.isHidden } : item);
+    saveTabs(next);
+  };
+
+  const handleResetTabs = () => {
+    saveTabs([...DEFAULT_TAB_ORDER]);
+  };
+
+  const TAB_META: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+    overview: { label: t('nav.overview'), icon: LayoutDashboard },
+    reports: { label: t('nav.reports'), icon: BarChart3 },
+    transactions: { label: t('nav.transactions'), icon: Receipt },
+    accounts: { label: t('nav.accounts'), icon: Wallet },
+    budgets: { label: t('nav.budgets'), icon: Target },
+    recurring: { label: t('nav.recurring'), icon: Repeat },
+    'debt-payoff': { label: t('nav.debt_payoff') || 'Debt Payoff', icon: TrendingDown },
+    inflation: { label: t('nav.inflation'), icon: TrendingUp },
+    'ai-advisor': { label: t('nav.ai_advisor'), icon: Sparkles },
+    settings: { label: t('nav.settings'), icon: Sliders },
+  };
 
   // Diagnostic State for Balance Verification
   const [diagnosticStatus, setDiagnosticStatus] = useState<{
@@ -1134,6 +1198,127 @@ export function SettingsTab({
                   Enable All (170+)
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Navigation Tabs Customization Box */}
+          <div className="bg-[#121720] border border-slate-800 rounded-2xl p-6 space-y-5 md:col-span-2 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div className="flex items-start gap-3">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 shrink-0 mt-0.5">
+                  <Sliders className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-100">{t('navigation_tabs.title')}</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider font-mono">
+                      {tabList.filter(item => !item.isHidden).length} / {tabList.length} {t('navigation_tabs.visible')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed max-w-2xl">
+                    {t('navigation_tabs.description')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Reset to defaults button */}
+              <button
+                type="button"
+                onClick={handleResetTabs}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#161b22] hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-all self-start sm:self-center cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                <span>{t('navigation_tabs.reset_defaults')}</span>
+              </button>
+            </div>
+
+            {/* List of tabs with reorder and toggle controls */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {tabList.map((item, index) => {
+                const meta = TAB_META[item.id] || { label: item.id, icon: Sliders };
+                const IconComponent = meta.icon;
+                const isHidden = !!item.isHidden;
+                const isSettings = item.id === 'settings';
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                      isHidden
+                        ? 'bg-[#0e1218]/80 border-slate-800/60 opacity-60'
+                        : 'bg-[#161b22] border-slate-800 hover:border-slate-700/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center text-slate-600">
+                        <GripVertical className="w-4 h-4" />
+                      </div>
+                      <div className={`p-2 rounded-lg border shrink-0 ${
+                        isHidden
+                          ? 'bg-slate-800/40 border-slate-700/30 text-slate-500'
+                          : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                      }`}>
+                        <IconComponent className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-200 truncate flex items-center gap-1.5">
+                          <span>{meta.label}</span>
+                          {isSettings && (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700 font-normal">
+                              Locked
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono">
+                          {isHidden ? t('navigation_tabs.hidden') : t('navigation_tabs.visible')} • Pos #{index + 1}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      {/* Move Up */}
+                      <button
+                        type="button"
+                        onClick={() => handleMoveTab(index, 'up')}
+                        disabled={index === 0}
+                        className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-slate-700/50 transition-colors cursor-pointer"
+                        title={t('navigation_tabs.move_up')}
+                      >
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Move Down */}
+                      <button
+                        type="button"
+                        onClick={() => handleMoveTab(index, 'down')}
+                        disabled={index === tabList.length - 1}
+                        className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-slate-700/50 transition-colors cursor-pointer"
+                        title={t('navigation_tabs.move_down')}
+                      >
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Visibility Toggle */}
+                      {!isSettings ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTabVisibility(item.id)}
+                          className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                            isHidden
+                              ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
+                              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                          }`}
+                          title={isHidden ? t('navigation_tabs.show') : t('navigation_tabs.hide')}
+                        >
+                          {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      ) : (
+                        <div className="w-[29px]" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

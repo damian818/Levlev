@@ -4,10 +4,12 @@
  */
 
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember, RecurringRule } from './types';
+import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
-import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount, detectFinancialAnomalies, getPendingRecurringForMonth, getCurrentMonthKey } from './utils/financeUtils';
+import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount, detectFinancialAnomalies, getPendingRecurringForMonth, getCurrentMonthKey, getSavedDismissedRecurring, saveDismissedRecurring } from './utils/financeUtils';
+import { TabCustomizationItem, getSavedTabCustomization, saveTabCustomizationToStorage, mergeTabOrder } from './utils/tabUtils';
+import { getSavedDebts, saveDebtsToStorage, getSavedDebtStrategy, saveDebtStrategyToStorage, getSavedExtraPayment, saveExtraPaymentToStorage } from './utils/debtUtils';
 import { useBrowserNotifications } from './hooks/useBrowserNotifications';
 import { initializeGlobalFxRates } from './utils/currencyUtils';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
@@ -196,6 +198,50 @@ export default function App() {
       console.warn('Failed to save custom accounts to localStorage');
     }
   }, [accounts]);
+
+  // Tab Customization State
+  const [tabCustomization, setTabCustomization] = useState<TabCustomizationItem[]>(() => getSavedTabCustomization());
+
+  // Debts & Strategy States
+  const [debts, setDebts] = useState<DebtItem[]>(() => getSavedDebts());
+  const [debtStrategy, setDebtStrategy] = useState<DebtPayoffStrategy>(() => getSavedDebtStrategy());
+  const [debtExtraPayment, setDebtExtraPayment] = useState<number>(() => getSavedExtraPayment());
+
+  // Recurring Dismissed State
+  const [dismissedRecurring, setDismissedRecurring] = useState<string[]>(() => getSavedDismissedRecurring());
+
+  // Real-time custom event listeners across modules
+  useEffect(() => {
+    const handleDismissed = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setDismissedRecurring(e.detail);
+    };
+    const handleTabs = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setTabCustomization(e.detail);
+    };
+    const handleDebts = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) setDebts(e.detail);
+    };
+    const handleStrategy = (e: any) => {
+      if (e.detail) setDebtStrategy(e.detail);
+    };
+    const handleExtraPay = (e: any) => {
+      if (typeof e.detail === 'number') setDebtExtraPayment(e.detail);
+    };
+
+    window.addEventListener('finance_app_dismissed_updated', handleDismissed);
+    window.addEventListener('finance_app_tab_settings_updated', handleTabs);
+    window.addEventListener('finance_app_debts_updated', handleDebts);
+    window.addEventListener('finance_app_debt_strategy_updated', handleStrategy);
+    window.addEventListener('finance_app_debt_extra_payment_updated', handleExtraPay);
+
+    return () => {
+      window.removeEventListener('finance_app_dismissed_updated', handleDismissed);
+      window.removeEventListener('finance_app_tab_settings_updated', handleTabs);
+      window.removeEventListener('finance_app_debts_updated', handleDebts);
+      window.removeEventListener('finance_app_debt_strategy_updated', handleStrategy);
+      window.removeEventListener('finance_app_debt_extra_payment_updated', handleExtraPay);
+    };
+  }, []);
 
   // Trigger notifications
   // (Moved to after recurringRules declaration)
@@ -707,6 +753,27 @@ export default function App() {
               localStorage.setItem('finance_app_global_recurring_threshold', String(data.settings.globalRecurringThreshold));
             } catch (e) {}
           }
+          if (data.settings.debts && Array.isArray(data.settings.debts)) {
+            setDebts(data.settings.debts);
+            saveDebtsToStorage(data.settings.debts);
+          }
+          if (data.settings.debtStrategy) {
+            setDebtStrategy(data.settings.debtStrategy);
+            saveDebtStrategyToStorage(data.settings.debtStrategy);
+          }
+          if (data.settings.debtExtraPayment !== undefined) {
+            setDebtExtraPayment(data.settings.debtExtraPayment);
+            saveExtraPaymentToStorage(data.settings.debtExtraPayment);
+          }
+          if (data.settings.dismissedRecurring && Array.isArray(data.settings.dismissedRecurring)) {
+            setDismissedRecurring(data.settings.dismissedRecurring);
+            saveDismissedRecurring(data.settings.dismissedRecurring);
+          }
+          if (data.settings.tabSettings && Array.isArray(data.settings.tabSettings)) {
+            const merged = mergeTabOrder(data.settings.tabSettings);
+            setTabCustomization(merged);
+            saveTabCustomizationToStorage(merged);
+          }
         }
       }
     } catch (err) {
@@ -1059,11 +1126,16 @@ export default function App() {
           },
           recurringThresholds,
           globalRecurringThreshold,
+          debts,
+          debtStrategy,
+          debtExtraPayment,
+          dismissedRecurring,
+          tabSettings: tabCustomization,
         },
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [transactions, categories, accounts, budgets, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold, hiddenCategoryIds]);
+  }, [transactions, categories, accounts, budgets, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold, hiddenCategoryIds, debts, debtStrategy, debtExtraPayment, dismissedRecurring, tabCustomization]);
 
   if (authLoading) {
     return (
@@ -1264,6 +1336,7 @@ export default function App() {
         onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
         onLogout={handleLogout}
         isOnline={isOnline}
+        tabCustomization={tabCustomization}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 pb-28 lg:pb-8 max-w-full overflow-x-hidden">
@@ -1437,6 +1510,11 @@ export default function App() {
               requestNotificationPermission={requestPermission}
               hiddenCategoryIds={hiddenCategoryIds}
               onUpdateHiddenCategoryIds={setHiddenCategoryIds}
+              tabCustomization={tabCustomization}
+              onUpdateTabCustomization={(tabs) => {
+                setTabCustomization(tabs);
+                saveTabCustomizationToStorage(tabs);
+              }}
             />
           )}
         </Suspense>
