@@ -1936,14 +1936,14 @@ export function isOccurrenceDismissed(itemId: string, itemTitle: string, monthKe
   const keys = dismissedKeys || getSavedDismissedRecurring();
   if (!keys || keys.length === 0) return false;
   
-  const key1 = `${itemId}-${monthKey}`;
-  const key2 = getOccurrenceDismissKey(itemId, itemTitle, monthKey);
-  const key3 = itemId;
+  const key1 = `${itemId}-${monthKey}`.toLowerCase();
+  const key2 = getOccurrenceDismissKey(itemId, itemTitle, monthKey).toLowerCase();
   const cleanTitle = normalizeCleanTitle(itemTitle || '').toLowerCase().trim();
+  const key3 = `${cleanTitle}_${monthKey}`.toLowerCase();
   
   return keys.some(k => {
     const lk = k.toLowerCase().trim();
-    return lk === key1.toLowerCase() || lk === key2 || lk === key3.toLowerCase() || lk === `${cleanTitle}-${monthKey}` || lk === `${itemId}_${monthKey}`;
+    return lk === key1 || lk === key2 || lk === key3;
   });
 }
 
@@ -1960,12 +1960,12 @@ export function undismissRecurringOccurrence(itemId: string, itemTitle: string, 
   const current = getSavedDismissedRecurring();
   const key1 = `${itemId}-${monthKey}`.toLowerCase();
   const key2 = getOccurrenceDismissKey(itemId, itemTitle, monthKey).toLowerCase();
-  const key3 = itemId.toLowerCase();
   const cleanTitle = normalizeCleanTitle(itemTitle || '').toLowerCase().trim();
+  const key3 = `${cleanTitle}_${monthKey}`.toLowerCase();
 
   const next = current.filter(k => {
     const lk = k.toLowerCase().trim();
-    return lk !== key1 && lk !== key2 && lk !== key3 && lk !== `${cleanTitle}-${monthKey}` && lk !== `${itemId}_${monthKey}`;
+    return lk !== key1 && lk !== key2 && lk !== key3;
   });
   saveDismissedRecurring(next);
   return next;
@@ -2023,29 +2023,19 @@ export function getPendingRecurringForMonth(
     const day = Math.min(31, Math.max(1, item.dayOfMonth || 15));
     const estimatedDateStr = `${monthKey}-${String(day).padStart(2, '0')}`;
 
-    // 1. Check if ANY transaction in this month matches this title (irrelevant from income or expense, and regardless of amount)
+    // Previous standard matching logic: require same transaction type and title match
     const matchedTx = monthTransactions.find(t => {
+      if (t.type !== item.type) return false;
       const tTitleClean = normalizeCleanTitle(t.title || '').toLowerCase().trim();
       const tTitle = (t.title || '').toLowerCase().trim();
-      const tDescClean = normalizeCleanTitle(t.description || '').toLowerCase().trim();
-      const tDesc = (t.description || '').toLowerCase().trim();
 
-      // Check title match, clean title match, or description match
+      // Check exact or clean title match
       if (tTitle === itemTitleLower || tTitleClean === cleanItemTitle || tTitleClean === itemTitleLower || tTitle === cleanItemTitle) return true;
-      if (tDesc === itemTitleLower || tDescClean === cleanItemTitle || tDescClean === itemTitleLower || tDesc === cleanItemTitle) return true;
-
-      // Check substring containment if length >= 3
-      if (cleanItemTitle.length >= 3) {
-        if (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitle) || tTitleClean.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean)) return true;
-        if (tDesc.includes(cleanItemTitle) || cleanItemTitle.includes(tDesc) || tDescClean.includes(cleanItemTitle) || cleanItemTitle.includes(tDescClean)) return true;
-      }
-      if (itemTitleLower.length >= 3) {
-        if (tTitle.includes(itemTitleLower) || itemTitleLower.includes(tTitle) || tTitleClean.includes(itemTitleLower) || itemTitleLower.includes(tTitleClean)) return true;
-        if (tDesc.includes(itemTitleLower) || itemTitleLower.includes(tDesc) || tDescClean.includes(itemTitleLower) || itemTitleLower.includes(tDescClean)) return true;
-      }
+      if (cleanItemTitle.length >= 4 && (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean))) return true;
+      if (tTitleClean.length >= 4 && (itemTitleLower.includes(tTitleClean) || tTitleClean.includes(itemTitleLower))) return true;
 
       // For installments: check description or installments tag or title
-      if (item.isInstallment && (t.installments || t.description) && (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean) || tDesc.includes(cleanItemTitle))) return true;
+      if (item.isInstallment && t.installments && (tTitle.includes(cleanItemTitle) || cleanItemTitle.includes(tTitleClean))) return true;
 
       return false;
     });
