@@ -434,8 +434,24 @@ export default function App() {
       if (data.accounts) setAccounts(data.accounts);
       if (data.budgets) setBudgets(data.budgets);
     } else {
-      if (data.transactions) {
-        setTransactions(data.transactions);
+      if (data.transactions && data.transactions.length > 0) {
+        setTransactions(prev => {
+          const existingMap = new Map<string, Transaction>();
+          prev.forEach(t => {
+            if (t.id) existingMap.set(t.id, t);
+          });
+
+          data.transactions.forEach(t => {
+            const txId = t.id || `tx_imp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+            existingMap.set(txId, { ...t, id: txId });
+          });
+
+          const mergedTransactions = Array.from(existingMap.values());
+          try {
+            localStorage.setItem('finance_app_transactions', JSON.stringify(mergedTransactions));
+          } catch (e) {}
+          return mergedTransactions;
+        });
         
         // Auto-generate missing accounts and categories from imported transactions
         setAccounts(prev => {

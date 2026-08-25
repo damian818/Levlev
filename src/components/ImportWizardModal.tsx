@@ -166,10 +166,10 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
               cleanDesc = cleanDesc.replace(installments, '').replace(/^[\s\-\:]+/, '').replace(/[\s\-\:]+$/, '').trim();
             }
 
-            // Parse ID cleanly
+            // Parse ID cleanly with high entropy
             let rowId = (row.ID || '').trim();
             if (!rowId || rowId.includes('T') || rowId.length < 5) {
-              rowId = `tx-ivy-${Date.now()}-${idx}`;
+              rowId = `tx-ivy-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 8)}`;
             }
 
             txs.push({

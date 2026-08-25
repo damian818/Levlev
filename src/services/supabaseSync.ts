@@ -555,9 +555,6 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           }
         }
       }
-    } else if (data.transactions && data.transactions.length === 0) {
-      const { error: delTxErr } = await client.from('transactions').delete().eq('user_id', userId);
-      if (delTxErr) console.error('Error clearing transactions in Supabase:', delTxErr);
     }
 
     // 2. Categories upsert
