@@ -89,12 +89,11 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
   const userId = session.user.id;
 
   try {
-    const [catRes, accRes, budRes, setRes, txResFirstPage] = await Promise.all([
+    const [catRes, accRes, budRes, setRes] = await Promise.all([
       client.from('categories').select('*'),
       client.from('accounts').select('*'),
       client.from('budgets').select('*'),
       client.from('user_settings').select('*').eq('user_id', session.user.id).maybeSingle(),
-      client.from('transactions').select('*').order('date', { ascending: false }).range(0, 999),
     ]);
 
     if (catRes.error) console.warn('Supabase fetch categories error:', catRes.error);
@@ -118,32 +117,91 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     const categoryConfigs = userSettings?.categoryConfigs || {};
     const hiddenCategoryIds: string[] = Array.isArray(userSettings?.hiddenCategoryIds) ? userSettings.hiddenCategoryIds : [];
 
-    // Handle transactions (first page already fetched)
-    let rawTxRows: any[] = txResFirstPage.data || [];
-    if (txResFirstPage.error) console.warn('Supabase fetch transactions error:', txResFirstPage.error);
+    // Robust pagination: fetch all transactions from Supabase without limits
+    const rawTxRowsMap = new Map<string, any>();
+    const pageSize = 1000;
+    
+    // Helper function with retries and exponential backoff
+    const fetchTxPage = async (from: number, to: number, maxRetries = 3): Promise<{ data: any[] | null; count: number | null; error: any }> => {
+      let lastErr: any = null;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const res = await client
+            .from('transactions')
+            .select('*', { count: 'exact' })
+            .order('date', { ascending: false })
+            .order('id', { ascending: false })
+            .range(from, to);
 
-    if (txResFirstPage.data && txResFirstPage.data.length === 1000) {
+          if (!res.error && res.data) {
+            return { data: res.data, count: res.count ?? null, error: null };
+          }
+          lastErr = res.error;
+        } catch (err) {
+          lastErr = err;
+        }
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, attempt * 350));
+        }
+      }
+      return { data: null, count: null, error: lastErr };
+    };
+
+    // 1. Fetch initial page and exact total count
+    const firstPage = await fetchTxPage(0, pageSize - 1);
+    if (firstPage.error) {
+      console.warn('Supabase fetch transactions first page error:', firstPage.error);
+    }
+    if (firstPage.data && firstPage.data.length > 0) {
+      firstPage.data.forEach(row => {
+        const rowId = row.id || `tx_gen_${Math.random().toString(36).substring(2)}`;
+        rawTxRowsMap.set(rowId, row);
+      });
+    }
+
+    const totalTxCount = firstPage.count;
+    if (typeof totalTxCount === 'number' && totalTxCount > pageSize) {
+      const totalPages = Math.ceil(totalTxCount / pageSize);
+      for (let page = 1; page < totalPages; page++) {
+        const from = page * pageSize;
+        const to = Math.min(from + pageSize - 1, totalTxCount - 1);
+        
+        let pageRes = await fetchTxPage(from, to);
+        if (pageRes.data && pageRes.data.length > 0) {
+          pageRes.data.forEach(row => {
+            const rowId = row.id || `tx_gen_${Math.random().toString(36).substring(2)}`;
+            rawTxRowsMap.set(rowId, row);
+          });
+        } else {
+          // If 1000-chunk failed or timed out, attempt smaller 250-row sub-slices
+          console.warn(`[SupabaseSync] Retrying page ${page} (${from}-${to}) with smaller sub-chunks...`);
+          const subChunkSize = 250;
+          for (let subFrom = from; subFrom <= to; subFrom += subChunkSize) {
+            const subTo = Math.min(subFrom + subChunkSize - 1, to);
+            const subRes = await fetchTxPage(subFrom, subTo, 4);
+            if (subRes.data && subRes.data.length > 0) {
+              subRes.data.forEach(row => {
+                const rowId = row.id || `tx_gen_${Math.random().toString(36).substring(2)}`;
+                rawTxRowsMap.set(rowId, row);
+              });
+            }
+          }
+        }
+      }
+    } else if (firstPage.data && firstPage.data.length === pageSize) {
+      // Fallback pagination if count was not returned
       let page = 1;
-      const pageSize = 1000;
       let keepGoing = true;
-
-      while (keepGoing) {
+      while (keepGoing && page < 200) { // Safety ceiling of 200,000 transactions
         const from = page * pageSize;
         const to = from + pageSize - 1;
-        const txRes = await client
-          .from('transactions')
-          .select('*')
-          .order('date', { ascending: false })
-          .range(from, to);
-
-        if (txRes.error) {
-          console.warn('Supabase fetch transactions range error:', txRes.error);
-          break;
-        }
-
-        if (txRes.data && txRes.data.length > 0) {
-          rawTxRows = rawTxRows.concat(txRes.data);
-          if (txRes.data.length < pageSize) {
+        const res = await fetchTxPage(from, to);
+        if (res.data && res.data.length > 0) {
+          res.data.forEach(row => {
+            const rowId = row.id || `tx_gen_${Math.random().toString(36).substring(2)}`;
+            rawTxRowsMap.set(rowId, row);
+          });
+          if (res.data.length < pageSize) {
             keepGoing = false;
           } else {
             page++;
@@ -153,6 +211,8 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
         }
       }
     }
+
+    const rawTxRows: any[] = Array.from(rawTxRowsMap.values());
 
     const deletedIds = getDeletedTxIds();
     const transactions: Transaction[] = rawTxRows
@@ -469,18 +529,28 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
         };
       });
 
-      const batchSize = 500;
+      const batchSize = 250;
       for (let i = 0; i < txRows.length; i += batchSize) {
         const batch = txRows.slice(i, i + batchSize);
-        const { error: txErr } = await client.from('transactions').upsert(batch, { onConflict: 'id' });
-        if (txErr) {
-          console.error(`Error upserting transactions batch ${i} to Supabase:`, txErr);
-          // Fallback retry stripping transfer_amount/transfer_currency if column missing in DB schema cache
-          if (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency')) {
-            const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, ...rest }) => rest);
-            const { error: fbErr } = await client.from('transactions').upsert(fallbackBatch, { onConflict: 'id' });
-            if (fbErr) {
-              console.error(`Fallback transactions batch ${i} error:`, fbErr);
+        let success = false;
+        for (let attempt = 1; attempt <= 3 && !success; attempt++) {
+          const { error: txErr } = await client.from('transactions').upsert(batch, { onConflict: 'id' });
+          if (!txErr) {
+            success = true;
+          } else {
+            console.error(`Error upserting transactions batch ${i} (attempt ${attempt}) to Supabase:`, txErr);
+            // Fallback retry stripping transfer_amount/transfer_currency if column missing in DB schema cache
+            if (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency')) {
+              const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, ...rest }) => rest);
+              const { error: fbErr } = await client.from('transactions').upsert(fallbackBatch, { onConflict: 'id' });
+              if (!fbErr) {
+                success = true;
+              } else {
+                console.error(`Fallback transactions batch ${i} error:`, fbErr);
+              }
+            }
+            if (!success && attempt < 3) {
+              await new Promise(r => setTimeout(r, attempt * 300));
             }
           }
         }
