@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule, AccountItem, SharedMember } from '../types';
 import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString, getTransferOutflow, getTransferInflow } from '../utils/financeUtils';
-import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, ChevronUp, ChevronDown, ArrowUpDown, Eye, EyeOff, MoreVertical, Trash2, Building2, Coins, GripVertical } from 'lucide-react';
+import { exportAllCreditCardExpensesCSV } from '../utils/exportUtils';
+import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, ChevronUp, ChevronDown, ArrowUpDown, Eye, EyeOff, MoreVertical, Trash2, Building2, Coins, GripVertical, Download } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { motion } from 'motion/react';
 import { CreditCardDetailModal } from './CreditCardDetailModal';
@@ -786,14 +787,27 @@ export const AccountsTab = React.memo(function AccountsTab({
                   {/* Footer Actions */}
                   <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-slate-800/40">
                     {isCC ? (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCardAccount(acc.accountName)}
-                        className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-purple-900/20 flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <span>{t('accounts.details')}</span>
-                        <ChevronRight className="w-3 h-3" />
-                      </button>
+                      <div className="flex items-center gap-1.5 w-full">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCardAccount(acc.accountName)}
+                          className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-purple-900/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <span>{t('accounts.details')}</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            exportAllCreditCardExpensesCSV(transactions, acc.accountName);
+                          }}
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 rounded-lg text-xs font-medium transition-all flex items-center justify-center cursor-pointer"
+                          title={t('cc_modal.export_all_expenses', { defaultValue: 'Export All Card Expenses (CSV)' })}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ) : (
                       <>
                         {editingAccount !== acc.accountName ? (

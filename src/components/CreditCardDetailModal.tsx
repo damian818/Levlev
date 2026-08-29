@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, TransactionFilter, CreditCardClosingRule, ClosingRuleType } from '../types';
 import { getCreditCardStatements, getCurrentStatementIndex, getNextCloseDate, formatCurrency, getStatementCloseDateForTx, getStatementCloseDateForPayment, getClosingRuleLabel, getCloseDateForMonthAndYear } from '../utils/financeUtils';
-import { X, CreditCard, Calendar, ArrowRightLeft, Plus, CheckCircle, AlertCircle, FileText, ChevronRight, Settings, Edit3 } from 'lucide-react';
+import { exportCreditCardResumeCSV, exportAllCreditCardExpensesCSV } from '../utils/exportUtils';
+import { X, CreditCard, Calendar, ArrowRightLeft, Plus, CheckCircle, AlertCircle, FileText, ChevronRight, Settings, Edit3, Download } from 'lucide-react';
 
 interface CreditCardDetailModalProps {
   isOpen: boolean;
@@ -188,6 +189,16 @@ export function CreditCardDetailModal({
       setPaymentNote(`Pago Resumen ${activeStatement.closeDate}`);
       setShowPaymentForm(true);
     }
+  };
+
+  const handleExportStatementCSV = () => {
+    if (activeStatement) {
+      exportCreditCardResumeCSV(activeStatement, accountName);
+    }
+  };
+
+  const handleExportAllExpensesCSV = () => {
+    exportAllCreditCardExpensesCSV(transactions, accountName);
   };
 
   return (
@@ -443,13 +454,26 @@ export function CreditCardDetailModal({
             )}
           </div>
 
-          <button
-            onClick={handlePreFillPayment}
-            className="w-full sm:w-auto px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm"
-          >
-            <ArrowRightLeft className="w-3.5 h-3.5" />
-            <span>{t('cc_modal.record_payment')}</span>
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handleExportStatementCSV}
+              disabled={!activeStatement}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
+              title={t('cc_modal.export_resume_csv', { defaultValue: 'Export Resume (CSV)' })}
+            >
+              <Download className="w-3.5 h-3.5 text-purple-400" />
+              <span>{t('cc_modal.export_resume_csv', { defaultValue: 'Export Resume (CSV)' })}</span>
+            </button>
+
+            <button
+              onClick={handlePreFillPayment}
+              className="flex-1 sm:flex-none px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              <span>{t('cc_modal.record_payment')}</span>
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
@@ -621,13 +645,26 @@ export function CreditCardDetailModal({
                 <FileText className="w-4 h-4 text-purple-400" />
                 {t('cc_modal.transactions')} ({activeStatement?.expenses.length || 0})
               </h3>
-              <button
-                onClick={() => onNavigateToTransactionsWithFilter({ account: accountName })}
-                className="text-xs text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1"
-              >
-                <span>{t('cc_modal.view_all')}</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {activeStatement && activeStatement.expenses.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleExportStatementCSV}
+                    className="text-xs text-purple-300 hover:text-purple-200 font-semibold flex items-center gap-1 px-2.5 py-1 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-lg transition-colors cursor-pointer"
+                    title={t('cc_modal.export_expenses_csv', { defaultValue: 'Export Expenses CSV' })}
+                  >
+                    <Download className="w-3 h-3 text-purple-400" />
+                    <span>{t('cc_modal.export_expenses_csv', { defaultValue: 'Export Expenses CSV' })}</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => onNavigateToTransactionsWithFilter({ account: accountName })}
+                  className="text-xs text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1 cursor-pointer"
+                >
+                  <span>{t('cc_modal.view_all')}</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {activeStatement?.expenses.length === 0 ? (
@@ -827,10 +864,30 @@ export function CreditCardDetailModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 bg-[#121620] border-t border-slate-800 flex justify-end">
+        <div className="p-4 bg-[#121620] border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportStatementCSV}
+              disabled={!activeStatement}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-purple-400" />
+              <span>{t('cc_modal.export_resume_csv', { defaultValue: 'Export Resume (CSV)' })}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleExportAllExpensesCSV}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-400" />
+              <span>{t('cc_modal.export_all_expenses', { defaultValue: 'Export All Card Expenses (CSV)' })}</span>
+            </button>
+          </div>
+
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
           >
             {t('common.close')}
           </button>

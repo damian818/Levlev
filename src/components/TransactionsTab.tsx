@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint, CategoryItem, AccountItem } from '../types';
 import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString, normalizeCleanTitle, isInstallmentTx, detectRecurringItems } from '../utils/financeUtils';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2 } from 'lucide-react';
+import { exportTransactionsToCSV } from '../utils/exportUtils';
+import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2, Download } from 'lucide-react';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -333,6 +334,32 @@ export const TransactionsTab = React.memo(function TransactionsTab({
 
   const isFiltered = searchTerm || selectedType !== 'ALL' || selectedCategory !== 'ALL' || selectedAccount !== 'ALL' || selectedMonth !== 'ALL' || recurringFilter !== 'ALL';
 
+  const handleExportVisibleCSV = () => {
+    if (filtered.length === 0) return;
+    let filename = 'transactions';
+    if (selectedAccount !== 'ALL') {
+      filename += `_${selectedAccount.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    }
+    if (selectedCategory !== 'ALL') {
+      filename += `_${selectedCategory.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    }
+    if (selectedMonth !== 'ALL') {
+      filename += `_${selectedMonth}`;
+    } else if (isFiltered) {
+      filename += '_filtered';
+    }
+    filename += `_${new Date().toISOString().substring(0, 10)}.csv`;
+
+    exportTransactionsToCSV(filtered, filename);
+  };
+
+  const handleExportSelectedCSV = () => {
+    const selectedList = filtered.filter(t => selectedIds.has(t.id));
+    if (selectedList.length === 0) return;
+    const filename = `transactions_selected_${selectedList.length}_${new Date().toISOString().substring(0, 10)}.csv`;
+    exportTransactionsToCSV(selectedList, filename);
+  };
+
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedType('ALL');
@@ -347,7 +374,7 @@ export const TransactionsTab = React.memo(function TransactionsTab({
     <div className="space-y-4">
       {/* Active Filter Pill Bar */}
       {isFiltered && (
-        <div className="bg-[#121620] px-4 py-2 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
+        <div className="bg-[#121620] px-4 py-2 rounded-lg border border-slate-800 flex items-center justify-between text-xs flex-wrap gap-2">
           <div className="flex items-center space-x-2 text-slate-300 flex-wrap gap-y-1">
             <Filter className="w-3.5 h-3.5 text-emerald-400" />
             <span>{t('common.filter')}:</span>
@@ -363,13 +390,24 @@ export const TransactionsTab = React.memo(function TransactionsTab({
             {selectedMonth !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.month')}: {selectedMonth}</span>}
             {searchTerm && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.search')}: "{searchTerm}"</span>}
           </div>
-          <button
-            onClick={handleResetFilters}
-            className="text-slate-400 hover:text-slate-200 flex items-center space-x-1 underline text-[11px]"
-          >
-            <X className="w-3 h-3" />
-            <span>{t('transactions.reset_filters')}</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExportVisibleCSV}
+              disabled={filtered.length === 0}
+              className="text-purple-400 hover:text-purple-300 flex items-center space-x-1 text-[11px] font-semibold cursor-pointer"
+              title={t('transactions.export_tooltip', { defaultValue: 'Export visible filtered transactions as CSV' })}
+            >
+              <Download className="w-3 h-3" />
+              <span>{t('transactions.export_visible', { count: filtered.length, defaultValue: `Export CSV (${filtered.length})` })}</span>
+            </button>
+            <button
+              onClick={handleResetFilters}
+              className="text-slate-400 hover:text-slate-200 flex items-center space-x-1 underline text-[11px] cursor-pointer"
+            >
+              <X className="w-3 h-3" />
+              <span>{t('transactions.reset_filters')}</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -486,15 +524,29 @@ export const TransactionsTab = React.memo(function TransactionsTab({
 
           <button
             onClick={onOpenAddModal}
-            className="inline-flex items-center px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-xs font-medium hover:bg-slate-700 transition-colors ml-auto shadow-xs"
+            className="inline-flex items-center px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-xs font-medium hover:bg-slate-700 transition-colors ml-auto shadow-xs cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
             <span>{t('overview.quick_add')}</span>
           </button>
 
           <button
+            onClick={handleExportVisibleCSV}
+            disabled={filtered.length === 0}
+            title={t('transactions.export_tooltip', { defaultValue: 'Export visible filtered transactions as CSV' })}
+            className="inline-flex items-center px-3 py-2 bg-slate-800 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-700 rounded-lg text-xs font-medium transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 mr-1.5 text-purple-400" />
+            <span>
+              {isFiltered
+                ? t('transactions.export_visible', { count: filtered.length, defaultValue: `Export CSV (${filtered.length})` })
+                : t('transactions.export_all', { count: filtered.length, defaultValue: `Export CSV (${filtered.length})` })}
+            </span>
+          </button>
+
+          <button
             onClick={toggleBulkMode}
-            className={`inline-flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors border shadow-xs ${
+            className={`inline-flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors border shadow-xs cursor-pointer ${
               isBulkMode 
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
                 : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
@@ -508,7 +560,7 @@ export const TransactionsTab = React.memo(function TransactionsTab({
             <button
               onClick={onOpenDeleteModal}
               title={t('transactions.delete_title')}
-              className="inline-flex items-center px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-medium transition-colors"
+              className="inline-flex items-center px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-medium transition-colors cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5 text-rose-400" />
               <span>{t('common.delete')}</span>
@@ -529,6 +581,14 @@ export const TransactionsTab = React.memo(function TransactionsTab({
           </div>
           
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportSelectedCSV}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded-lg text-[11px] font-bold border border-slate-700 transition-all cursor-pointer"
+              title="Export selected transactions to CSV"
+            >
+              <Download className="w-3.5 h-3.5 text-purple-400" />
+              <span>Export Selected ({selectedIds.size})</span>
+            </button>
             <button
               onClick={() => setBulkActionTarget('CATEGORY')}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold border border-slate-700 transition-all"

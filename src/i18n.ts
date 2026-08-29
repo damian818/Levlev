@@ -333,6 +333,10 @@ export const resources = {
         delete_inst_confirm: 'Delete Installment Purchase?',
         delete_inst_desc: '"{{title}}" on account {{account}} is part of an installment plan.',
         selected_cuota: 'Selected Cuota:',
+        export_visible: 'Export CSV ({{count}})',
+        export_filtered: 'Export Filtered CSV',
+        export_all: 'Export All CSV ({{count}})',
+        export_tooltip: 'Export currently visible transactions to a CSV file',
       },
       accounts: {
         title: 'Accounts & Credit Cards',
@@ -456,6 +460,10 @@ export const resources = {
         rule_nth: 'Nth weekday of month',
         rule_prev_last: 'Previous to last weekday',
         rule_last: 'Last weekday of month',
+        export_resume_csv: 'Export Resume (CSV)',
+        export_statement_csv: 'Export Statement CSV',
+        export_expenses_csv: 'Export Expenses CSV',
+        export_all_expenses: 'Export All Card Expenses (CSV)',
       },
       share_modal: {
         title: 'Share Account Access',
@@ -1312,6 +1320,10 @@ export const resources = {
         delete_inst_confirm: '¿Eliminar Compra en Cuotas?',
         delete_inst_desc: '"{{title}}" en la cuenta {{account}} es parte de un plan de cuotas.',
         selected_cuota: 'Cuota Seleccionada:',
+        export_visible: 'Exportar CSV ({{count}})',
+        export_filtered: 'Exportar CSV Filtrado',
+        export_all: 'Exportar Todas en CSV ({{count}})',
+        export_tooltip: 'Exportar los movimientos visibles filtrados a un archivo CSV',
       },
       accounts: {
         title: 'Cuentas y Tarjetas de Crédito',
@@ -1435,6 +1447,10 @@ export const resources = {
         rule_nth: 'N-ésimo día de la semana',
         rule_prev_last: 'Penúltimo día de la semana',
         rule_last: 'Último día de la semana',
+        export_resume_csv: 'Exportar Resumen (CSV)',
+        export_statement_csv: 'Exportar Resumen CSV',
+        export_expenses_csv: 'Exportar Consumos CSV',
+        export_all_expenses: 'Exportar Todos los Consumos (CSV)',
       },
       share_modal: {
         title: 'Compartir Acceso a Cuenta',
