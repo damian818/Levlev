@@ -600,7 +600,7 @@ export function CreditCardDetailModal({
                     required
                     value={paymentDate}
                     onChange={(e) => setPaymentDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-[#0f131a] border border-slate-700 text-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    className="w-full px-2.5 py-1.5 bg-[#0f131a] border border-slate-700 text-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500 [color-scheme:dark]"
                   />
                 </div>
 

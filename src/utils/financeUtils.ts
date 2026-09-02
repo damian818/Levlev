@@ -2199,15 +2199,15 @@ export function getCurrentStatementIndex(statements: CreditCardStatement[], rule
 
   const currentCloseStr = getNextCloseDate(rule);
 
-  // 1. If an open statement has a pending balance / unpaid due, select it first
-  const openPendingIdx = statements.findIndex(s => !s.isPaid && s.netDue > 0);
-  if (openPendingIdx !== -1) return openPendingIdx;
+  // 1. Exact match with the current active closing date
+  const exactIdx = statements.findIndex(s => s.closeDate === currentCloseStr);
+  if (exactIdx !== -1) return exactIdx;
 
-  // 2. Otherwise match current close date
-  const idx = statements.findIndex(s => s.closeDate === currentCloseStr);
-  if (idx !== -1) return idx;
+  // 2. If exact match is not found, select the most recent statement that closed on or before currentCloseStr
+  const currentOrPastIdx = statements.findIndex(s => s.closeDate <= currentCloseStr);
+  if (currentOrPastIdx !== -1) return currentOrPastIdx;
 
-  // 3. If exact statement for currentCloseStr is not present, select statement closest to currentCloseStr
+  // 3. Fallback: closest statement to currentCloseStr
   let closestIdx = 0;
   let minDiff = Infinity;
   const currentVal = new Date(currentCloseStr).getTime();

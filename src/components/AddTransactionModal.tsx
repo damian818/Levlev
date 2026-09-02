@@ -15,7 +15,9 @@ import {
   Sparkles, 
   Plus,
   Clock,
-  Layers
+  Layers,
+  Calculator,
+  Equal
 } from 'lucide-react';
 import { 
   isCreditCardAccount, 
@@ -26,6 +28,8 @@ import {
   formatCurrency 
 } from '../utils/financeUtils';
 import { WORLD_CURRENCIES, CURRENCY_MAP } from '../utils/currencyUtils';
+import { evaluateMathExpression, isMathExpression } from '../utils/calculatorUtils';
+import { AmountCalculator } from './AmountCalculator';
 
 export interface AddTransactionModalProps {
   isOpen: boolean;
@@ -251,6 +255,7 @@ export function AddTransactionModal({
 
   // Title suggestions state & auto-complete
   const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const titleContainerRef = useRef<HTMLDivElement>(null);
 
@@ -562,7 +567,8 @@ export function AddTransactionModal({
 
   useEffect(() => {
     if (type !== 'TRANSFER') return;
-    const parsedSent = parseFloat(amount);
+    const evalRes = evaluateMathExpression(amount);
+    const parsedSent = evalRes.isValid && evalRes.result !== null ? evalRes.result : parseFloat(amount);
     if (isNaN(parsedSent) || parsedSent <= 0) {
       if (fxEditMode === 'AUTO') {
         setReceiveAmount('');
@@ -572,7 +578,7 @@ export function AddTransactionModal({
     }
 
     if (sourceCurrency === destCurrency) {
-      setReceiveAmount(amount);
+      setReceiveAmount(evalRes.isValid && evalRes.result !== null ? String(evalRes.result) : amount);
       setCustomFxRate('1.00');
       return;
     }
@@ -585,7 +591,7 @@ export function AddTransactionModal({
         setReceiveAmount((parsedSent * usdArsRate).toFixed(2));
         setCustomFxRate(usdArsRate.toString());
       } else {
-        setReceiveAmount(amount);
+        setReceiveAmount(evalRes.isValid && evalRes.result !== null ? String(evalRes.result) : amount);
         setCustomFxRate('1.00');
       }
     } else if (fxEditMode === 'CUSTOM_RATE') {
@@ -611,7 +617,8 @@ export function AddTransactionModal({
 
   // Installment breakdown calculation
   const installmentSchedule = useMemo(() => {
-    const totalAmt = parseFloat(amount);
+    const evalRes = evaluateMathExpression(amount);
+    const totalAmt = evalRes.isValid && evalRes.result !== null ? evalRes.result : parseFloat(amount);
     if (isNaN(totalAmt) || totalAmt <= 0 || numInstallments <= 1) {
       return [];
     }
@@ -667,7 +674,8 @@ export function AddTransactionModal({
     e.preventDefault();
     if (isSubmittingRef.current) return;
 
-    const parsedAmount = parseFloat(amount);
+    const evalRes = evaluateMathExpression(amount);
+    const parsedAmount = evalRes.isValid && evalRes.result !== null ? evalRes.result : parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) return;
 
     isSubmittingRef.current = true;
@@ -929,11 +937,12 @@ export function AddTransactionModal({
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           
-          {/* Main Amount Input */}
-          <div className="p-3.5 bg-[#0a0c10] border border-slate-800/90 rounded-2xl space-y-2">
+          {/* Main Amount Input & Calculator */}
+          <div className="p-3.5 bg-[#0a0c10] border border-slate-800/90 rounded-2xl space-y-2.5">
             <div className="flex justify-between items-center text-[11px] font-medium text-slate-400">
-              <label>
-                {type === 'TRANSFER' ? t('add_tx.sent_amount') : t('add_tx.amount')}
+              <label className="flex items-center gap-1.5 text-slate-300 font-semibold">
+                <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{type === 'TRANSFER' ? t('add_tx.sent_amount') : t('add_tx.amount')}</span>
               </label>
               <div className="flex items-center space-x-1.5">
                 <span className="text-[10px] text-slate-500">{t('add_tx.quick_date')}</span>
@@ -960,18 +969,61 @@ export function AddTransactionModal({
 
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm select-none">
                   {CURRENCY_MAP[currency]?.symbol || '$'}
                 </span>
                 <input
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   required
-                  placeholder="0.00"
+                  placeholder="0.00 (e.g. 1500+350, 5000-20%)"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full pl-12 pr-3 py-2.5 bg-[#161b22] border border-slate-700 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-base font-mono font-bold placeholder-slate-600"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const evalRes = evaluateMathExpression(amount);
+                      if (evalRes.isExpression && evalRes.isValid && evalRes.result !== null) {
+                        e.preventDefault();
+                        setAmount(evalRes.formatted);
+                      }
+                    }
+                  }}
+                  className="w-full pl-10 pr-24 py-2.5 bg-[#161b22] border border-slate-700 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-base font-mono font-bold placeholder-slate-500"
                 />
+
+                {/* Right actions: live expression tag & calculator toggle button */}
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                  {isMathExpression(amount) && (() => {
+                    const evalRes = evaluateMathExpression(amount);
+                    return evalRes.isValid && evalRes.result !== null ? (
+                      <button
+                        type="button"
+                        onClick={() => setAmount(evalRes.formatted)}
+                        className="px-2 py-0.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 rounded-lg text-xs font-mono font-bold flex items-center gap-1 transition-colors"
+                        title="Click to apply calculated result"
+                      >
+                        <span>= {evalRes.formatted}</span>
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        ...
+                      </span>
+                    );
+                  })()}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCalculator(!showCalculator)}
+                    className={`p-1.5 rounded-lg border transition-all ${
+                      showCalculator
+                        ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-950/50'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+                    }`}
+                    title={t('add_tx.open_calc') || 'Calculator & Presets'}
+                  >
+                    <Calculator className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               {type !== 'TRANSFER' ? (
@@ -995,6 +1047,21 @@ export function AddTransactionModal({
                 </div>
               )}
             </div>
+
+            {/* Quick interactive calculator drawer */}
+            {showCalculator && (
+              <AmountCalculator
+                value={amount}
+                onChange={(val) => setAmount(val)}
+                currencySymbol={CURRENCY_MAP[currency]?.symbol || '$'}
+                onApply={(computedNum) => {
+                  const strVal = computedNum % 1 === 0 ? String(computedNum) : computedNum.toFixed(2);
+                  setAmount(strVal);
+                  setShowCalculator(false);
+                }}
+                onClose={() => setShowCalculator(false)}
+              />
+            )}
           </div>
 
           {/* TITLE INPUT WITH AUTOCOMPLETE SUGGESTIONS */}
@@ -1060,23 +1127,45 @@ export function AddTransactionModal({
           {/* DATE & CLOSING DATE ROW */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-400 font-medium mb-1 flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-slate-500" /> {t('add_tx.tx_date')}
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-slate-300 font-medium text-xs flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-400" /> {t('add_tx.tx_date')}
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setDate(getTodayStr())}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                      date === getTodayStr() ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {t('add_tx.today')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDate(getYesterdayStr())}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                      date === getYesterdayStr() ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {t('add_tx.yesterday')}
+                  </button>
+                </div>
+              </div>
               <input
                 type="date"
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-2.5 py-2 bg-[#0a0c10] border border-slate-700 text-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-slate-500 text-xs"
+                className="w-full px-3 py-2 bg-[#161b22] border border-slate-700 text-slate-100 font-medium rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-xs [color-scheme:dark] shadow-inner"
               />
             </div>
 
             {/* Credit Card Statement Closing Date Dropdown */}
             {isCC && (
               <div>
-                <label className="block text-slate-400 font-medium mb-1 flex items-center gap-1">
-                  <Clock className={`w-3 h-3 ${type === 'CC_PAYMENT' ? 'text-purple-400' : 'text-amber-400'}`} /> 
+                <label className="block text-slate-300 font-medium mb-1 text-xs flex items-center gap-1">
+                  <Clock className={`w-3.5 h-3.5 ${type === 'CC_PAYMENT' ? 'text-purple-400' : 'text-amber-400'}`} /> 
                   {type === 'CC_PAYMENT' 
                     ? (t('add_tx.statement_being_paid') || 'Statement Being Paid / Resumen a Cancelar')
                     : t('add_tx.statement_closing')
@@ -1085,10 +1174,10 @@ export function AddTransactionModal({
                 <select
                   value={statementCloseDate}
                   onChange={(e) => setStatementCloseDate(e.target.value)}
-                  className={`w-full px-2.5 py-2 bg-[#0a0c10] border rounded-xl focus:outline-none focus:ring-1 text-xs font-semibold ${
+                  className={`w-full px-3 py-2 bg-[#161b22] border rounded-xl focus:outline-none focus:ring-2 text-xs font-semibold ${
                     type === 'CC_PAYMENT'
-                      ? 'border-purple-500/50 text-purple-200 focus:ring-purple-500'
-                      : 'border-amber-500/40 text-amber-200 focus:ring-amber-500'
+                      ? 'border-purple-500/50 text-purple-200 focus:ring-purple-500/50'
+                      : 'border-amber-500/40 text-amber-200 focus:ring-amber-500/50'
                   }`}
                 >
                   {statementCloseDatesList.map((item) => (
