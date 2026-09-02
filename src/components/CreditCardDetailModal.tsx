@@ -158,9 +158,11 @@ export function CreditCardDetailModal({
     const amt = parseFloat(paymentAmount);
     if (isNaN(amt) || amt <= 0) return;
 
+    const dateStr = paymentDate ? (paymentDate.includes('T') ? paymentDate.substring(0, 10) : paymentDate) : new Date().toISOString().substring(0, 10);
     const paymentTx: Transaction = {
-      id: `cc-pay-${Date.now()}`,
-      date: new Date(paymentDate).toISOString(),
+      id: `ccpay-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      date: dateStr,
+      timestamp: new Date().toISOString(),
       title: paymentNote || `Pago Resumen ${accountName}`,
       category: 'Tarjetas de Crédito',
       account: paidFromAccount,

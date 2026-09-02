@@ -34,9 +34,19 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Ensure columns exist on existing transactions table
+-- Ensure columns and constraints exist on existing transactions table
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS transfer_amount NUMERIC;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS transfer_currency TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS receive_amount NUMERIC;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS receive_currency TEXT;
+
+DO $$
+BEGIN
+    ALTER TABLE public.transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
+    ALTER TABLE public.transactions ADD CONSTRAINT transactions_type_check CHECK (type IN ('INCOME', 'EXPENSE', 'TRANSFER', 'CC_PAYMENT'));
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END $$;
 
 -- 3. CATEGORIES TABLE
 CREATE TABLE IF NOT EXISTS public.categories (

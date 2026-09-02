@@ -230,6 +230,19 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
           finalInstallments = `${row.installment_number}/${row.total_installments}`;
         }
         
+        let resolvedType: 'EXPENSE' | 'INCOME' | 'TRANSFER' | 'CC_PAYMENT' = (row.type as any) || 'EXPENSE';
+        let rawNotes: string | undefined = row.notes || undefined;
+        
+        // Recover CC_PAYMENT from legacy or fallback database representations
+        if (row.type === 'CC_PAYMENT') {
+          resolvedType = 'CC_PAYMENT';
+        } else if (row.type === 'TRANSFER' && rawNotes && rawNotes.includes('[CC_PAYMENT]')) {
+          resolvedType = 'CC_PAYMENT';
+          rawNotes = rawNotes.replace('[CC_PAYMENT]', '').trim() || undefined;
+        } else if (row.type === 'TRANSFER' && row.category === 'Tarjetas de Crédito' && row.to_account) {
+          resolvedType = 'CC_PAYMENT';
+        }
+
         return {
           id: row.id || `tx-${Math.random().toString(36).substring(2)}`,
           ownerId: row.user_id,
@@ -239,17 +252,17 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
           currency: row.currency || 'ARS',
           category: row.category || 'General',
           account: tAccount,
-          type: row.type || 'EXPENSE',
+          type: resolvedType,
           toAccount: tToAccount,
           installments: finalInstallments,
           installmentNumber: row.installment_number ? Number(row.installment_number) : undefined,
           totalInstallments: row.total_installments ? Number(row.total_installments) : undefined,
           statementCloseDate: row.statement_close_date || undefined,
-          transferAmount: row.transfer_amount !== undefined && row.transfer_amount !== null ? Number(row.transfer_amount) : (row.type === 'TRANSFER' ? Number(row.amount) : undefined),
-          transferCurrency: row.transfer_currency || (row.type === 'TRANSFER' ? row.currency : undefined),
+          transferAmount: row.transfer_amount !== undefined && row.transfer_amount !== null ? Number(row.transfer_amount) : (resolvedType === 'TRANSFER' || resolvedType === 'CC_PAYMENT' ? Number(row.amount) : undefined),
+          transferCurrency: row.transfer_currency || (resolvedType === 'TRANSFER' || resolvedType === 'CC_PAYMENT' ? row.currency : undefined),
           receiveAmount: row.receive_amount !== undefined && row.receive_amount !== null ? Number(row.receive_amount) : undefined,
           receiveCurrency: row.receive_currency || undefined,
-          description: row.notes || undefined,
+          description: rawNotes,
         };
       });
 
@@ -539,8 +552,36 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
             success = true;
           } else {
             console.error(`Error upserting transactions batch ${i} (attempt ${attempt}) to Supabase:`, txErr);
-            // Fallback retry stripping transfer_amount/transfer_currency if column missing in DB schema cache
-            if (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency')) {
+
+            // 1. Fallback for CC_PAYMENT constraint in older Supabase databases
+            const isTypeConstraintErr = txErr.code === '23514' || 
+              txErr.message?.includes('check constraint') || 
+              txErr.message?.includes('transactions_type_check') || 
+              txErr.message?.includes('type');
+
+            if (isTypeConstraintErr) {
+              const fallbackTypeBatch = batch.map(row => {
+                if (row.type === 'CC_PAYMENT') {
+                  const prefix = '[CC_PAYMENT]';
+                  const newNotes = row.notes ? (row.notes.startsWith(prefix) ? row.notes : `${prefix} ${row.notes}`) : prefix;
+                  return {
+                    ...row,
+                    type: 'TRANSFER',
+                    notes: newNotes,
+                  };
+                }
+                return row;
+              });
+              const { error: typeFbErr } = await client.from('transactions').upsert(fallbackTypeBatch, { onConflict: 'id' });
+              if (!typeFbErr) {
+                success = true;
+              } else {
+                console.error(`Fallback CC_PAYMENT->TRANSFER batch ${i} error:`, typeFbErr);
+              }
+            }
+
+            // 2. Fallback retry stripping transfer_amount/transfer_currency if column missing in DB schema cache
+            if (!success && (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency'))) {
               const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, ...rest }) => rest);
               const { error: fbErr } = await client.from('transactions').upsert(fallbackBatch, { onConflict: 'id' });
               if (!fbErr) {
@@ -549,6 +590,23 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
                 console.error(`Fallback transactions batch ${i} error:`, fbErr);
               }
             }
+
+            // 3. Fallback row-by-row on final attempt to prevent losing other transactions in the batch
+            if (!success && attempt === 3) {
+              for (const row of batch) {
+                const { error: singleErr } = await client.from('transactions').upsert(row, { onConflict: 'id' });
+                if (singleErr && (singleErr.code === '23514' || singleErr.message?.includes('check constraint') || row.type === 'CC_PAYMENT')) {
+                  const safeRow = {
+                    ...row,
+                    type: 'TRANSFER',
+                    notes: row.notes ? (row.notes.startsWith('[CC_PAYMENT]') ? row.notes : `[CC_PAYMENT] ${row.notes}`) : '[CC_PAYMENT]',
+                  };
+                  await client.from('transactions').upsert(safeRow, { onConflict: 'id' });
+                }
+              }
+              success = true; // Avoid infinite retries
+            }
+
             if (!success && attempt < 3) {
               await new Promise(r => setTimeout(r, attempt * 300));
             }

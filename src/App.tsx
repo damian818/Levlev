@@ -14,7 +14,7 @@ import { getSavedDebts, saveDebtsToStorage, getSavedDebtStrategy, saveDebtStrate
 import { useBrowserNotifications } from './hooks/useBrowserNotifications';
 import { initializeGlobalFxRates } from './utils/currencyUtils';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
-import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase } from './services/supabaseSync';
+import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase, getDeletedTxIds } from './services/supabaseSync';
 import { Navbar } from './components/Navbar';
 
 // Lazy load non-critical components
@@ -691,7 +691,33 @@ export default function App() {
     try {
       const data = await fetchUserDataFromSupabase();
       if (data) {
-        setTransactions(data.transactions || []);
+        setTransactions(prev => {
+          const deletedIds = getDeletedTxIds();
+          const remoteTxs = (data.transactions || []).filter(t => !deletedIds.has(t.id));
+          
+          const remoteIdMap = new Map<string, Transaction>();
+          remoteTxs.forEach(t => {
+            remoteIdMap.set(t.id, t);
+            if (t.id.includes('_')) {
+              const clean = t.id.split('_').slice(1).join('_');
+              remoteIdMap.set(clean, t);
+            }
+          });
+
+          // Keep local transactions that were added recently or not yet in remote, as long as not deleted
+          const pendingLocal = prev.filter(t => {
+            if (deletedIds.has(t.id)) return false;
+            const clean = t.id.includes('_') ? t.id.split('_').slice(1).join('_') : t.id;
+            if (deletedIds.has(clean)) return false;
+            return !remoteIdMap.has(t.id) && !remoteIdMap.has(clean);
+          });
+
+          const merged = [...pendingLocal, ...remoteTxs];
+          try {
+            localStorage.setItem('finance_app_transactions', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
         if (data.categories && data.categories.length > 0) {
           setCategories(data.categories);
           try {
