@@ -176,15 +176,18 @@ export function getStatementCloseDateForPayment(
 export function getUpcomingStatementCloseDates(
   txDateStr: string,
   closingRule?: CreditCardClosingRule,
-  countPast: number = 3,
-  countFuture: number = 8
+  countPast: number = 4,
+  countFuture: number = 8,
+  isPayment: boolean = false
 ): { dateStr: string; label: string; isDefault: boolean }[] {
   const dt = txDateStr ? new Date(txDateStr) : new Date();
   const baseYear = isNaN(dt.getTime()) ? new Date().getFullYear() : dt.getFullYear();
   const baseMonth = isNaN(dt.getTime()) ? new Date().getMonth() : dt.getMonth();
 
   const rule: CreditCardClosingRule = closingRule || { ruleType: 'FIXED_DAY', fixedDay: 25 };
-  const defaultCloseStr = getStatementCloseDateForTx(txDateStr || new Date().toISOString().substring(0, 10), rule);
+  const defaultCloseStr = isPayment
+    ? getStatementCloseDateForPayment(txDateStr || new Date().toISOString().substring(0, 10), rule)
+    : getStatementCloseDateForTx(txDateStr || new Date().toISOString().substring(0, 10), rule);
 
   const pad = (n: number) => String(n).padStart(2, '0');
   const results: { dateStr: string; label: string; isDefault: boolean }[] = [];
@@ -199,8 +202,18 @@ export function getUpcomingStatementCloseDates(
       seen.add(dateStr);
       const monthName = closeDt.toLocaleString('en-US', { month: 'short' });
       const isDefault = dateStr === defaultCloseStr;
-      const label = `${closeDt.getDate()} ${monthName} ${closeDt.getFullYear()}${isDefault ? ' (Current Period)' : ''}`;
+      const label = `${closeDt.getDate()} ${monthName} ${closeDt.getFullYear()}${isDefault ? (isPayment ? ' (Statement Due / Paid)' : ' (Current Period)') : ''}`;
       results.push({ dateStr, label, isDefault });
+    }
+  }
+
+  // Ensure defaultCloseStr is present in the list
+  if (defaultCloseStr && !seen.has(defaultCloseStr)) {
+    const d = new Date(defaultCloseStr);
+    if (!isNaN(d.getTime())) {
+      const monthName = d.toLocaleString('en-US', { month: 'short' });
+      const label = `${d.getDate()} ${monthName} ${d.getFullYear()}${isPayment ? ' (Statement Due / Paid)' : ' (Current Period)'}`;
+      results.push({ dateStr: defaultCloseStr, label, isDefault: true });
     }
   }
 
@@ -213,8 +226,10 @@ export function getCreditCardStatements(
   defaultCloseDayOrRule: number | CreditCardClosingRule = 25,
   statusOverrides?: Record<string, 'PAID' | 'OPEN'>
 ): CreditCardStatement[] {
+  const normAccName = (accountName || '').trim().toLowerCase();
   const accountTxs = transactions.filter(t => 
-    t.account === accountName || t.toAccount === accountName
+    (t.account && t.account.trim().toLowerCase() === normAccName) || 
+    (t.toAccount && t.toAccount.trim().toLowerCase() === normAccName)
   );
 
   const rule: CreditCardClosingRule = typeof defaultCloseDayOrRule === 'number'
@@ -229,8 +244,15 @@ export function getCreditCardStatements(
   const payments: Transaction[] = [];
 
   accountTxs.forEach(tx => {
-    const isExpenseOnThisCard = tx.account === accountName && tx.type === 'EXPENSE';
-    const isPaymentToThisCard = tx.toAccount === accountName || tx.type === 'CC_PAYMENT' || (tx.type === 'TRANSFER' && tx.toAccount === accountName) || (tx.account === accountName && tx.type === 'INCOME');
+    const isThisAccountSource = tx.account && tx.account.trim().toLowerCase() === normAccName;
+    const isThisAccountDest = tx.toAccount && tx.toAccount.trim().toLowerCase() === normAccName;
+
+    const isExpenseOnThisCard = isThisAccountSource && tx.type === 'EXPENSE';
+    const isPaymentToThisCard = 
+      isThisAccountDest || 
+      (isThisAccountSource && (tx.type === 'CC_PAYMENT' || tx.type === 'INCOME')) ||
+      (tx.type === 'TRANSFER' && isThisAccountDest) ||
+      (tx.type === 'CC_PAYMENT' && (isThisAccountDest || isThisAccountSource));
 
     if (isExpenseOnThisCard) {
       expenses.push(tx);
@@ -376,8 +398,6 @@ export function getCreditCardStatements(
     const currency = val.expenses[0]?.currency || val.payments[0]?.currency || 'ARS';
     const periodMonth = closeDate.substring(0, 7);
 
-    // All past historical statement periods (closeDate < currentCloseStr) are considered Paid
-    const isPastPeriod = closeDate < currentCloseStr;
     const rawNetDue = totalExpenses - totalPayments;
 
     const overrideKey = `${accountName}|${closeDate}`;
@@ -396,8 +416,16 @@ export function getCreditCardStatements(
       netDue = Math.max(0, rawNetDue > 0 ? rawNetDue : totalExpenses);
       isManualOverride = true;
     } else {
-      netDue = isPastPeriod ? 0 : Math.max(0, rawNetDue);
-      isPaid = isPastPeriod || (rawNetDue <= 0);
+      if (totalExpenses <= 0 && totalPayments >= 0) {
+        isPaid = true;
+        netDue = 0;
+      } else if (rawNetDue <= 0) {
+        isPaid = true;
+        netDue = 0;
+      } else {
+        netDue = Math.max(0, rawNetDue);
+        isPaid = false;
+      }
     }
 
     result.push({
@@ -2171,10 +2199,15 @@ export function getCurrentStatementIndex(statements: CreditCardStatement[], rule
 
   const currentCloseStr = getNextCloseDate(rule);
 
+  // 1. If an open statement has a pending balance / unpaid due, select it first
+  const openPendingIdx = statements.findIndex(s => !s.isPaid && s.netDue > 0);
+  if (openPendingIdx !== -1) return openPendingIdx;
+
+  // 2. Otherwise match current close date
   const idx = statements.findIndex(s => s.closeDate === currentCloseStr);
   if (idx !== -1) return idx;
 
-  // If exact statement for currentCloseStr is not present, select statement closest to currentCloseStr
+  // 3. If exact statement for currentCloseStr is not present, select statement closest to currentCloseStr
   let closestIdx = 0;
   let minDiff = Infinity;
   const currentVal = new Date(currentCloseStr).getTime();

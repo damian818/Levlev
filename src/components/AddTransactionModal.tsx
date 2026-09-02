@@ -252,6 +252,34 @@ export function AddTransactionModal({
   // Title suggestions state & auto-complete
   const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close title suggestions dropdown when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (titleContainerRef.current && !titleContainerRef.current.contains(event.target as Node)) {
+        setShowTitleSuggestions(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowTitleSuggestions(false);
+      }
+    };
+
+    if (showTitleSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showTitleSuggestions]);
 
   const uniquePastTitles = useMemo(() => {
     const map = new Map<string, string>(); // title -> most recent category
@@ -513,7 +541,7 @@ export function AddTransactionModal({
   const statementCloseDatesList = useMemo(() => {
     const targetAcc = type === 'CC_PAYMENT' ? toAccount : account;
     const rule = lookupAccountClosingRule(targetAcc);
-    return getUpcomingStatementCloseDates(date, rule);
+    return getUpcomingStatementCloseDates(date, rule, 6, 6, type === 'CC_PAYMENT');
   }, [date, account, toAccount, type, accountItems, isOpen]);
 
   // Auto set statement close date to default current period when date or account changes
@@ -970,7 +998,7 @@ export function AddTransactionModal({
           </div>
 
           {/* TITLE INPUT WITH AUTOCOMPLETE SUGGESTIONS */}
-          <div className="relative">
+          <div ref={titleContainerRef} className="relative">
             <label className="block text-slate-400 font-medium mb-1">
               {type === 'CC_PAYMENT' ? t('add_tx.payment_ref') : t('add_tx.title_merchant')}
             </label>
@@ -1048,12 +1076,20 @@ export function AddTransactionModal({
             {isCC && (
               <div>
                 <label className="block text-slate-400 font-medium mb-1 flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-amber-400" /> {t('add_tx.statement_closing')}
+                  <Clock className={`w-3 h-3 ${type === 'CC_PAYMENT' ? 'text-purple-400' : 'text-amber-400'}`} /> 
+                  {type === 'CC_PAYMENT' 
+                    ? (t('add_tx.statement_being_paid') || 'Statement Being Paid / Resumen a Cancelar')
+                    : t('add_tx.statement_closing')
+                  }
                 </label>
                 <select
                   value={statementCloseDate}
                   onChange={(e) => setStatementCloseDate(e.target.value)}
-                  className="w-full px-2.5 py-2 bg-[#0a0c10] border border-amber-500/40 text-amber-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-500 text-xs font-semibold"
+                  className={`w-full px-2.5 py-2 bg-[#0a0c10] border rounded-xl focus:outline-none focus:ring-1 text-xs font-semibold ${
+                    type === 'CC_PAYMENT'
+                      ? 'border-purple-500/50 text-purple-200 focus:ring-purple-500'
+                      : 'border-amber-500/40 text-amber-200 focus:ring-amber-500'
+                  }`}
                 >
                   {statementCloseDatesList.map((item) => (
                     <option key={item.dateStr} value={item.dateStr}>
