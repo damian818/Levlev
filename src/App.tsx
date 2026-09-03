@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
-import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount, detectFinancialAnomalies, getCreditCardStatements, getPendingRecurringForMonth, getCurrentMonthKey, getSavedDismissedRecurring, saveDismissedRecurring } from './utils/financeUtils';
+import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount, detectFinancialAnomalies, getCreditCardStatements, getPendingRecurringForMonth, getCurrentMonthKey, getSavedDismissedRecurring, saveDismissedRecurring, computeAccountBalances } from './utils/financeUtils';
 import { TabCustomizationItem, getSavedTabCustomization, saveTabCustomizationToStorage, mergeTabOrder } from './utils/tabUtils';
 import { getSavedSelectedReports, saveSelectedReports } from './utils/reportsCatalog';
 import { getSavedDebts, saveDebtsToStorage, getSavedDebtStrategy, saveDebtStrategyToStorage, getSavedExtraPayment, saveExtraPaymentToStorage } from './utils/debtUtils';
@@ -1258,6 +1258,46 @@ export default function App() {
   }
 
   const handleUpdateAccountBalance = (accountName: string, currentBalance: number | undefined, currency: string) => {
+    if (currentBalance !== undefined) {
+      // Calculate current balance of this account prior to this manual adjustment
+      const currentSummaries = computeAccountBalances(transactions, usdArsRate, customBalances, accounts);
+      const accSummary = currentSummaries.find(s => s.accountName === accountName);
+      const prevBal = accSummary ? accSummary.balanceOriginal : 0;
+      const delta = Number((currentBalance - prevBal).toFixed(2));
+
+      if (Math.abs(delta) >= 0.01) {
+        const isSpanish = (i18n.language || '').toLowerCase().startsWith('es');
+        const title = isSpanish ? 'Ajuste' : 'Balance adjust';
+        const category = isSpanish ? 'Ajustes' : 'Balance Adjust';
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+        const adjustTx: Transaction = {
+          id: `tx_adj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          date: todayStr,
+          timestamp: now.toISOString(),
+          title,
+          category,
+          account: accountName,
+          amount: Math.abs(delta),
+          currency,
+          type: delta > 0 ? 'INCOME' : 'EXPENSE',
+          description: isSpanish
+            ? `Ajuste de saldo (${prevBal.toFixed(2)} → ${currentBalance.toFixed(2)})`
+            : `Balance adjust (${prevBal.toFixed(2)} → ${currentBalance.toFixed(2)})`,
+        };
+
+        setTransactions(prev => {
+          const updatedTxs = [adjustTx, ...prev];
+          try {
+            localStorage.setItem('finance_app_transactions', JSON.stringify(updatedTxs));
+          } catch (e) {}
+          return updatedTxs;
+        });
+      }
+    }
+
     setCustomBalances(prev => {
       const updated = { ...prev };
       if (currentBalance === undefined) {
@@ -1463,6 +1503,8 @@ export default function App() {
               onDuplicateTransaction={handleDuplicateTransaction}
               categoriesList={categories}
               accountsList={accounts}
+              customBalances={customBalances}
+              periodStatusOverrides={periodStatusOverrides}
               onOpenAddModal={() => setIsAddModalOpen(true)}
               onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
               activeFilter={activeFilter}

@@ -281,11 +281,14 @@ export function getCreditCardStatements(
     }
   });
 
-  // Always ensure at least the current month's statement close date exists
+  // Always ensure at least the current month's statement close date and the active cycle close date exist
   const now = new Date();
   const currentClose = getCloseDateForMonthAndYear(now.getFullYear(), now.getMonth(), rule);
   const currentCloseStr = `${currentClose.getFullYear()}-${pad(currentClose.getMonth() + 1)}-${pad(currentClose.getDate())}`;
   closeDateSet.add(currentCloseStr);
+
+  const activeNextCloseStr = getNextCloseDate(rule);
+  closeDateSet.add(activeNextCloseStr);
 
   const sortedCloseDates = Array.from(closeDateSet).sort((a, b) => a.localeCompare(b));
 
@@ -389,7 +392,7 @@ export function getCreditCardStatements(
   const result: CreditCardStatement[] = [];
 
   statementMap.forEach((val, closeDate) => {
-    if (val.expenses.length === 0 && val.payments.length === 0 && closeDate !== currentCloseStr) {
+    if (val.expenses.length === 0 && val.payments.length === 0 && closeDate !== currentCloseStr && closeDate !== activeNextCloseStr) {
       return;
     }
 
@@ -407,7 +410,13 @@ export function getCreditCardStatements(
     let netDue: number;
     let isManualOverride = false;
 
-    if (overrideStatus === 'PAID') {
+    // Requirement: If a statement has payments for the total amount of expenses,
+    // it should be moved from OPEN PENDING to PAID SETTLED automatically
+    if (totalExpenses > 0 && totalPayments >= totalExpenses - 0.001) {
+      isPaid = true;
+      netDue = 0;
+      isManualOverride = false;
+    } else if (overrideStatus === 'PAID') {
       isPaid = true;
       netDue = 0;
       isManualOverride = true;
@@ -786,18 +795,25 @@ export function computeAccountBalances(
       accountDeltas[acc].netDelta -= amt;
     } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
       const destAcc = tx.toAccount;
-      const destCurr = destAcc ? getAccountCurrency(destAcc, tx.receiveCurrency) : originCurr;
+      if (!destAcc && tx.type === 'CC_PAYMENT') {
+        // If CC_PAYMENT was logged directly on the CC account without toAccount,
+        // it represents a payment inflow reducing card debt
+        accountDeltas[acc].netDelta += amt;
+      } else {
+        const destCurr = destAcc ? getAccountCurrency(destAcc, tx.receiveCurrency) : originCurr;
 
-      const outflow = getTransferOutflow(tx, usdArsRate, originCurr, destCurr);
-      accountDeltas[acc].netDelta -= outflow;
+        const outflow = getTransferOutflow(tx, usdArsRate, originCurr, destCurr);
+        accountDeltas[acc].netDelta -= outflow;
 
-      if (destAcc) {
-        const inflow = getTransferInflow(tx, usdArsRate, originCurr, destCurr);
+        if (destAcc) {
+          const inflow = getTransferInflow(tx, usdArsRate, originCurr, destCurr);
 
-        if (!accountDeltas[destAcc]) {
-          accountDeltas[destAcc] = { netDelta: 0, currency: destCurr, count: 0 };
+          if (!accountDeltas[destAcc]) {
+            accountDeltas[destAcc] = { netDelta: 0, currency: destCurr, count: 0 };
+          }
+          accountDeltas[destAcc].netDelta += inflow;
+          accountDeltas[destAcc].count++;
         }
-        accountDeltas[destAcc].netDelta += inflow;
       }
     }
   });
@@ -827,9 +843,10 @@ export function computeAccountBalances(
       const deltaObj = accountDeltas[accName] || { netDelta: 0, currency: 'ARS', count: 0 };
       const custom = customBalances?.[accName];
       const accItem = accountsList?.find(a => a.name === accName);
+      const initBal = accItem?.initialBalance || 0;
 
       const currency = custom?.currency || accItem?.currency || deltaObj.currency || getAccountCurrency(accName);
-      const balance = custom !== undefined ? custom.currentBalance : deltaObj.netDelta;
+      const balance = custom !== undefined ? custom.currentBalance : (initBal + deltaObj.netDelta);
 
       const isUsd = currency.toUpperCase().includes('USD');
       const balARS = isUsd ? balance * usdArsRate : balance;
@@ -2291,8 +2308,12 @@ export function verifyAccountBalances(
         } else if (tx.type === 'EXPENSE') {
           sumTransactions -= amt;
         } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-          const outflow = getTransferOutflow(tx, usdArsRate);
-          sumTransactions -= outflow;
+          if (!tx.toAccount && tx.type === 'CC_PAYMENT') {
+            sumTransactions += amt;
+          } else {
+            const outflow = getTransferOutflow(tx, usdArsRate);
+            sumTransactions -= outflow;
+          }
         }
       }
 
@@ -2351,7 +2372,8 @@ export function recalculateAccountBalancesFromTransactions(
 
   nameSet.forEach(accName => {
     const currency = getAccCurrency(accName);
-    let netBalance = 0;
+    const accItem = accounts.find(a => a.name === accName);
+    let netBalance = accItem?.initialBalance ?? 0;
 
     transactions.forEach(tx => {
       // Exclude future transactions from current status balance
@@ -2365,10 +2387,14 @@ export function recalculateAccountBalancesFromTransactions(
         } else if (tx.type === 'EXPENSE') {
           netBalance -= amt;
         } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-          const originCurr = currency;
-          const destCurr = tx.toAccount ? getAccCurrency(tx.toAccount) : originCurr;
-          const outflow = getTransferOutflow(tx, usdArsRate, originCurr, destCurr);
-          netBalance -= outflow;
+          if (!tx.toAccount && tx.type === 'CC_PAYMENT') {
+            netBalance += amt;
+          } else {
+            const originCurr = currency;
+            const destCurr = tx.toAccount ? getAccCurrency(tx.toAccount) : originCurr;
+            const outflow = getTransferOutflow(tx, usdArsRate, originCurr, destCurr);
+            netBalance -= outflow;
+          }
         }
       }
 

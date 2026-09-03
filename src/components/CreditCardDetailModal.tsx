@@ -9,6 +9,7 @@ interface CreditCardDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   accountName: string;
+  initialCloseDate?: string;
   transactions: Transaction[];
   displayCurrency: DisplayCurrency;
   usdArsRate: number;
@@ -25,6 +26,7 @@ export function CreditCardDetailModal({
   isOpen,
   onClose,
   accountName,
+  initialCloseDate,
   transactions,
   displayCurrency,
   usdArsRate,
@@ -120,11 +122,20 @@ export function CreditCardDetailModal({
 
   useEffect(() => {
     if (isOpen) {
+      if (initialCloseDate) {
+        const targetIdx = statements.findIndex(s => s.closeDate === initialCloseDate);
+        if (targetIdx !== -1) {
+          setSelectedStatementIdx(targetIdx);
+          return;
+        }
+      }
       setSelectedStatementIdx(currentIdx);
     }
-  }, [isOpen, accountName, currentIdx]);
+  }, [isOpen, accountName, initialCloseDate, currentIdx, statements]);
 
-  const activeStatement = statements[selectedStatementIdx] || statements[currentIdx] || statements[0];
+  const activeStatement = (selectedStatementIdx >= 0 && selectedStatementIdx < statements.length)
+    ? statements[selectedStatementIdx]
+    : (statements[currentIdx] || statements[0]);
 
   const availablePeriods = useMemo(() => {
     const datesSet = new Set<string>();

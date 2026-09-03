@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint, CategoryItem, AccountItem } from '../types';
-import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString, normalizeCleanTitle, isInstallmentTx, detectRecurringItems } from '../utils/financeUtils';
+import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint, CategoryItem, AccountItem, AccountCustomBalance } from '../types';
+import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString, normalizeCleanTitle, isInstallmentTx, detectRecurringItems, isCreditCardAccount, computeAccountBalances } from '../utils/financeUtils';
 import { exportTransactionsToCSV } from '../utils/exportUtils';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2, Download } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2, Download, CreditCard, Landmark } from 'lucide-react';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -14,6 +14,8 @@ interface TransactionsTabProps {
   onUpdateTransaction: (id: string | string[], updates: Partial<Transaction>) => void;
   categoriesList: CategoryItem[];
   accountsList: AccountItem[];
+  customBalances?: Record<string, AccountCustomBalance>;
+  periodStatusOverrides?: Record<string, 'PAID' | 'OPEN'>;
   onOpenAddModal: () => void;
   onOpenDeleteModal?: () => void;
   onEditTransaction?: (tx: Transaction) => void;
@@ -37,6 +39,8 @@ export const TransactionsTab = React.memo(function TransactionsTab({
   onUpdateTransaction,
   categoriesList,
   accountsList,
+  customBalances,
+  periodStatusOverrides,
   onOpenAddModal,
   onOpenDeleteModal,
   onEditTransaction,
@@ -334,6 +338,87 @@ export const TransactionsTab = React.memo(function TransactionsTab({
 
   const isFiltered = searchTerm || selectedType !== 'ALL' || selectedCategory !== 'ALL' || selectedAccount !== 'ALL' || selectedMonth !== 'ALL' || recurringFilter !== 'ALL';
 
+  const accountMovementsStats = useMemo(() => {
+    if (selectedAccount === 'ALL') return null;
+
+    let totalInflows = 0;
+    let totalOutflows = 0;
+    let ccPaymentsCount = 0;
+    let ccPaymentsTotal = 0;
+    let transferInTotal = 0;
+    let transferOutTotal = 0;
+    let expenseTotal = 0;
+    let incomeTotal = 0;
+
+    const accItem = accountsList.find(a => a.name === selectedAccount);
+    const isCC = isCreditCardAccount(selectedAccount, accountsList);
+    const currency = accItem?.currency || customBalances?.[selectedAccount]?.currency || 'ARS';
+
+    filtered.forEach(tx => {
+      const amt = Number(tx.amount || 0);
+      const isOrigin = tx.account === selectedAccount;
+      const isDest = tx.toAccount === selectedAccount;
+
+      if (tx.type === 'INCOME') {
+        if (isOrigin) {
+          totalInflows += amt;
+          incomeTotal += amt;
+        }
+      } else if (tx.type === 'EXPENSE') {
+        if (isOrigin) {
+          totalOutflows += amt;
+          expenseTotal += amt;
+        }
+      } else if (tx.type === 'CC_PAYMENT') {
+        if (isDest || (isOrigin && !tx.toAccount)) {
+          const pAmt = (tx.receiveAmount && tx.receiveAmount > 0)
+            ? Number(tx.receiveAmount)
+            : ((tx.transferAmount && tx.transferAmount > 0) ? Number(tx.transferAmount) : amt);
+          totalInflows += pAmt;
+          ccPaymentsTotal += pAmt;
+          ccPaymentsCount++;
+        } else if (isOrigin && tx.toAccount) {
+          const outAmt = (tx.transferAmount && tx.transferAmount > 0) ? Number(tx.transferAmount) : amt;
+          totalOutflows += outAmt;
+        }
+      } else if (tx.type === 'TRANSFER') {
+        if (isDest) {
+          const inAmt = (tx.receiveAmount && tx.receiveAmount > 0) ? Number(tx.receiveAmount) : amt;
+          totalInflows += inAmt;
+          transferInTotal += inAmt;
+        } else if (isOrigin) {
+          const outAmt = (tx.transferAmount && tx.transferAmount > 0) ? Number(tx.transferAmount) : amt;
+          totalOutflows += outAmt;
+          transferOutTotal += outAmt;
+        }
+      }
+    });
+
+    const netMovements = totalInflows - totalOutflows;
+
+    // Current calculated balance for this account
+    const summaries = computeAccountBalances(transactions, usdArsRate, customBalances, accountsList);
+    const summary = summaries.find(s => s.accountName === selectedAccount);
+    const currentBalance = summary ? summary.balanceOriginal : (accItem?.initialBalance || 0);
+
+    return {
+      accountName: selectedAccount,
+      isCC,
+      currency,
+      totalInflows,
+      totalOutflows,
+      ccPaymentsCount,
+      ccPaymentsTotal,
+      transferInTotal,
+      transferOutTotal,
+      expenseTotal,
+      incomeTotal,
+      netMovements,
+      currentBalance,
+      movementsCount: filtered.length,
+    };
+  }, [selectedAccount, filtered, accountsList, customBalances, transactions, usdArsRate]);
+
   const handleExportVisibleCSV = () => {
     if (filtered.length === 0) return;
     let filename = 'transactions';
@@ -622,6 +707,83 @@ export const TransactionsTab = React.memo(function TransactionsTab({
         </div>
       )}
 
+      {/* Account Movements & Totals Summary Banner */}
+      {accountMovementsStats && (
+        <div className="bg-[#121620] border border-slate-800 rounded-xl p-4 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                {accountMovementsStats.isCC ? <CreditCard className="w-5 h-5" /> : <Landmark className="w-5 h-5" />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-100">{accountMovementsStats.accountName}</h3>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {accountMovementsStats.isCC ? t('accounts.credit_card', { defaultValue: 'Credit Card' }) : t('accounts.bank_account', { defaultValue: 'Account' })}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  {t('transactions.movements_count', { count: accountMovementsStats.movementsCount, defaultValue: `${accountMovementsStats.movementsCount} movements` })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="sm:text-right">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                  {t('accounts.balance_synced', { defaultValue: 'Calculated Balance' })}
+                </span>
+                <span className="text-base sm:text-lg font-bold text-slate-100">
+                  {formatCurrency(accountMovementsStats.currentBalance, accountMovementsStats.currency as DisplayCurrency)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 text-xs">
+            <div className="bg-[#161b22] p-2.5 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">{t('transactions.total_inflows', { defaultValue: 'Inflows / Credits' })}</span>
+              <span className="text-emerald-400 font-bold text-sm">
+                +{formatCurrency(accountMovementsStats.totalInflows, accountMovementsStats.currency as DisplayCurrency)}
+              </span>
+            </div>
+
+            <div className="bg-[#161b22] p-2.5 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">{t('transactions.total_outflows', { defaultValue: 'Outflows / Debits' })}</span>
+              <span className="text-rose-400 font-bold text-sm">
+                -{formatCurrency(accountMovementsStats.totalOutflows, accountMovementsStats.currency as DisplayCurrency)}
+              </span>
+            </div>
+
+            {accountMovementsStats.isCC ? (
+              <div className="bg-[#161b22] p-2.5 rounded-lg border border-purple-500/20">
+                <span className="text-[10px] uppercase font-bold text-purple-300 block">{t('cc_modal.payments_applied', { defaultValue: 'CC Payments Applied' })}</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-purple-300 font-bold text-sm">
+                    +{formatCurrency(accountMovementsStats.ccPaymentsTotal, accountMovementsStats.currency as DisplayCurrency)}
+                  </span>
+                  <span className="text-[10px] text-purple-400/80 font-medium">({accountMovementsStats.ccPaymentsCount})</span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[#161b22] p-2.5 rounded-lg border border-slate-800/80">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">{t('transactions.net_movements', { defaultValue: 'Net Movements' })}</span>
+                <span className={`font-bold text-sm ${accountMovementsStats.netMovements >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {accountMovementsStats.netMovements >= 0 ? '+' : ''}{formatCurrency(accountMovementsStats.netMovements, accountMovementsStats.currency as DisplayCurrency)}
+                </span>
+              </div>
+            )}
+
+            <div className="bg-[#161b22] p-2.5 rounded-lg border border-slate-800/80">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">{t('transactions.movements_net', { defaultValue: 'Net Movements Delta' })}</span>
+              <span className={`font-bold text-sm ${accountMovementsStats.netMovements >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {accountMovementsStats.netMovements >= 0 ? '+' : ''}{formatCurrency(accountMovementsStats.netMovements, accountMovementsStats.currency as DisplayCurrency)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Transactions Table */}
       <div className="bg-[#161b22] rounded-xl border border-slate-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -832,8 +994,32 @@ export const TransactionsTab = React.memo(function TransactionsTab({
                           )}
                         </div>
                       </td>
-                      <td className="p-3 text-right font-semibold text-slate-200">
-                        {formatCurrency(tx.amount, tx.currency as DisplayCurrency)}
+                      <td className="p-3 text-right font-semibold">
+                        {selectedAccount !== 'ALL' ? (
+                          (() => {
+                            const isDest = tx.toAccount === selectedAccount;
+                            const isOrigin = tx.account === selectedAccount;
+                            const isCCPayment = tx.type === 'CC_PAYMENT' && (isDest || (isOrigin && !tx.toAccount));
+                            const isIncome = tx.type === 'INCOME' || isCCPayment || (tx.type === 'TRANSFER' && isDest);
+                            const amt = (isIncome && (tx.receiveAmount && tx.receiveAmount > 0)) ? tx.receiveAmount : tx.amount;
+                            return (
+                              <div className="flex flex-col items-end">
+                                <span className={isIncome ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                  {isIncome ? '+' : '-'}{formatCurrency(amt, tx.currency as DisplayCurrency)}
+                                </span>
+                                {isCCPayment && (
+                                  <span className="text-[10px] text-purple-400 font-medium">
+                                    {t('cc_modal.payment_credit', { defaultValue: 'Pago Tarjeta' })}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <span className="text-slate-200">
+                            {formatCurrency(tx.amount, tx.currency as DisplayCurrency)}
+                          </span>
+                        )}
                       </td>
                       <td className="p-3 text-right font-bold text-slate-100">
                         <div>{formatCurrency(converted, displayCurrency)}</div>

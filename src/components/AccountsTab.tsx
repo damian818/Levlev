@@ -952,6 +952,7 @@ export const AccountsTab = React.memo(function AccountsTab({
           isOpen={!!selectedCardAccount}
           onClose={() => setSelectedCardAccount(null)}
           accountName={selectedCardAccount}
+          initialCloseDate={reconstructedAccounts.find(a => a.accountName === selectedCardAccount)?.currentStatement?.closeDate}
           transactions={filteredTransactions}
           displayCurrency={displayCurrency}
           usdArsRate={usdArsRate}
