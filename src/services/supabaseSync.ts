@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../lib/supabase';
-import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, TabCustomizationItem } from '../types';
+import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, TabCustomizationItem, InstallmentPlan } from '../types';
 
 const DELETED_TX_KEY = 'finance_app_deleted_tx_ids';
 
@@ -48,6 +48,7 @@ export interface SupabaseUserData {
   budgets: BudgetGoal[];
   recurringRules?: RecurringRule[];
   nonRecurringKeys?: string[];
+  installmentPlans?: InstallmentPlan[];
   settings?: {
     ccRulesMap?: Record<string, CreditCardClosingRule>;
     ccMap?: Record<string, boolean>;
@@ -60,6 +61,9 @@ export interface SupabaseUserData {
     hiddenCategoryIds?: string[];
     recurringRules?: RecurringRule[];
     nonRecurringKeys?: string[];
+    installmentPlans?: InstallmentPlan[];
+    txPlanIds?: Record<string, string>;
+    txAttachments?: Record<string, any[]>;
     onboardingCompleted?: boolean;
     localCurrency?: string;
     displayCurrency?: string;
@@ -263,6 +267,9 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
           receiveAmount: row.receive_amount !== undefined && row.receive_amount !== null ? Number(row.receive_amount) : undefined,
           receiveCurrency: row.receive_currency || undefined,
           description: rawNotes,
+          planId: row.plan_id || (userSettings?.txPlanIds ? userSettings.txPlanIds[row.id] : undefined),
+          installmentPlanId: row.plan_id || (userSettings?.txPlanIds ? userSettings.txPlanIds[row.id] : undefined),
+          attachments: row.attachments || (userSettings?.txAttachments ? userSettings.txAttachments[row.id] : undefined) || [],
         };
       });
 
@@ -436,7 +443,39 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     const recurringRules: RecurringRule[] = Array.isArray(userSettings?.recurringRules) ? userSettings.recurringRules : [];
     const nonRecurringKeys: string[] = Array.isArray(userSettings?.nonRecurringKeys) ? userSettings.nonRecurringKeys : [];
 
-    return { transactions, categories, accounts, budgets, recurringRules, nonRecurringKeys, settings: userSettings };
+    let installmentPlans: InstallmentPlan[] = Array.isArray(userSettings?.installmentPlans) ? userSettings.installmentPlans : [];
+    try {
+      const planRes = await client.from('installment_plans').select('*');
+      if (planRes.data && planRes.data.length > 0) {
+        const tablePlans: InstallmentPlan[] = planRes.data.map((r: any) => ({
+          id: r.id,
+          ownerId: r.user_id,
+          title: r.title || 'Plan',
+          category: r.category || 'General',
+          account: r.account || '',
+          totalAmount: Number(r.total_amount) || 0,
+          installmentAmount: Number(r.installment_amount) || 0,
+          currency: r.currency || 'ARS',
+          totalInstallments: Number(r.total_installments) || 1,
+          paidInstallments: r.paid_installments !== undefined ? Number(r.paid_installments) : undefined,
+          startDate: r.start_date || new Date().toISOString().substring(0, 10),
+          status: r.status || 'ACTIVE',
+          description: r.description || undefined,
+          notes: r.notes || undefined,
+          statementCloseDate: r.statement_close_date || undefined,
+          createdAt: r.created_at || new Date().toISOString(),
+          updatedAt: r.updated_at || new Date().toISOString(),
+        }));
+        const pMap = new Map<string, InstallmentPlan>();
+        installmentPlans.forEach(p => pMap.set(p.id, p));
+        tablePlans.forEach(p => pMap.set(p.id, p));
+        installmentPlans = Array.from(pMap.values());
+      }
+    } catch (e) {
+      // Table may not exist yet in Supabase schema, rely on user_settings
+    }
+
+    return { transactions, categories, accounts, budgets, recurringRules, nonRecurringKeys, installmentPlans, settings: userSettings };
   } catch (err) {
     console.error('Error fetching data from Supabase:', err);
     return null;
@@ -538,6 +577,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           transfer_currency: t.transferCurrency || null,
           receive_amount: t.receiveAmount !== undefined && t.receiveAmount !== null ? Math.round(t.receiveAmount * 100) / 100 : null,
           receive_currency: t.receiveCurrency || null,
+          plan_id: t.planId || t.installmentPlanId || null,
           notes: t.description || null,
         };
       });
@@ -580,9 +620,9 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
               }
             }
 
-            // 2. Fallback retry stripping transfer_amount/transfer_currency if column missing in DB schema cache
-            if (!success && (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency'))) {
-              const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, ...rest }) => rest);
+            // 2. Fallback retry stripping transfer_amount/transfer_currency/plan_id if column missing in DB schema cache
+            if (!success && (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency') || txErr.message?.includes('plan_id'))) {
+              const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, plan_id, ...rest }) => rest);
               const { error: fbErr } = await client.from('transactions').upsert(fallbackBatch, { onConflict: 'id' });
               if (!fbErr) {
                 success = true;
@@ -792,7 +832,58 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           return raw ? JSON.parse(raw) : undefined;
         } catch { return undefined; }
       })() : undefined),
+      installmentPlans: data.installmentPlans || data.settings?.installmentPlans || (typeof window !== 'undefined' ? (() => {
+        try {
+          const raw = localStorage.getItem('levlev_installment_plans');
+          return raw ? JSON.parse(raw) : undefined;
+        } catch { return undefined; }
+      })() : undefined),
+      txPlanIds: (() => {
+        const idsMap: Record<string, string> = {};
+        (data.transactions || []).forEach(t => {
+          const pId = t.planId || t.installmentPlanId;
+          if (pId) idsMap[t.id] = pId;
+        });
+        return Object.keys(idsMap).length > 0 ? idsMap : undefined;
+      })(),
+      txAttachments: (() => {
+        const attMap: Record<string, any[]> = {};
+        (data.transactions || []).forEach(t => {
+          if (t.attachments && t.attachments.length > 0) {
+            attMap[t.id] = t.attachments;
+          }
+        });
+        return Object.keys(attMap).length > 0 ? attMap : undefined;
+      })(),
     };
+
+    // Save installment plans to dedicated Supabase table if available
+    const plansToSave: InstallmentPlan[] = data.installmentPlans || data.settings?.installmentPlans || [];
+    if (plansToSave.length > 0) {
+      try {
+        const planRows = plansToSave.map(p => ({
+          id: p.id,
+          user_id: userId,
+          title: p.title,
+          category: p.category || 'General',
+          account: p.account,
+          total_amount: p.totalAmount,
+          installment_amount: p.installmentAmount,
+          currency: p.currency || 'ARS',
+          total_installments: p.totalInstallments,
+          paid_installments: p.paidInstallments || 0,
+          start_date: p.startDate,
+          status: p.status,
+          description: p.description || null,
+          notes: p.notes || null,
+          statement_close_date: p.statementCloseDate || null,
+          updated_at: new Date().toISOString(),
+        }));
+        await client.from('installment_plans').upsert(planRows, { onConflict: 'id' });
+      } catch (err) {
+        // Fallback: table may not exist yet; user_settings will securely store it
+      }
+    }
 
     try {
       const { error: setErr } = await client.from('user_settings').upsert({

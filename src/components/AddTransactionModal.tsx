@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Transaction, AccountItem, CategoryItem } from '../types';
+import { Transaction, AccountItem, CategoryItem, InstallmentPlan, TransactionAttachment } from '../types';
 import { 
   X, 
   CreditCard, 
@@ -17,7 +17,11 @@ import {
   Clock,
   Layers,
   Calculator,
-  Equal
+  Equal,
+  Paperclip,
+  Trash2,
+  FileText,
+  Upload
 } from 'lucide-react';
 import { 
   isCreditCardAccount, 
@@ -35,6 +39,7 @@ export interface AddTransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddTransaction: (tx: Transaction | Transaction[]) => void;
+  onAddInstallmentPlan?: (plan: InstallmentPlan, txList: Transaction[]) => void;
   onUpdateTransaction?: (id: string, updates: Partial<Transaction>) => void;
   editingTx?: Transaction | null;
   accountsList?: AccountItem[];
@@ -98,6 +103,7 @@ export function AddTransactionModal({
   isOpen, 
   onClose, 
   onAddTransaction,
+  onAddInstallmentPlan,
   onUpdateTransaction,
   editingTx,
   accountsList = [],
@@ -318,6 +324,40 @@ export function AddTransactionModal({
   const [statementCloseDate, setStatementCloseDate] = useState('');
   const [description, setDescription] = useState('');
 
+  // Attachments state
+  const [attachments, setAttachments] = useState<TransactionAttachment[]>(() => editingTx?.attachments || []);
+  const [isDragOverAtt, setIsDragOverAtt] = useState(false);
+  const attFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAttachFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const maxFileSize = 8 * 1024 * 1024;
+    Array.from(files).forEach(file => {
+      if (file.size > maxFileSize) {
+        alert(`"${file.name}" is larger than 8MB. Please select a smaller file.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const newAtt: TransactionAttachment = {
+          id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          dataUrl,
+          uploadedAt: new Date().toISOString(),
+        };
+        setAttachments(prev => [...prev, newAtt]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  };
+
   // Installments state
   const [numInstallments, setNumInstallments] = useState<number>(1);
 
@@ -385,6 +425,7 @@ export function AddTransactionModal({
 
       setStatementCloseDate(editingTx.statementCloseDate || '');
       setDescription(editingTx.description || '');
+      setAttachments(editingTx.attachments || []);
 
       let instCount = 1;
       if (editingTx.totalInstallments && editingTx.totalInstallments > 1) {
@@ -535,12 +576,12 @@ export function AddTransactionModal({
     return isCreditCardAccount(account);
   }, [account, accountItems, type]);
 
-  // Reset installments to 1 if the account is not a credit card
+  // Reset installments when transaction type is not EXPENSE
   useEffect(() => {
-    if (!isCC) {
+    if (type !== 'EXPENSE') {
       setNumInstallments(1);
     }
-  }, [isCC]);
+  }, [type]);
 
   // Statement close dates list for the selected CC account
   const statementCloseDatesList = useMemo(() => {
@@ -721,6 +762,10 @@ export function AddTransactionModal({
         });
       } else {
         const now = new Date();
+        const currentInstNum = editingTx.installmentNumber || (editingTx.installments ? parseInt(editingTx.installments.split('/')[0], 10) : 1);
+        const effectiveTotalInst = numInstallments > 1 ? numInstallments : (editingTx.totalInstallments || undefined);
+        const resolvedInstNum = effectiveTotalInst && currentInstNum > effectiveTotalInst ? effectiveTotalInst : currentInstNum;
+
         onUpdateTransaction(editingTx.id, {
           date: date,
           timestamp: now.toISOString(),
@@ -731,10 +776,11 @@ export function AddTransactionModal({
           currency,
           type,
           description: description || undefined,
-          installments: numInstallments > 1 ? `1/${numInstallments}` : undefined,
-          installmentNumber: 1,
-          totalInstallments: numInstallments > 1 ? numInstallments : undefined,
+          installments: effectiveTotalInst && effectiveTotalInst > 1 ? `${resolvedInstNum}/${effectiveTotalInst}` : undefined,
+          installmentNumber: effectiveTotalInst && effectiveTotalInst > 1 ? resolvedInstNum : undefined,
+          totalInstallments: effectiveTotalInst && effectiveTotalInst > 1 ? effectiveTotalInst : undefined,
           statementCloseDate: isCC ? statementCloseDate : undefined,
+          attachments: attachments.length > 0 ? attachments : undefined,
         });
       }
       onClose();
@@ -762,6 +808,7 @@ export function AddTransactionModal({
         type: 'CC_PAYMENT',
         description: description || `Payment to ${toAccount}`,
         statementCloseDate: statementCloseDate || undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
       };
       onAddTransaction(paymentTx);
     } else if (type === 'TRANSFER') {
@@ -783,15 +830,40 @@ export function AddTransactionModal({
         receiveCurrency: destCurrency,
         type: 'TRANSFER',
         description: description || undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
       };
       onAddTransaction(transferTx);
     } else {
       // EXPENSE or INCOME
-      if (type === 'EXPENSE' && isCC && numInstallments > 1 && installmentSchedule.length > 0) {
-        // Create multiple installment transactions
+      if (type === 'EXPENSE' && numInstallments > 1 && installmentSchedule.length > 0) {
+        // Create parent InstallmentPlan entity
+        const planId = `plan_${uniqueId}`;
+        const planTitle = title || 'Expense';
         const now = new Date();
+
+        const parentPlan: InstallmentPlan = {
+          id: planId,
+          title: planTitle,
+          category: category || 'General',
+          account: account,
+          totalAmount: parsedAmount,
+          installmentAmount: installmentSchedule[0]?.amount || (parsedAmount / numInstallments),
+          currency,
+          totalInstallments: numInstallments,
+          paidInstallments: 0,
+          startDate: installmentSchedule[0]?.instTxDate || date,
+          status: 'ACTIVE',
+          description: description || undefined,
+          statementCloseDate: isCC ? statementCloseDate : undefined,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        };
+
+        // Create child installment transactions
         const txList: Transaction[] = installmentSchedule.map((cuota, idx) => ({
           id: `${uniqueId}-${idx + 1}`,
+          planId: planId,
+          installmentPlanId: planId,
           date: cuota.instTxDate,
           timestamp: now.toISOString(),
           title: title || 'Expense',
@@ -806,8 +878,14 @@ export function AddTransactionModal({
           totalInstallments: numInstallments,
           originalAmount: parsedAmount,
           statementCloseDate: isCC ? cuota.stmtCloseDate : undefined,
+          attachments: idx === 0 && attachments.length > 0 ? attachments : undefined,
         }));
-        onAddTransaction(txList);
+
+        if (onAddInstallmentPlan) {
+          onAddInstallmentPlan(parentPlan, txList);
+        } else {
+          onAddTransaction(txList);
+        }
       } else {
         const now = new Date();
         const newTx: Transaction = {
@@ -825,6 +903,7 @@ export function AddTransactionModal({
           installmentNumber: 1,
           totalInstallments: numInstallments > 1 ? numInstallments : undefined,
           statementCloseDate: isCC ? statementCloseDate : undefined,
+          attachments: attachments.length > 0 ? attachments : undefined,
         };
         onAddTransaction(newTx);
       }
@@ -1410,8 +1489,8 @@ export function AddTransactionModal({
             </div>
           )}
 
-          {/* CREDIT CARD INSTALLMENTS BREAKDOWN ENGINE (For Expenses on Credit Cards) */}
-          {type === 'EXPENSE' && isCC && (
+          {/* INSTALLMENTS BREAKDOWN ENGINE (For Expenses) */}
+          {type === 'EXPENSE' && (
             <div className="p-3.5 bg-[#0d1017] border border-slate-800 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
@@ -1519,6 +1598,74 @@ export function AddTransactionModal({
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3 py-2 bg-[#0a0c10] border border-slate-700 text-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-slate-500 placeholder-slate-600 text-xs"
             />
+          </div>
+
+          {/* Attachments / Receipts */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-slate-400 font-medium text-xs flex items-center gap-1.5">
+                <Paperclip className="w-3.5 h-3.5 text-blue-400" /> Attachments / Receipts
+              </label>
+              {attachments.length > 0 && (
+                <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 font-medium">
+                  {attachments.length} {attachments.length === 1 ? 'file' : 'files'}
+                </span>
+              )}
+            </div>
+
+            <div
+              onDragEnter={(e) => { e.preventDefault(); setIsDragOverAtt(true); }}
+              onDragOver={(e) => { e.preventDefault(); setIsDragOverAtt(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setIsDragOverAtt(false); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOverAtt(false);
+                if (e.dataTransfer.files) handleAttachFiles(e.dataTransfer.files);
+              }}
+              onClick={() => attFileInputRef.current?.click()}
+              className={`border border-dashed rounded-xl p-3 text-center cursor-pointer transition-colors ${
+                isDragOverAtt 
+                  ? 'border-blue-500 bg-blue-500/10' 
+                  : 'border-slate-800 hover:border-slate-700 bg-slate-900/40 hover:bg-slate-900/60'
+              }`}
+            >
+              <input
+                ref={attFileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf,application/pdf"
+                className="hidden"
+                onChange={(e) => handleAttachFiles(e.target.files)}
+              />
+              <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+                <Upload className="w-3.5 h-3.5 text-blue-400" />
+                <span>Click to attach receipts or drag & drop (Images, PDF)</span>
+              </div>
+            </div>
+
+            {attachments.length > 0 && (
+              <div className="mt-2 space-y-1.5 max-h-28 overflow-y-auto pr-1">
+                {attachments.map((att) => (
+                  <div 
+                    key={att.id}
+                    className="flex items-center justify-between p-1.5 bg-slate-900/80 border border-slate-800 rounded-lg text-xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span className="text-slate-300 truncate max-w-[200px]" title={att.name}>{att.name}</span>
+                      <span className="text-[10px] text-slate-500">({Math.round(att.size / 1024)} KB)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleRemoveAttachment(att.id); }}
+                      className="text-slate-500 hover:text-red-400 p-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}

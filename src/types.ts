@@ -1,3 +1,32 @@
+export interface TransactionAttachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string; // e.g. 'image/jpeg', 'image/png', 'application/pdf'
+  dataUrl: string; // Base64 data URL
+  uploadedAt: string;
+}
+
+export interface InstallmentPlan {
+  id: string;
+  ownerId?: string;
+  title: string;
+  category: string;
+  account: string;
+  totalAmount: number;
+  installmentAmount: number;
+  currency: string;
+  totalInstallments: number;
+  paidInstallments?: number;
+  startDate: string; // YYYY-MM-DD
+  status: 'ACTIVE' | 'SETTLED' | 'CANCELLED';
+  description?: string;
+  notes?: string;
+  statementCloseDate?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Transaction {
   id: string;
   ownerId?: string;
@@ -25,6 +54,9 @@ export interface Transaction {
   originalAmount?: number; // total amount before split
   statementCloseDate?: string; // e.g. "2026-08-25"
   isPaid?: boolean;
+  planId?: string; // ID of the parent InstallmentPlan entity
+  installmentPlanId?: string; // Alias for planId
+  attachments?: TransactionAttachment[]; // Receipts, invoices, and documents
 }
 
 export interface CreditCardStatement {

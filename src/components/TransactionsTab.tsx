@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint, CategoryItem, AccountItem, AccountCustomBalance } from '../types';
+import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint, CategoryItem, AccountItem, AccountCustomBalance, InstallmentPlan } from '../types';
 import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString, normalizeCleanTitle, isInstallmentTx, detectRecurringItems, isCreditCardAccount, computeAccountBalances } from '../utils/financeUtils';
 import { exportTransactionsToCSV } from '../utils/exportUtils';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2, Download, CreditCard, Landmark } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2, Download, CreditCard, Landmark, Paperclip, FileText } from 'lucide-react';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -16,6 +16,9 @@ interface TransactionsTabProps {
   accountsList: AccountItem[];
   customBalances?: Record<string, AccountCustomBalance>;
   periodStatusOverrides?: Record<string, 'PAID' | 'OPEN'>;
+  installmentPlans?: InstallmentPlan[];
+  onOpenInstallmentPlansModal?: (planId?: string) => void;
+  onOpenAttachmentsModal?: (tx: Transaction) => void;
   onOpenAddModal: () => void;
   onOpenDeleteModal?: () => void;
   onEditTransaction?: (tx: Transaction) => void;
@@ -41,6 +44,9 @@ export const TransactionsTab = React.memo(function TransactionsTab({
   accountsList,
   customBalances,
   periodStatusOverrides,
+  installmentPlans = [],
+  onOpenInstallmentPlansModal,
+  onOpenAttachmentsModal,
   onOpenAddModal,
   onOpenDeleteModal,
   onEditTransaction,
@@ -615,6 +621,22 @@ export const TransactionsTab = React.memo(function TransactionsTab({
             <span>{t('overview.quick_add')}</span>
           </button>
 
+          {onOpenInstallmentPlansModal && (
+            <button
+              onClick={() => onOpenInstallmentPlansModal()}
+              title="Manage Installment Plans (Cuotas)"
+              className="inline-flex items-center px-3 py-2 bg-slate-800 border border-slate-700 text-amber-300 hover:text-amber-200 hover:bg-slate-700 rounded-lg text-xs font-medium transition-colors shadow-xs cursor-pointer"
+            >
+              <CreditCard className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
+              <span>Cuotas / Plans</span>
+              {installmentPlans.length > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-[10px] font-bold">
+                  {installmentPlans.filter(p => p.status === 'ACTIVE').length || installmentPlans.length}
+                </span>
+              )}
+            </button>
+          )}
+
           <button
             onClick={handleExportVisibleCSV}
             disabled={filtered.length === 0}
@@ -943,6 +965,20 @@ export const TransactionsTab = React.memo(function TransactionsTab({
                       <td className="p-3 font-medium text-slate-200">
                         <div className="flex items-center space-x-1.5">
                           <span>{tx.title}</span>
+                          {tx.attachments && tx.attachments.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onOpenAttachmentsModal) onOpenAttachmentsModal(tx);
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 text-[9px] font-bold transition-colors cursor-pointer"
+                              title={`${tx.attachments.length} attachment(s). Click to view / manage.`}
+                            >
+                              <Paperclip className="w-2.5 h-2.5" />
+                              <span>{tx.attachments.length}</span>
+                            </button>
+                          )}
                           {tx.ownerId && currentUserId && tx.ownerId !== currentUserId && (
                             <span className="px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[9px] font-bold" title="Shared by another workspace member">{t('transactions.shared')}</span>
                           )}
@@ -985,12 +1021,19 @@ export const TransactionsTab = React.memo(function TransactionsTab({
                             {tx.type === 'CC_PAYMENT' ? 'CC PAYMENT' : tx.type}
                           </span>
                           {tx.installments && (
-                            <span 
-                              className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 cursor-help"
-                              title={tx.installmentStartDate && tx.installmentEndDate ? `Cycle: ${tx.installmentStartDate} to ${tx.installmentEndDate}` : undefined}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onOpenInstallmentPlansModal) {
+                                  onOpenInstallmentPlansModal(tx.planId || tx.installmentPlanId);
+                                }
+                              }}
+                              className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold border border-amber-500/20 cursor-pointer transition-colors"
+                              title={tx.planId || tx.installmentPlanId ? 'Click to view parent installment plan' : (tx.installmentStartDate && tx.installmentEndDate ? `Cycle: ${tx.installmentStartDate} to ${tx.installmentEndDate}` : undefined)}
                             >
                               {tx.installments}
-                            </span>
+                            </button>
                           )}
                         </div>
                       </td>
@@ -1031,6 +1074,19 @@ export const TransactionsTab = React.memo(function TransactionsTab({
                       </td>
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end space-x-1 opacity-60 hover:opacity-100 transition-opacity">
+                          {onOpenAttachmentsModal && (
+                            <button
+                              onClick={() => onOpenAttachmentsModal(tx)}
+                              className={`p-1.5 rounded-md transition-colors ${
+                                tx.attachments && tx.attachments.length > 0
+                                  ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-950/50'
+                                  : 'text-slate-400 hover:text-blue-400 hover:bg-blue-950/50'
+                              }`}
+                              title={tx.attachments && tx.attachments.length > 0 ? `Manage attachments (${tx.attachments.length})` : 'Attach receipts/invoices'}
+                            >
+                              <Paperclip className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {onEditTransaction && (
                             <button
                               onClick={() => onEditTransaction(tx)}

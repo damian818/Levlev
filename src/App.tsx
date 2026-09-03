@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy } from './types';
+import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, InstallmentPlan, TransactionAttachment } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
 import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount, detectFinancialAnomalies, getCreditCardStatements, getPendingRecurringForMonth, getCurrentMonthKey, getSavedDismissedRecurring, saveDismissedRecurring, computeAccountBalances } from './utils/financeUtils';
@@ -33,6 +33,8 @@ const ConfirmDeleteModal = lazy(() => import('./components/ConfirmDeleteModal').
 const ShareWorkspaceModal = lazy(() => import('./components/ShareWorkspaceModal').then(m => ({ default: m.ShareWorkspaceModal })));
 const AiChatWidget = lazy(() => import('./components/AiChatWidget').then(m => ({ default: m.AiChatWidget })));
 const ImportWizardModal = lazy(() => import('./components/ImportWizardModal'));
+const InstallmentPlansModal = lazy(() => import('./components/InstallmentPlansModal').then(m => ({ default: m.InstallmentPlansModal })));
+const TransactionAttachmentsModal = lazy(() => import('./components/TransactionAttachmentsModal').then(m => ({ default: m.TransactionAttachmentsModal })));
 
 import { LandingPage } from './components/LandingPage';
 import { LevLevIcon, LevLevLogo } from './components/LevLevLogo';
@@ -116,6 +118,19 @@ export default function App() {
       }
     } catch (e) {
       console.warn('Failed to load transactions from localStorage', e);
+    }
+    return [];
+  });
+
+  const [installmentPlans, setInstallmentPlans] = useState<InstallmentPlan[]>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_installment_plans');
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load installment plans from localStorage', e);
     }
     return [];
   });
@@ -571,6 +586,10 @@ export default function App() {
     });
   }, []);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isInstallmentPlansModalOpen, setIsInstallmentPlansModalOpen] = useState(false);
+  const [selectedPlanIdForModal, setSelectedPlanIdForModal] = useState<string | undefined>(undefined);
+  const [isAttachmentsModalOpen, setIsAttachmentsModalOpen] = useState(false);
+  const [selectedAttachmentTx, setSelectedAttachmentTx] = useState<Transaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -737,6 +756,13 @@ export default function App() {
           } catch (e) {}
         }
         setBudgets(data.budgets || []);
+
+        if (data.installmentPlans && Array.isArray(data.installmentPlans)) {
+          setInstallmentPlans(data.installmentPlans);
+          try {
+            localStorage.setItem('finance_app_installment_plans', JSON.stringify(data.installmentPlans));
+          } catch (e) {}
+        }
 
         if (data.settings?.onboardingCompleted || (data.transactions && data.transactions.length > 0)) {
           try {
@@ -1193,6 +1219,7 @@ export default function App() {
         categories,
         accounts,
         budgets,
+        installmentPlans,
         settings: {
           hiddenCategoryIds: Array.from(new Set([
             ...hiddenCategoryIds,
@@ -1220,7 +1247,7 @@ export default function App() {
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [transactions, categories, accounts, budgets, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold, hiddenCategoryIds, debts, debtStrategy, debtExtraPayment, dismissedRecurring, tabCustomization, reportSettings]);
+  }, [transactions, categories, accounts, budgets, installmentPlans, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold, hiddenCategoryIds, debts, debtStrategy, debtExtraPayment, dismissedRecurring, tabCustomization, reportSettings]);
 
   if (authLoading) {
     return (
@@ -1423,6 +1450,65 @@ export default function App() {
     });
   };
 
+  const handleAddInstallmentPlan = (plan: InstallmentPlan, planTransactions: Transaction[]) => {
+    setInstallmentPlans(prev => {
+      const next = [plan, ...prev.filter(p => p.id !== plan.id)];
+      try {
+        localStorage.setItem('finance_app_installment_plans', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+    handleAddTransaction(planTransactions);
+  };
+
+  const handleUpdateInstallmentPlan = (planId: string, updates: Partial<InstallmentPlan>) => {
+    setInstallmentPlans(prev => {
+      const next = prev.map(p => p.id === planId ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p);
+      try {
+        localStorage.setItem('finance_app_installment_plans', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const handleDeleteInstallmentPlan = (planId: string, deleteTransactions: boolean) => {
+    setInstallmentPlans(prev => {
+      const next = prev.filter(p => p.id !== planId);
+      try {
+        localStorage.setItem('finance_app_installment_plans', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+    if (deleteTransactions) {
+      const childTxIds = transactions.filter(t => t.planId === planId || t.installmentPlanId === planId).map(t => t.id);
+      if (childTxIds.length > 0) {
+        handleDeleteTransaction(childTxIds);
+      }
+    }
+  };
+
+  const handleSettleInstallmentPlan = (planId: string) => {
+    setInstallmentPlans(prev => {
+      const plan = prev.find(p => p.id === planId);
+      if (!plan) return prev;
+      const next: InstallmentPlan[] = prev.map(p => p.id === planId ? { ...p, status: 'SETTLED' as const, paidInstallments: p.totalInstallments, updatedAt: new Date().toISOString() } : p);
+      try {
+        localStorage.setItem('finance_app_installment_plans', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const handleOpenInstallmentPlansModal = (planId?: string) => {
+    setSelectedPlanIdForModal(planId);
+    setIsInstallmentPlansModalOpen(true);
+  };
+
+  const handleOpenAttachmentsModal = (tx: Transaction) => {
+    setSelectedAttachmentTx(tx);
+    setIsAttachmentsModalOpen(true);
+  };
+
   const handleLogout = async () => {
     try {
       await signOutFromSupabase();
@@ -1505,6 +1591,9 @@ export default function App() {
               accountsList={accounts}
               customBalances={customBalances}
               periodStatusOverrides={periodStatusOverrides}
+              installmentPlans={installmentPlans}
+              onOpenInstallmentPlansModal={handleOpenInstallmentPlansModal}
+              onOpenAttachmentsModal={handleOpenAttachmentsModal}
               onOpenAddModal={() => setIsAddModalOpen(true)}
               onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
               activeFilter={activeFilter}
@@ -1658,6 +1747,7 @@ export default function App() {
               setEditingTransaction(null);
             }}
             onAddTransaction={handleAddTransaction}
+            onAddInstallmentPlan={handleAddInstallmentPlan}
             onUpdateTransaction={handleUpdateTransaction}
             editingTx={editingTransaction}
             accountsList={accounts}
@@ -1670,6 +1760,60 @@ export default function App() {
             usdArsRate={usdArsRate}
             enabledCurrencies={enabledCurrencies}
             localCurrency={localCurrency}
+          />
+        )}
+
+        {isInstallmentPlansModalOpen && (
+          <InstallmentPlansModal
+            isOpen={isInstallmentPlansModalOpen}
+            onClose={() => {
+              setIsInstallmentPlansModalOpen(false);
+              setSelectedPlanIdForModal(undefined);
+            }}
+            plans={installmentPlans}
+            transactions={transactions}
+            accountsList={accounts}
+            categoriesList={categories}
+            displayCurrency={displayCurrency}
+            usdArsRate={usdArsRate}
+            initialSelectedPlanId={selectedPlanIdForModal}
+            onUpdatePlans={(updatedPlans) => {
+              setInstallmentPlans(updatedPlans);
+              try {
+                localStorage.setItem('finance_app_installment_plans', JSON.stringify(updatedPlans));
+              } catch (e) {}
+            }}
+            onUpdateTransactions={(updatedTxs) => {
+              setTransactions(prev => {
+                const map = new Map(updatedTxs.map(t => [t.id, t]));
+                const merged = prev.map(t => map.get(t.id) || t);
+                try {
+                  localStorage.setItem('finance_app_transactions', JSON.stringify(merged));
+                } catch (e) {}
+                return merged;
+              });
+            }}
+            onDeleteTransactions={(txIds) => {
+              handleDeleteTransaction(txIds);
+            }}
+            onOpenAttachments={(tx) => {
+              handleOpenAttachmentsModal(tx);
+            }}
+          />
+        )}
+
+        {isAttachmentsModalOpen && selectedAttachmentTx && (
+          <TransactionAttachmentsModal
+            isOpen={isAttachmentsModalOpen}
+            onClose={() => {
+              setIsAttachmentsModalOpen(false);
+              setSelectedAttachmentTx(null);
+            }}
+            transaction={selectedAttachmentTx}
+            onUpdateTransaction={(updatedTx) => {
+              handleUpdateTransaction(updatedTx.id, updatedTx);
+              setSelectedAttachmentTx(updatedTx);
+            }}
           />
         )}
 
