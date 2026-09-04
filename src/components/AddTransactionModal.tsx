@@ -21,7 +21,8 @@ import {
   Paperclip,
   Trash2,
   FileText,
-  Upload
+  Upload,
+  Lock
 } from 'lucide-react';
 import { 
   isCreditCardAccount, 
@@ -252,6 +253,11 @@ export function AddTransactionModal({
     return { ruleType: 'FIXED_DAY', fixedDay: 25 };
   };
 
+  // Helper for generating standard Transfer description
+  const getTransferDescription = (srcAcc: string, dstAcc: string) => {
+    return `Transfer: ${srcAcc || ''} -> ${dstAcc || ''}`;
+  };
+
   // State
   const [type, setType] = useState<'EXPENSE' | 'INCOME' | 'TRANSFER' | 'CC_PAYMENT'>('EXPENSE');
   const [title, setTitle] = useState('');
@@ -292,15 +298,37 @@ export function AddTransactionModal({
     };
   }, [showTitleSuggestions]);
 
-  const uniquePastTitles = useMemo(() => {
-    const map = new Map<string, string>(); // title -> most recent category
-    existingTransactions.forEach(t => {
-      if (t.title && !map.has(t.title)) {
-        map.set(t.title, t.category);
+  // Map past transactions by title to retrieve the most recent Category and Account used
+  const pastMatchesByTitle = useMemo(() => {
+    // Sort transactions by date descending so the first entry encountered is the latest one
+    const sorted = [...existingTransactions].sort((a, b) => {
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      if (dateA !== dateB) return dateB.localeCompare(dateA);
+      const tsA = a.timestamp || '';
+      const tsB = b.timestamp || '';
+      return tsB.localeCompare(tsA);
+    });
+
+    const map = new Map<string, { title: string; category: string; account: string }>();
+    sorted.forEach(t => {
+      if (t.title && t.title.trim() && t.type !== 'TRANSFER') {
+        const cleanKey = t.title.trim().toLowerCase();
+        if (!map.has(cleanKey)) {
+          map.set(cleanKey, {
+            title: t.title.trim(),
+            category: t.category,
+            account: t.account,
+          });
+        }
       }
     });
-    return Array.from(map.entries()).map(([t, cat]) => ({ title: t, category: cat }));
+    return map;
   }, [existingTransactions]);
+
+  const uniquePastTitles = useMemo(() => {
+    return Array.from(pastMatchesByTitle.values());
+  }, [pastMatchesByTitle]);
 
   const titleSuggestions = useMemo(() => {
     if (!title.trim()) return uniquePastTitles.slice(0, 6);
@@ -309,6 +337,50 @@ export function AddTransactionModal({
       .filter(item => item.title.toLowerCase().includes(query))
       .slice(0, 6);
   }, [title, uniquePastTitles]);
+
+  // Automatically adjust Category and Account based on past transactions with the same description
+  const autoAdjustCategoryAndAccount = (selectedTitle: string) => {
+    if (type === 'TRANSFER' || type === 'CC_PAYMENT') return;
+    const cleanKey = selectedTitle.trim().toLowerCase();
+    if (!cleanKey) return;
+    const match = pastMatchesByTitle.get(cleanKey);
+    if (!match) return;
+
+    // Auto-adjust Category based on past transactions with the same description
+    if (match.category && categoriesList.includes(match.category)) {
+      setCategory(match.category);
+    }
+
+    // Auto-adjust Account based on past transactions with the same description
+    if (match.account && accountNames.includes(match.account)) {
+      setAccount(match.account);
+      setCurrency(lookupAccountCurrency(match.account));
+    }
+  };
+
+  const handleSelectTitleSuggestion = (item: { title: string; category?: string; account?: string }) => {
+    setTitle(item.title);
+    setShowTitleSuggestions(false);
+    autoAdjustCategoryAndAccount(item.title);
+  };
+
+  const handleTitleChange = (newVal: string) => {
+    if (type === 'TRANSFER') return;
+    setTitle(newVal);
+    setShowTitleSuggestions(true);
+    const cleanKey = newVal.trim().toLowerCase();
+    if (cleanKey && pastMatchesByTitle.has(cleanKey)) {
+      autoAdjustCategoryAndAccount(newVal);
+    }
+  };
+
+  const handleTitleBlur = () => {
+    if (type === 'TRANSFER') return;
+    const cleanKey = title.trim().toLowerCase();
+    if (cleanKey && pastMatchesByTitle.has(cleanKey)) {
+      autoAdjustCategoryAndAccount(title);
+    }
+  };
 
   // Amounts & Currencies
   const [amount, setAmount] = useState('');
@@ -397,17 +469,23 @@ export function AddTransactionModal({
       // Populating from transaction being edited or duplicated
       const txType = editingTx.type || 'EXPENSE';
       setType(txType);
-      setTitle(editingTx.title || '');
-      setCategory(
-        editingTx.category || 
-        (txType === 'TRANSFER' ? 'Transferencias' : txType === 'CC_PAYMENT' ? 'Tarjetas de Crédito' : 'General')
-      );
       
       const acc = editingTx.account || initialAccount || accountNames[0] || 'BBVA';
       setAccount(acc);
       
       const toAcc = editingTx.toAccount || accountNames.find(a => a !== acc) || 'Visa BBVA';
       setToAccount(toAcc);
+
+      if (txType === 'TRANSFER') {
+        setTitle(getTransferDescription(acc, toAcc));
+      } else {
+        setTitle(editingTx.title || '');
+      }
+
+      setCategory(
+        editingTx.category || 
+        (txType === 'TRANSFER' ? 'Transferencias' : txType === 'CC_PAYMENT' ? 'Tarjetas de Crédito' : 'General')
+      );
       
       setCurrency(editingTx.currency || lookupAccountCurrency(acc));
 
@@ -485,6 +563,7 @@ export function AddTransactionModal({
       setCategory('Tarjetas de Crédito');
     } else if (newType === 'TRANSFER') {
       setCategory('Transferencias');
+      setTitle(getTransferDescription(account, toAccount));
     } else if (newType === 'INCOME' && category === 'Alimentos y Bebidas') {
       setCategory('Sueldo');
     } else if (newType === 'EXPENSE' && category === 'Sueldo') {
@@ -500,6 +579,9 @@ export function AddTransactionModal({
     }
     setAccount(newAcc);
     setCurrency(lookupAccountCurrency(newAcc));
+    if (type === 'TRANSFER') {
+      setTitle(getTransferDescription(newAcc, toAccount));
+    }
   };
 
   const handleToAccountChange = (newAcc: string) => {
@@ -508,6 +590,9 @@ export function AddTransactionModal({
       return;
     }
     setToAccount(newAcc);
+    if (type === 'TRANSFER') {
+      setTitle(getTransferDescription(account, newAcc));
+    }
   };
 
   const handleCategorySelectChange = (val: string) => {
@@ -745,12 +830,11 @@ export function AddTransactionModal({
       } else if (type === 'TRANSFER') {
         const parsedReceiveAmt = parseFloat(receiveAmount) || parsedAmount;
         const now = new Date();
-        // In the original, sourceCurrency and destCurrency are used. 
-        // We will just use the current account currencies.
+        const transferDesc = getTransferDescription(account, toAccount);
         onUpdateTransaction(editingTx.id, {
           date: date,
           timestamp: now.toISOString(),
-          title: title || `Transferencia: ${account} → ${toAccount}`,
+          title: transferDesc,
           category: category || 'Transferencias',
           account: account,
           toAccount: toAccount,
@@ -758,7 +842,7 @@ export function AddTransactionModal({
           transferAmount: parsedAmount,
           receiveAmount: parsedReceiveAmt,
           type: 'TRANSFER',
-          description: description || undefined,
+          description: description || transferDesc,
         });
       } else {
         const now = new Date();
@@ -814,11 +898,12 @@ export function AddTransactionModal({
     } else if (type === 'TRANSFER') {
       const parsedReceiveAmt = parseFloat(receiveAmount) || parsedAmount;
       const now = new Date();
+      const transferDesc = getTransferDescription(account, toAccount);
       const transferTx: Transaction = {
         id: `transfer-${uniqueId}`,
         date: date,
         timestamp: now.toISOString(),
-        title: title || `Transferencia: ${account} → ${toAccount}`,
+        title: transferDesc,
         category: category || 'Transferencias',
         account: account,
         toAccount: toAccount,
@@ -829,7 +914,7 @@ export function AddTransactionModal({
         receiveAmount: parsedReceiveAmt,
         receiveCurrency: destCurrency,
         type: 'TRANSFER',
-        description: description || undefined,
+        description: description || transferDesc,
         attachments: attachments.length > 0 ? attachments : undefined,
       };
       onAddTransaction(transferTx);
@@ -1145,57 +1230,77 @@ export function AddTransactionModal({
 
           {/* TITLE INPUT WITH AUTOCOMPLETE SUGGESTIONS */}
           <div ref={titleContainerRef} className="relative">
-            <label className="block text-slate-400 font-medium mb-1">
-              {type === 'CC_PAYMENT' ? t('add_tx.payment_ref') : t('add_tx.title_merchant')}
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-slate-400 font-medium text-xs flex items-center gap-1.5">
+                {type === 'TRANSFER' ? (
+                  <>
+                    <span>{t('transactions.merchant_title', 'Description')}</span>
+                    <span className="text-[10px] text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20 font-medium flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Auto-generated for Transfer
+                    </span>
+                  </>
+                ) : type === 'CC_PAYMENT' ? (
+                  t('add_tx.payment_ref')
+                ) : (
+                  t('add_tx.title_merchant')
+                )}
+              </label>
+            </div>
             <div className="relative">
               <input
                 ref={titleInputRef}
                 type="text"
                 required
+                readOnly={type === 'TRANSFER'}
                 placeholder={
                   type === 'CC_PAYMENT' ? t('add_tx.placeholder_cc_pay') : 
-                  type === 'TRANSFER' ? t('add_tx.placeholder_transfer') : 
+                  type === 'TRANSFER' ? getTransferDescription(account, toAccount) : 
                   type === 'INCOME' ? t('add_tx.placeholder_income') :
                   t('add_tx.placeholder_merchant')
                 }
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setShowTitleSuggestions(true);
+                value={type === 'TRANSFER' ? getTransferDescription(account, toAccount) : title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                onBlur={handleTitleBlur}
+                onFocus={() => {
+                  if (type !== 'TRANSFER') setShowTitleSuggestions(true);
                 }}
-                onFocus={() => setShowTitleSuggestions(true)}
-                className="w-full px-3 py-2 bg-[#0a0c10] border border-slate-700 text-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder-slate-500 font-medium text-xs"
+                className={`w-full px-3 py-2 rounded-xl text-xs font-medium focus:outline-none transition-colors ${
+                  type === 'TRANSFER'
+                    ? 'bg-slate-900/60 border border-slate-700/60 text-slate-300 cursor-not-allowed select-none font-mono'
+                    : 'bg-[#0a0c10] border border-slate-700 text-slate-200 focus:ring-1 focus:ring-emerald-500 placeholder-slate-500'
+                }`}
               />
 
-              {/* Suggestions Dropdown */}
-              {showTitleSuggestions && titleSuggestions.length > 0 && (
+              {/* Suggestions Dropdown (Only for non-transfers) */}
+              {type !== 'TRANSFER' && showTitleSuggestions && titleSuggestions.length > 0 && (
                 <div 
-                  className="absolute left-0 right-0 top-full mt-1 bg-[#161b22] border border-slate-700 rounded-xl shadow-xl z-30 max-h-44 overflow-y-auto divide-y divide-slate-800/60"
+                  className="absolute left-0 right-0 top-full mt-1 bg-[#161b22] border border-slate-700 rounded-xl shadow-xl z-30 max-h-48 overflow-y-auto divide-y divide-slate-800/60"
                   onMouseDown={(e) => e.preventDefault()} // Prevent input blur before click
                 >
-                  <div className="px-2.5 py-1 text-[9px] uppercase tracking-wider text-slate-500 font-bold bg-[#11141c]">
-                    {t('add_tx.previous_merchants')}
+                  <div className="px-2.5 py-1 text-[9px] uppercase tracking-wider text-slate-500 font-bold bg-[#11141c] flex items-center justify-between">
+                    <span>{t('add_tx.previous_merchants')}</span>
+                    <span className="text-[9px] font-normal text-slate-500 lowercase">auto-fills category & account</span>
                   </div>
                   {titleSuggestions.map((item, idx) => (
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => {
-                        setTitle(item.title);
-                        if (item.category && categoriesList.includes(item.category)) {
-                          setCategory(item.category);
-                        }
-                        setShowTitleSuggestions(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-slate-800/80 flex items-center justify-between transition-colors"
+                      onClick={() => handleSelectTitleSuggestion(item)}
+                      className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-slate-800/80 flex items-center justify-between transition-colors group"
                     >
-                      <span className="font-semibold text-emerald-300">{item.title}</span>
-                      {item.category && (
-                        <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">
-                          {item.category}
-                        </span>
-                      )}
+                      <span className="font-semibold text-emerald-300 truncate mr-2">{item.title}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {item.category && (
+                          <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">
+                            {item.category}
+                          </span>
+                        )}
+                        {item.account && (
+                          <span className="text-[10px] text-sky-400/90 bg-sky-950/40 px-1.5 py-0.5 rounded border border-sky-800/40 font-medium">
+                            {item.account}
+                          </span>
+                        )}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -1588,12 +1693,12 @@ export function AddTransactionModal({
 
           {/* Description Notes */}
           <div>
-            <label className="block text-slate-400 font-medium mb-1">
-              Notes / Description (Optional)
+            <label className="block text-slate-400 font-medium mb-1 text-xs">
+              {type === 'TRANSFER' ? 'Transfer Notes (Optional)' : 'Notes / Description (Optional)'}
             </label>
             <input
               type="text"
-              placeholder="Add optional notes, tags, or invoice info..."
+              placeholder={type === 'TRANSFER' ? 'Add optional transfer notes or memo...' : 'Add optional notes, tags, or invoice info...'}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3 py-2 bg-[#0a0c10] border border-slate-700 text-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-slate-500 placeholder-slate-600 text-xs"

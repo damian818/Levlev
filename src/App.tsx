@@ -1399,7 +1399,7 @@ export default function App() {
     const duplicatedTx = {
       ...tx,
       id: '', // Empty ID means it's a new transaction
-      title: `${tx.title} (Copy)`,
+      title: tx.title,
     };
     setEditingTransaction(duplicatedTx);
     setIsAddModalOpen(true);
