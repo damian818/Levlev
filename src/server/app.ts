@@ -379,7 +379,7 @@ ${langInstruction}`;
     const fullPrompt = `${contextXml}\n\n${taskText}`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: fullPrompt,
       config: {
         systemInstruction,
@@ -463,7 +463,7 @@ Respond ONLY with valid JSON in this exact structure:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -533,7 +533,7 @@ Return ONLY a JSON object with the following fields:
 Do NOT include markdown formatting or backticks in the response. Return raw JSON.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: [
         { role: "user", parts: [{ text: text }] }
       ],
@@ -617,7 +617,7 @@ Recent Transactions: ${JSON.stringify(financialContext?.recentTransactions || []
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents,
       config: {
         systemInstruction,

@@ -1,4 +1,4 @@
-import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem, AccountCustomBalance, ProjectedBalancePoint, ProjectedBalanceCalculation } from '../types';
+import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem, AccountCustomBalance, ProjectedBalancePoint, ProjectedBalanceCalculation, BudgetStreakAlert, BudgetUtilizationMonthPoint } from '../types';
 
 export function isCreditCardAccount(
   accountName: string, 
@@ -846,7 +846,12 @@ export function computeAccountBalances(
       const initBal = accItem?.initialBalance || 0;
 
       const currency = custom?.currency || accItem?.currency || deltaObj.currency || getAccountCurrency(accName);
-      const balance = custom !== undefined ? custom.currentBalance : (initBal + deltaObj.netDelta);
+      // When transactions exist or an initial balance is set, the ledger (initBal + deltaObj.netDelta)
+      // is authoritative and dynamically accounts for all transactions, including manual adjustments and any subsequent transactions.
+      // A static customBalance override is only used as a fallback if no transactions or initial balance exist.
+      const balance = (deltaObj.count > 0 || initBal !== 0)
+        ? (initBal + deltaObj.netDelta)
+        : (custom !== undefined ? custom.currentBalance : (initBal + deltaObj.netDelta));
 
       const isUsd = currency.toUpperCase().includes('USD');
       const balARS = isUsd ? balance * usdArsRate : balance;
@@ -1466,19 +1471,37 @@ export function detectRecurringItems(
     groups.get(groupKey)!.push(t);
   });
 
-  // Use the actual current date as the reference point for evaluating recurrence
-  const refDate = new Date();
+  // Use reference point for evaluating recurrence (align with latest transaction if dataset is historical)
+  let refDate = new Date();
+  if (transactions.length > 0) {
+    let maxTxTime = 0;
+    transactions.forEach(t => {
+      if (t.date) {
+        const time = new Date(t.date).getTime();
+        if (!isNaN(time) && time > maxTxTime) maxTxTime = time;
+      }
+    });
+    if (maxTxTime > 0) {
+      const latestTxDate = new Date(maxTxTime);
+      if (Math.abs(refDate.getTime() - latestTxDate.getTime()) > 60 * 24 * 60 * 60 * 1000) {
+        refDate = latestTxDate;
+      }
+    }
+  }
+
   const refYear = refDate.getFullYear();
   const refMonth = refDate.getMonth() + 1; // 1 to 12
 
-  const last4Months = new Set<string>(); // Current month + 3 previous months
-  for (let i = 0; i < 4; i++) {
+  // Last 3 months: current month + 2 previous months
+  const last3Months = new Set<string>();
+  for (let i = 0; i < 3; i++) {
     const d = new Date(refYear, refMonth - 1 - i, 1);
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
-    last4Months.add(`${yyyy}-${mm}`);
+    last3Months.add(`${yyyy}-${mm}`);
   }
 
+  // Last 12 months: current month + 11 previous months
   const last12Months = new Set<string>();
   for (let i = 0; i < 12; i++) {
     const d = new Date(refYear, refMonth - 1 - i, 1);
@@ -1487,14 +1510,27 @@ export function detectRecurringItems(
     last12Months.add(`${yyyy}-${mm}`);
   }
 
+  // Count overall dataset months in the last 12-month window
+  const datasetMonthsInLast12 = new Set<string>();
+  transactions.forEach(t => {
+    if (t.date) {
+      const m = t.date.substring(0, 7);
+      if (last12Months.has(m)) {
+        datasetMonthsInLast12.add(m);
+      }
+    }
+  });
+
   const result: IdentifiedRecurringItem[] = [];
 
   groups.forEach((txList, groupKey) => {
     const sorted = [...txList].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
-    // Count distinct months, 4-month occurrences, and 12-month occurrences
+    // Track monthly occurrences and counts for last 3 and last 12 months
     const distinctMonths = new Set<string>();
-    const distinctMonthsInLast4 = new Set<string>();
+    const distinctMonthsInLast3 = new Set<string>();
+    const distinctMonthsInLast12 = new Set<string>();
+    let occurrencesInLast3Months = 0;
     let occurrencesInLast12Months = 0;
     let daySum = 0;
     const accountsSet = new Set<string>();
@@ -1504,10 +1540,12 @@ export function detectRecurringItems(
         const m = t.date.substring(0, 7);
         distinctMonths.add(m);
 
-        if (last4Months.has(m)) {
-          distinctMonthsInLast4.add(m);
+        if (last3Months.has(m)) {
+          distinctMonthsInLast3.add(m);
+          occurrencesInLast3Months++;
         }
         if (last12Months.has(m)) {
+          distinctMonthsInLast12.add(m);
           occurrencesInLast12Months++;
         }
 
@@ -1521,12 +1559,19 @@ export function detectRecurringItems(
       }
     });
 
-    const repeatedInLast4Months = distinctMonthsInLast4.size >= 2;
-    const happenedAtLeast9TimesInLast12Months = occurrencesInLast12Months >= 9;
+    // Rule:
+    // "flag only transactions happening every period (last 12-months),
+    // or that they happened at least 9 times in the last 12 months AND 3 times in the last 3 months."
+    
+    // Condition 1: Happened every period in the last 12-months window
+    // (If user dataset has at least 3 months and fewer than 12 months total, present in all available months)
+    const happenedEveryPeriod = distinctMonthsInLast12.size >= 12 || 
+      (datasetMonthsInLast12.size >= 3 && distinctMonthsInLast12.size === datasetMonthsInLast12.size);
 
-    // Rule: It is considered recurring if it has repeated over the current and 3 previous periods (>= 2 distinct months in that window)
-    // OR it has happened at least 9 times over the last 12 months.
-    if (!repeatedInLast4Months && !happenedAtLeast9TimesInLast12Months) {
+    // Condition 2: Happened at least 9 times in last 12 months AND at least 3 times in last 3 months
+    const happenedFrequentAndRecent = occurrencesInLast12Months >= 9 && occurrencesInLast3Months >= 3;
+
+    if (!happenedEveryPeriod && !happenedFrequentAndRecent) {
       return;
     }
 
@@ -2765,6 +2810,162 @@ export function getTopSpendingCategoriesLast30Days(
     startDate: startDateStr,
     endDate: endDateStr,
   };
+}
+
+/**
+ * Computes monthly trend of overall budget utilization and per-category utilization
+ */
+export function computeBudgetUtilizationTrend(
+  transactions: Transaction[],
+  budgets: BudgetGoal[],
+  displayCurrency: DisplayCurrency,
+  usdArsRate: number,
+  maxMonths: number = 8
+): BudgetUtilizationMonthPoint[] {
+  if (!budgets || budgets.length === 0 || !transactions || transactions.length === 0) return [];
+
+  const monthSet = new Set<string>();
+  transactions.forEach(t => {
+    if (t.date && t.type === 'EXPENSE') {
+      monthSet.add(t.date.substring(0, 7));
+    }
+  });
+
+  const sortedMonths = Array.from(monthSet).sort().slice(-maxMonths);
+  if (sortedMonths.length === 0) return [];
+
+  const totalBudgetedDisplay = budgets.reduce((sum, b) => {
+    return sum + convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+  }, 0);
+
+  return sortedMonths.map(month => {
+    const categoryBreakdown: Record<string, { spent: number; limit: number; utilization: number }> = {};
+    let totalSpent = 0;
+
+    budgets.forEach(b => {
+      const limit = convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+      const catTxs = transactions.filter(t => t.type === 'EXPENSE' && t.category === b.category && t.date && t.date.startsWith(month));
+      const spent = catTxs.reduce((sum, t) => {
+        return sum + convertCurrency(t.amount, t.currency, displayCurrency, usdArsRate, t.date, transactions);
+      }, 0);
+      const utilization = limit > 0 ? (spent / limit) * 100 : 0;
+      categoryBreakdown[b.category] = {
+        spent: Number(spent.toFixed(2)),
+        limit: Number(limit.toFixed(2)),
+        utilization: Number(utilization.toFixed(1)),
+      };
+      totalSpent += spent;
+    });
+
+    const utilization = totalBudgetedDisplay > 0 ? (totalSpent / totalBudgetedDisplay) * 100 : 0;
+
+    const [y, m] = month.split('-');
+    const dateObj = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+    const label = !isNaN(dateObj.getTime())
+      ? dateObj.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+      : month;
+
+    return {
+      month,
+      label,
+      totalBudgeted: Number(totalBudgetedDisplay.toFixed(2)),
+      totalSpent: Number(totalSpent.toFixed(2)),
+      utilization: Number(utilization.toFixed(1)),
+      isOver: utilization > 100,
+      categoryBreakdown,
+    };
+  });
+}
+
+/**
+ * Computes alerts and proposed limits for categories that have been:
+ * 1. Over budget for 3 consecutive months in a row (proposes new increased limit)
+ * 2. In budget and under 80% utilization for 3 consecutive months in a row (proposes new reduced limit)
+ */
+export function computeBudgetStreakAlerts(
+  transactions: Transaction[],
+  budgets: BudgetGoal[],
+  displayCurrency: DisplayCurrency,
+  usdArsRate: number
+): BudgetStreakAlert[] {
+  if (!budgets || budgets.length === 0 || !transactions || transactions.length === 0) {
+    return [];
+  }
+
+  // Find distinct chronological months with expenses
+  const monthSet = new Set<string>();
+  transactions.forEach(t => {
+    if (t.date && t.type === 'EXPENSE') {
+      monthSet.add(t.date.substring(0, 7));
+    }
+  });
+
+  const sortedMonths = Array.from(monthSet).sort();
+  if (sortedMonths.length < 3) {
+    return [];
+  }
+
+  // Evaluate the last 3 consecutive months
+  const last3Months = sortedMonths.slice(-3);
+
+  const alerts: BudgetStreakAlert[] = [];
+
+  budgets.forEach(b => {
+    const limitDisplay = convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+    if (limitDisplay <= 0) return;
+
+    // Spending and utilization in each of the 3 months
+    const history = last3Months.map(m => {
+      const txs = transactions.filter(t => t.type === 'EXPENSE' && t.category === b.category && t.date && t.date.startsWith(m));
+      const spentDisplay = txs.reduce((sum, t) => {
+        return sum + convertCurrency(t.amount, t.currency, displayCurrency, usdArsRate, t.date, transactions);
+      }, 0);
+      const utilization = (spentDisplay / limitDisplay) * 100;
+      return {
+        month: m,
+        spentDisplay: Number(spentDisplay.toFixed(2)),
+        utilization: Number(utilization.toFixed(1)),
+      };
+    });
+
+    const isOver3Months = history.every(h => h.utilization > 100);
+    const isUnder80ThreeMonths = history.every(h => h.utilization < 80) && history.some(h => h.spentDisplay > 0);
+
+    const avgSpend = history.reduce((sum, h) => sum + h.spentDisplay, 0) / 3;
+
+    if (isOver3Months) {
+      // Propose new budget limit: average spend + 5% buffer, rounded cleanly
+      const rawProposed = avgSpend * 1.05;
+      const proposedLimit = rawProposed > 1000 ? Math.ceil(rawProposed / 100) * 100 : (rawProposed > 100 ? Math.ceil(rawProposed / 25) * 25 : Math.ceil(rawProposed / 5) * 5);
+
+      alerts.push({
+        category: b.category,
+        type: 'OVER_BUDGET_3M',
+        currentLimitDisplay: Math.round(limitDisplay),
+        proposedLimitDisplay: proposedLimit,
+        averageSpendDisplay: Math.round(avgSpend),
+        history,
+      });
+    } else if (isUnder80ThreeMonths) {
+      // Propose new reduced budget limit: average spend + 15% safety buffer so they don't immediately breach
+      const rawProposed = Math.max(avgSpend * 1.15, avgSpend + 10);
+      const roundedProposed = rawProposed > 1000 ? Math.ceil(rawProposed / 100) * 100 : (rawProposed > 100 ? Math.ceil(rawProposed / 25) * 25 : Math.ceil(rawProposed / 5) * 5);
+      const proposedLimit = Math.min(Math.round(limitDisplay * 0.85), roundedProposed);
+
+      if (proposedLimit < limitDisplay) {
+        alerts.push({
+          category: b.category,
+          type: 'UNDER_80_PERCENT_3M',
+          currentLimitDisplay: Math.round(limitDisplay),
+          proposedLimitDisplay: proposedLimit,
+          averageSpendDisplay: Math.round(avgSpend),
+          history,
+        });
+      }
+    }
+  });
+
+  return alerts;
 }
 
 

@@ -103,6 +103,29 @@ export interface BudgetGoal {
   monthlyLimitARS: number;
 }
 
+export interface BudgetUtilizationMonthPoint {
+  month: string; // YYYY-MM
+  label: string;
+  totalBudgeted: number;
+  totalSpent: number;
+  utilization: number;
+  isOver: boolean;
+  categoryBreakdown: Record<string, { spent: number; limit: number; utilization: number }>;
+}
+
+export interface BudgetStreakAlert {
+  category: string;
+  type: 'OVER_BUDGET_3M' | 'UNDER_80_PERCENT_3M';
+  currentLimitDisplay: number;
+  proposedLimitDisplay: number;
+  averageSpendDisplay: number;
+  history: {
+    month: string;
+    spentDisplay: number;
+    utilization: number;
+  }[];
+}
+
 export interface RecurringRule {
   id: string;
   ownerId?: string;

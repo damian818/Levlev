@@ -10,7 +10,8 @@ import {
   getLatestMonth, 
   getCurrentMonthKey, 
   getDefaultSelectedMonth,
-  predictCategoryBudgetVelocity
+  predictCategoryBudgetVelocity,
+  computeBudgetStreakAlerts
 } from '../utils/financeUtils';
 import { 
   Target, 
@@ -29,11 +30,13 @@ import {
   Wallet2, 
   Flame,
   Trash2,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 import { CategoryTransactionsModal } from './CategoryTransactionsModal';
 import { CircularBudgetGauge } from './CircularBudgetGauge';
 import { BudgetOptimizationSuggestions } from './BudgetOptimizationSuggestions';
+import { BudgetUtilizationTrend } from './BudgetUtilizationTrend';
 
 interface BudgetTabProps {
   transactions: Transaction[];
@@ -239,6 +242,53 @@ export function BudgetTab({
     ? budgetList.find(b => b.category === inspectingCategory)
     : undefined;
 
+  // 3-Month streak alerts for over-budget or under 80% categories
+  const streakAlerts = useMemo(() => {
+    return computeBudgetStreakAlerts(transactions, budgetList, displayCurrency, usdArsRate);
+  }, [transactions, budgetList, displayCurrency, usdArsRate]);
+
+  const streakAlertsMap = useMemo(() => {
+    return new Map(streakAlerts.map(a => [a.category, a]));
+  }, [streakAlerts]);
+
+  const handleApplyProposedLimit = (category: string, newLimitDisplay: number) => {
+    const limitARS = convertCurrency(newLimitDisplay, displayCurrency, 'ARS', usdArsRate);
+    const updated = budgetList.map(b => b.category === category ? { ...b, monthlyLimitARS: limitARS } : b);
+    setBudgetList(updated);
+    onUpdateBudgets(updated);
+    if (isEditing) {
+      setDraftLimits(prev => ({
+        ...prev,
+        [category]: String(Math.round(newLimitDisplay)),
+      }));
+    }
+  };
+
+  const handleApplyAllProposedLimits = (proposals: { category: string; newLimitDisplay: number }[]) => {
+    const propMap = new Map(proposals.map(p => [p.category, p.newLimitDisplay]));
+    const updated = budgetList.map(b => {
+      const prop = propMap.get(b.category);
+      if (prop !== undefined) {
+        return {
+          ...b,
+          monthlyLimitARS: convertCurrency(prop, displayCurrency, 'ARS', usdArsRate),
+        };
+      }
+      return b;
+    });
+    setBudgetList(updated);
+    onUpdateBudgets(updated);
+    if (isEditing) {
+      setDraftLimits(prev => {
+        const next = { ...prev };
+        proposals.forEach(p => {
+          next[p.category] = String(Math.round(p.newLimitDisplay));
+        });
+        return next;
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Bar */}
@@ -370,6 +420,18 @@ export function BudgetTab({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Interactive Budget Utilization Trend & 3-Month Streak Quick Actions */}
+      {budgetList.length > 0 && transactions.length > 0 && (
+        <BudgetUtilizationTrend
+          transactions={transactions}
+          budgets={budgetList}
+          displayCurrency={displayCurrency}
+          usdArsRate={usdArsRate}
+          onApplyProposedLimit={handleApplyProposedLimit}
+          onApplyAllProposedLimits={handleApplyAllProposedLimits}
+        />
       )}
 
       {/* AI 30-Day Spending Optimization Suggestions (With Hide & Dismiss capabilities) */}
@@ -615,6 +677,54 @@ export function BudgetTab({
                     </div>
                   </div>
                 )}
+
+                {/* 3-Month Streak Alert & Quick Action on Card */}
+                {streakAlertsMap.has(budget.category) && !isEditing && (() => {
+                  const alert = streakAlertsMap.get(budget.category)!;
+                  const isOverAlert = alert.type === 'OVER_BUDGET_3M';
+                  return (
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      className={`p-2.5 rounded-xl border text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 ${
+                        isOverAlert 
+                          ? 'bg-rose-950/25 border-rose-800/40 text-rose-200' 
+                          : 'bg-emerald-950/25 border-emerald-800/40 text-emerald-200'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-1.5 font-bold">
+                          <Zap className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            {isOverAlert 
+                              ? (t('budget.over_3m_flag') || 'Over budget 3 months in a row')
+                              : (t('budget.under_3m_flag') || 'Under 80% for 3 months in a row')}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 flex items-center space-x-2">
+                          <span>{t('budget.proposed_limit') || 'Proposed'}:</span>
+                          <strong className={`font-mono font-bold ${isOverAlert ? 'text-rose-300' : 'text-emerald-300'}`}>
+                            {formatCurrency(alert.proposedLimitDisplay, displayCurrency)}
+                          </strong>
+                          <span className="text-slate-500">
+                            (Avg: {formatCurrency(alert.averageSpendDisplay, displayCurrency)})
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleApplyProposedLimit(budget.category, alert.proposedLimitDisplay)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-xs transition-colors shrink-0 cursor-pointer flex items-center space-x-1 ${
+                          isOverAlert 
+                            ? 'bg-rose-600 hover:bg-rose-500 text-white' 
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        }`}
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>{t('budget.apply_proposed_limit') || 'Apply'} {formatCurrency(alert.proposedLimitDisplay, displayCurrency)}</span>
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* Bottom Row: Remaining capacity & Inspect link */}
                 <div className="flex justify-between items-center text-[11px] text-slate-400 pt-0.5">

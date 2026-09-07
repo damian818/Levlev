@@ -1327,11 +1327,9 @@ export default function App() {
 
     setCustomBalances(prev => {
       const updated = { ...prev };
-      if (currentBalance === undefined) {
-        delete updated[accountName];
-      } else {
-        updated[accountName] = { accountName, currentBalance, currency };
-      }
+      // Since transactions ledger now holds the adjustment transaction and accurately tracks the balance,
+      // delete any static customBalance override so subsequent transactions update the balance dynamically.
+      delete updated[accountName];
       try {
         localStorage.setItem('finance_app_account_balances', JSON.stringify(updated));
       } catch (e) {
