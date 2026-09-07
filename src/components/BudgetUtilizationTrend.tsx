@@ -152,15 +152,15 @@ export function BudgetUtilizationTrend({
               </div>
               <div>
                 <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                  <span>{isSpanish ? 'Acciones Rápidas: Tendencia de 3 Meses' : 'Quick Actions: 3-Month Utilization Alerts'}</span>
+                  <span>{isSpanish ? 'Acciones Rápidas: Últimos 3 Meses Cerrados' : 'Quick Actions: Last 3 Completed Months'}</span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
                     {unappliedAlerts.length} {isSpanish ? 'sugerencias' : 'proposals'}
                   </span>
                 </h4>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {isSpanish
-                    ? 'Categorías con desviaciones sostenidas por 3 meses consecutivos. Aplica nuevos límites con un clic.'
-                    : 'Categories consistently over or under budget for 3 consecutive months. Adjust limits with one click.'}
+                    ? 'Categorías con desviaciones sostenidas en los últimos 3 meses cerrados (excluyendo el mes en curso). Aplica nuevos límites con un clic.'
+                    : 'Categories consistently over or under budget across the last 3 completed months (excluding ongoing month). Adjust limits with one click.'}
                 </p>
               </div>
             </div>

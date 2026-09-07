@@ -26,6 +26,39 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
   }
 }
 
+// Helper function to fetch with timeout and automatic retry on 5xx errors
+async function fetchWithRetryAndTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = 8000,
+  maxRetries: number = 1
+): Promise<Response> {
+  let lastError: any;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(id);
+      if (response.ok) return response;
+      if (attempt < maxRetries && response.status >= 500 && response.status <= 504) {
+        await new Promise(r => setTimeout(r, 600));
+        continue;
+      }
+      return response;
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 600));
+      }
+    }
+  }
+  throw lastError || new Error(`Failed to fetch ${url}`);
+}
+
 // In-memory rate limiter for public AI endpoints (Bug 5.1.4 fix)
 const aiRateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const AI_RATE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
@@ -102,6 +135,7 @@ const FALLBACK_INFLATION_HISTORY = [
   { month: '2026-06', inflationIndex: 162.2, usdArsRate: 1480 },
   { month: '2026-07', inflationIndex: 165.6, usdArsRate: 1485 },
   { month: '2026-08', inflationIndex: 169.1, usdArsRate: 1496 },
+  { month: '2026-09', inflationIndex: 172.5, usdArsRate: 1510 },
 ];
 
 // Simple in-memory cache for external API calls
@@ -248,92 +282,114 @@ app.get(["/api/fx-convert", "/fx-convert", "/api/fx-pair", "/fx-pair"], async (r
 
 app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res) => {
   try {
-    // Return cached data if fresh (ignoring startDate for simplicity or adding it to cache key)
     const now = Date.now();
     if (cache.inflationHistory.data && (now - cache.inflationHistory.timestamp < CACHE_TTL)) {
       return res.json(cache.inflationHistory.data);
     }
 
+    // Attempt to fetch both inflation and FX history with automatic retry on 5xx errors
     const [inflResSettled, fxResSettled] = await Promise.allSettled([
-      fetchWithTimeout("https://api.argentinadatos.com/v1/finanzas/indices/inflacion", {
+      fetchWithRetryAndTimeout("https://api.argentinadatos.com/v1/finanzas/indices/inflacion", {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-      }, 10000),
-      fetchWithTimeout("https://api.argentinadatos.com/v1/cotizaciones/dolares/bolsa", {
+      }, 8000, 1),
+      fetchWithRetryAndTimeout("https://api.argentinadatos.com/v1/cotizaciones/dolares/bolsa", {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-      }, 10000)
+      }, 8000, 1)
     ]);
 
-    if (inflResSettled.status === 'rejected' || fxResSettled.status === 'rejected') {
-      const inflErr = inflResSettled.status === 'rejected' ? inflResSettled.reason : null;
-      const fxErr = fxResSettled.status === 'rejected' ? fxResSettled.reason : null;
-      throw new Error(`Connection error: ${inflErr?.message || fxErr?.message || 'Unknown network error'}`);
+    const isInflOk = inflResSettled.status === 'fulfilled' && inflResSettled.value.ok;
+    const isFxOk = fxResSettled.status === 'fulfilled' && fxResSettled.value.ok;
+
+    let inflData: { fecha: string; valor: number }[] = [];
+    if (isInflOk) {
+      try {
+        inflData = await (inflResSettled as PromiseFulfilledResult<Response>).value.json();
+      } catch {
+        inflData = [];
+      }
     }
-
-    const inflRes = inflResSettled.value;
-    const fxRes = fxResSettled.value;
-
-    if (!inflRes.ok || !fxRes.ok) {
-      throw new Error(`API returned error status: Inflation=${inflRes.status}, FX=${fxRes.status}`);
-    }
-
-    const inflData: { fecha: string; valor: number }[] = await inflRes.json();
-    const fxData: { fecha: string; compra: number; venta: number }[] = await fxRes.json();
 
     const monthlyFx: Record<string, number> = {};
-    if (Array.isArray(fxData)) {
-      fxData.forEach(item => {
-        const month = item.fecha.substring(0, 7);
-        monthlyFx[month] = item.venta || item.compra;
-      });
+    if (isFxOk) {
+      try {
+        const fxData: { fecha: string; compra: number; venta: number }[] = await (fxResSettled as PromiseFulfilledResult<Response>).value.json();
+        if (Array.isArray(fxData)) {
+          fxData.forEach(item => {
+            const month = item.fecha.substring(0, 7);
+            monthlyFx[month] = item.venta || item.compra;
+          });
+        }
+      } catch {
+        // Fallback to known monthly rates
+      }
     }
+
+    // Populate any missing months in monthlyFx from known fallback rates
+    FALLBACK_INFLATION_HISTORY.forEach(item => {
+      if (!monthlyFx[item.month] && item.usdArsRate) {
+        monthlyFx[item.month] = item.usdArsRate;
+      }
+    });
 
     const startDate = (req.query.startDate as string) || '2024-01-01';
 
-    const recentInfl = Array.isArray(inflData) ? inflData.filter(item => item.fecha >= startDate) : [];
-    let cumulativeIndex = 100;
-    const historyPoints = recentInfl.map((item, idx) => {
-      const month = item.fecha.substring(0, 7);
-      if (idx > 0) {
-        cumulativeIndex = cumulativeIndex * (1 + item.valor / 100);
-      }
-      let rate = monthlyFx[month] || null;
-      
-      // Manual Overrides for simulation months (2026)
-      if (month === '2026-01') rate = 1450;
-      if (month === '2026-02') rate = 1400;
-      if (month === '2026-03') rate = 1380;
-      if (month === '2026-04') rate = 1448.5;
-      if (month === '2026-05') rate = 1410;
-      if (month === '2026-06') rate = 1480;
-      if (month === '2026-07') rate = 1485;
-      if (month === '2026-08') rate = 1496;
+    // If live inflation data is available, compute history points from it
+    if (Array.isArray(inflData) && inflData.length > 0) {
+      const recentInfl = inflData.filter(item => item.fecha >= startDate);
+      let cumulativeIndex = 100;
+      const historyPoints = recentInfl.map((item, idx) => {
+        const month = item.fecha.substring(0, 7);
+        if (idx > 0) {
+          cumulativeIndex = cumulativeIndex * (1 + item.valor / 100);
+        }
+        let rate = monthlyFx[month] || null;
+        
+        // Simulation rates for 2026
+        if (month === '2026-01') rate = 1450;
+        if (month === '2026-02') rate = 1400;
+        if (month === '2026-03') rate = 1380;
+        if (month === '2026-04') rate = 1448.5;
+        if (month === '2026-05') rate = 1410;
+        if (month === '2026-06') rate = 1480;
+        if (month === '2026-07') rate = 1485;
+        if (month === '2026-08') rate = 1496;
+        if (month === '2026-09') rate = 1510;
 
-      return {
-        month,
-        monthlyInflation: item.valor,
-        inflationIndex: Math.round(cumulativeIndex * 10) / 10,
-        usdArsRate: rate,
+        return {
+          month,
+          monthlyInflation: item.valor,
+          inflationIndex: Math.round(cumulativeIndex * 10) / 10,
+          usdArsRate: rate,
+        };
+      }).filter(pt => pt.usdArsRate !== null || pt.month >= '2024-09');
+
+      const responseData = {
+        points: historyPoints,
+        source: isFxOk ? "ArgentinaDatos API (INDEC CPI & MEP FX Rate)" : "ArgentinaDatos API (INDEC CPI + Historical MEP)",
+        fetchedAt: new Date().toISOString()
       };
-    }).filter(pt => pt.usdArsRate !== null || pt.month >= '2024-09');
 
+      cache.inflationHistory = { data: responseData, timestamp: Date.now() };
+      return res.json(responseData);
+    }
+
+    // If inflation API was unavailable, provide complete fallback data cleanly
     const responseData = {
-      points: historyPoints,
-      source: "ArgentinaDatos API (INDEC CPI & MEP FX Rate)",
-      fetchedAt: new Date().toISOString()
-    };
-
-    // Update cache
-    cache.inflationHistory = { data: responseData, timestamp: Date.now() };
-
-    res.json(responseData);
-  } catch (error: any) {
-    console.warn("Error fetching inflation/FX history, returning fallback historical data:", error?.message || error);
-    res.json({
       points: FALLBACK_INFLATION_HISTORY,
       fallback: true,
-      error: error?.message || "Using static historical inflation fallback data",
+      source: "Cached Fallback Historical Data",
       fetchedAt: new Date().toISOString()
-    });
+    };
+    cache.inflationHistory = { data: responseData, timestamp: Date.now() - (CACHE_TTL - 120000) };
+    return res.json(responseData);
+  } catch {
+    const responseData = {
+      points: FALLBACK_INFLATION_HISTORY,
+      fallback: true,
+      source: "Cached Fallback Historical Data",
+      fetchedAt: new Date().toISOString()
+    };
+    return res.json(responseData);
   }
 });
 
