@@ -1471,26 +1471,33 @@ export function detectRecurringItems(
     groups.get(groupKey)!.push(t);
   });
 
-  // Use reference point for evaluating recurrence (align with latest transaction if dataset is historical)
-  let refDate = new Date();
+  // Reference date: strictly see from current month to the past
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  
+  // If the dataset is purely historical and all transactions are in the past, align with latest past transaction
+  let refDate = now;
   if (transactions.length > 0) {
-    let maxTxTime = 0;
+    let maxPastTxTime = 0;
     transactions.forEach(t => {
       if (t.date) {
         const time = new Date(t.date).getTime();
-        if (!isNaN(time) && time > maxTxTime) maxTxTime = time;
+        if (!isNaN(time) && time <= now.getTime() && time > maxPastTxTime) {
+          maxPastTxTime = time;
+        }
       }
     });
-    if (maxTxTime > 0) {
-      const latestTxDate = new Date(maxTxTime);
-      if (Math.abs(refDate.getTime() - latestTxDate.getTime()) > 60 * 24 * 60 * 60 * 1000) {
-        refDate = latestTxDate;
+    if (maxPastTxTime > 0) {
+      const latestPastTxDate = new Date(maxPastTxTime);
+      if (now.getTime() - latestPastTxDate.getTime() > 60 * 24 * 60 * 60 * 1000) {
+        refDate = latestPastTxDate;
       }
     }
   }
 
   const refYear = refDate.getFullYear();
   const refMonth = refDate.getMonth() + 1; // 1 to 12
+  const effectiveCurrentMonthKey = `${refYear}-${String(refMonth).padStart(2, '0')}`;
 
   // Last 3 months: current month + 2 previous months
   const last3Months = new Set<string>();
@@ -1510,12 +1517,12 @@ export function detectRecurringItems(
     last12Months.add(`${yyyy}-${mm}`);
   }
 
-  // Count overall dataset months in the last 12-month window
+  // Count overall dataset months in the last 12-month window (strictly from current month to the past)
   const datasetMonthsInLast12 = new Set<string>();
   transactions.forEach(t => {
     if (t.date) {
       const m = t.date.substring(0, 7);
-      if (last12Months.has(m)) {
+      if (m <= effectiveCurrentMonthKey && last12Months.has(m)) {
         datasetMonthsInLast12.add(m);
       }
     }
@@ -1524,7 +1531,11 @@ export function detectRecurringItems(
   const result: IdentifiedRecurringItem[] = [];
 
   groups.forEach((txList, groupKey) => {
-    const sorted = [...txList].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Strictly filter out any future transactions: see from current month to the past
+    const pastTxs = txList.filter(t => !t.date || t.date.substring(0, 7) <= effectiveCurrentMonthKey);
+    if (pastTxs.length === 0) return;
+
+    const sorted = [...pastTxs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     // Track monthly occurrences and counts for last 3 and last 12 months
     const distinctMonths = new Set<string>();
@@ -2824,10 +2835,17 @@ export function computeBudgetUtilizationTrend(
 ): BudgetUtilizationMonthPoint[] {
   if (!budgets || budgets.length === 0 || !transactions || transactions.length === 0) return [];
 
+  const currentMonthKey = getCurrentMonthKey();
+  const todayStr = getTodayString();
+
+  // Find distinct chronological months strictly from current month to the past
   const monthSet = new Set<string>();
   transactions.forEach(t => {
     if (t.date && t.type === 'EXPENSE') {
-      monthSet.add(t.date.substring(0, 7));
+      const m = t.date.substring(0, 7);
+      if (m <= currentMonthKey) {
+        monthSet.add(m);
+      }
     }
   });
 
@@ -2844,7 +2862,13 @@ export function computeBudgetUtilizationTrend(
 
     budgets.forEach(b => {
       const limit = convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
-      const catTxs = transactions.filter(t => t.type === 'EXPENSE' && t.category === b.category && t.date && t.date.startsWith(month));
+      const catTxs = transactions.filter(t => 
+        t.type === 'EXPENSE' && 
+        t.category === b.category && 
+        t.date && 
+        t.date.startsWith(month) &&
+        (month < currentMonthKey || t.date.substring(0, 10) <= todayStr)
+      );
       const spent = catTxs.reduce((sum, t) => {
         return sum + convertCurrency(t.amount, t.currency, displayCurrency, usdArsRate, t.date, transactions);
       }, 0);
@@ -2881,6 +2905,7 @@ export function computeBudgetUtilizationTrend(
  * Computes alerts and proposed limits for categories that have been:
  * 1. Over budget for 3 consecutive months in a row (proposes new increased limit)
  * 2. In budget and under 80% utilization for 3 consecutive months in a row (proposes new reduced limit)
+ * Strictly sees from current month to the past (no future months).
  */
 export function computeBudgetStreakAlerts(
   transactions: Transaction[],
@@ -2892,11 +2917,17 @@ export function computeBudgetStreakAlerts(
     return [];
   }
 
-  // Find distinct chronological months with expenses
+  const currentMonthKey = getCurrentMonthKey();
+  const todayStr = getTodayString();
+
+  // Find distinct chronological months with expenses strictly from current month to the past
   const monthSet = new Set<string>();
   transactions.forEach(t => {
     if (t.date && t.type === 'EXPENSE') {
-      monthSet.add(t.date.substring(0, 7));
+      const m = t.date.substring(0, 7);
+      if (m <= currentMonthKey) {
+        monthSet.add(m);
+      }
     }
   });
 
@@ -2905,7 +2936,7 @@ export function computeBudgetStreakAlerts(
     return [];
   }
 
-  // Evaluate the last 3 consecutive months
+  // Evaluate the last 3 consecutive months strictly up to current month
   const last3Months = sortedMonths.slice(-3);
 
   const alerts: BudgetStreakAlert[] = [];
@@ -2914,9 +2945,15 @@ export function computeBudgetStreakAlerts(
     const limitDisplay = convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
     if (limitDisplay <= 0) return;
 
-    // Spending and utilization in each of the 3 months
+    // Spending and utilization in each of the 3 months (strictly ignoring future dated transactions)
     const history = last3Months.map(m => {
-      const txs = transactions.filter(t => t.type === 'EXPENSE' && t.category === b.category && t.date && t.date.startsWith(m));
+      const txs = transactions.filter(t => 
+        t.type === 'EXPENSE' && 
+        t.category === b.category && 
+        t.date && 
+        t.date.startsWith(m) &&
+        (m < currentMonthKey || t.date.substring(0, 10) <= todayStr)
+      );
       const spentDisplay = txs.reduce((sum, t) => {
         return sum + convertCurrency(t.amount, t.currency, displayCurrency, usdArsRate, t.date, transactions);
       }, 0);
