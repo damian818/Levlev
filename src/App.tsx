@@ -1647,6 +1647,7 @@ export default function App() {
               displayCurrency={displayCurrency}
               usdArsRate={usdArsRate}
               historyData={historyData}
+              categoriesList={categories}
               onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
               onEditTransaction={handleEditTransaction}
             />

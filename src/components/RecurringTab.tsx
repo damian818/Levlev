@@ -1089,6 +1089,8 @@ export function RecurringTab({
       
       <RecurringCategoryTrendModal
         recurringItems={regularRecurring}
+        transactions={transactions}
+        categoriesList={categoriesList}
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
         displayCurrency={displayCurrency}

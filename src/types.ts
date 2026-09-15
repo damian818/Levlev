@@ -126,6 +126,18 @@ export interface BudgetStreakAlert {
   }[];
 }
 
+export type BudgetHorizon = 'CURRENT_MONTH' | '6M' | '12M' | 'YTD' | 'YEAR_END';
+
+export interface BudgetHorizonInfo {
+  horizon: BudgetHorizon;
+  months: string[];
+  multiplier: number;
+  elapsedMonths: number;
+  label: string;
+  sublabel: string;
+  isProjection?: boolean;
+}
+
 export interface RecurringRule {
   id: string;
   ownerId?: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Transaction, BudgetGoal, DisplayCurrency, InflationPoint, TransactionFilter } from '../types';
+import { Transaction, BudgetGoal, DisplayCurrency, InflationPoint, TransactionFilter, BudgetHorizon, BudgetHorizonInfo, CategoryItem } from '../types';
 import { 
   analyzeSpending, 
   formatCurrency, 
@@ -11,7 +11,8 @@ import {
   getCurrentMonthKey, 
   getDefaultSelectedMonth,
   predictCategoryBudgetVelocity,
-  computeBudgetStreakAlerts
+  computeBudgetStreakAlerts,
+  getBudgetHorizonInfo
 } from '../utils/financeUtils';
 import { 
   Target, 
@@ -31,9 +32,12 @@ import {
   Flame,
   Trash2,
   X,
-  Zap
+  Zap,
+  Clock,
+  Compass
 } from 'lucide-react';
 import { CategoryTransactionsModal } from './CategoryTransactionsModal';
+import { RecurringCategoryTrendModal } from './RecurringCategoryTrendModal';
 import { CircularBudgetGauge } from './CircularBudgetGauge';
 import { BudgetOptimizationSuggestions } from './BudgetOptimizationSuggestions';
 import { BudgetUtilizationTrend } from './BudgetUtilizationTrend';
@@ -45,6 +49,7 @@ interface BudgetTabProps {
   displayCurrency: DisplayCurrency;
   usdArsRate: number;
   historyData?: InflationPoint[];
+  categoriesList?: CategoryItem[];
   onNavigateToTransactionsWithFilter?: (filter: TransactionFilter) => void;
   onEditTransaction?: (tx: Transaction) => void;
 }
@@ -56,6 +61,7 @@ export function BudgetTab({
   displayCurrency,
   usdArsRate,
   historyData,
+  categoriesList = [],
   onNavigateToTransactionsWithFilter,
   onEditTransaction,
 }: BudgetTabProps) {
@@ -65,6 +71,13 @@ export function BudgetTab({
   const [draftLimits, setDraftLimits] = useState<Record<string, string>>({});
   const [inspectingCategory, setInspectingCategory] = useState<string | null>(null);
   const [addingCategory, setAddingCategory] = useState<string>('');
+
+  // Time horizon view state: CURRENT_MONTH (default), 6M, 12M, YTD, YEAR_END
+  const [budgetHorizon, setBudgetHorizon] = useState<BudgetHorizon>('CURRENT_MONTH');
+
+  // Category Trend Modal state
+  const [isCategoryTrendsOpen, setIsCategoryTrendsOpen] = useState(false);
+  const [trendsInitialCategory, setTrendsInitialCategory] = useState<string | undefined>(undefined);
 
   const currentMonthKey = useMemo(() => getCurrentMonthKey(), []);
 
@@ -98,20 +111,41 @@ export function BudgetTab({
     }
   }, [budgets, transactions, isEditing]);
 
-  const spending = analyzeSpending(transactions, displayCurrency, usdArsRate, selectedMonth);
+  // Compute date range, multiplier and horizon info
+  const horizonInfo = useMemo(() => {
+    return getBudgetHorizonInfo(budgetHorizon, currentMonthKey, selectedMonth);
+  }, [budgetHorizon, currentMonthKey, selectedMonth]);
 
-  // Map transaction counts per category for the selected month
+  const targetMonths = useMemo(() => {
+    if (budgetHorizon === 'CURRENT_MONTH') {
+      return selectedMonth;
+    }
+    return horizonInfo.months;
+  }, [budgetHorizon, selectedMonth, horizonInfo.months]);
+
+  const spending = useMemo(() => {
+    return analyzeSpending(transactions, displayCurrency, usdArsRate, targetMonths);
+  }, [transactions, displayCurrency, usdArsRate, targetMonths]);
+
+  // Map transaction counts per category for the target months
   const categoryTransactionCounts = useMemo(() => {
     const countMap: Record<string, number> = {};
+    const monthsToCheck = budgetHorizon === 'CURRENT_MONTH'
+      ? (selectedMonth === 'ALL' ? null : [selectedMonth])
+      : horizonInfo.months;
+
     transactions.forEach(tx => {
       if (tx.type !== 'EXPENSE') return;
-      if (selectedMonth !== 'ALL' && (!tx.date || !tx.date.startsWith(selectedMonth))) return;
+      if (monthsToCheck && tx.date) {
+        const m = tx.date.substring(0, 7);
+        if (!monthsToCheck.includes(m)) return;
+      }
       if (tx.category) {
         countMap[tx.category] = (countMap[tx.category] || 0) + 1;
       }
     });
     return countMap;
-  }, [transactions, selectedMonth]);
+  }, [transactions, budgetHorizon, selectedMonth, horizonInfo.months]);
 
   // Available categories not yet in budget list
   const unbudgetedCategories = useMemo(() => {
@@ -125,15 +159,17 @@ export function BudgetTab({
     return Array.from(allCatSet).filter(c => !budgetedSet.has(c.toLowerCase())).sort();
   }, [budgetList, transactions]);
 
-  // Calculate overall totals based on active or draft values
+  // Calculate overall totals based on active or draft values, scaled by horizon multiplier
   const totalBudgeted = useMemo(() => {
     return budgetList.reduce((sum, b) => {
       if (isEditing && draftLimits[b.category] !== undefined) {
-        return sum + (parseFloat(draftLimits[b.category]) || 0);
+        const monthlyDraft = parseFloat(draftLimits[b.category]) || 0;
+        return sum + (monthlyDraft * horizonInfo.multiplier);
       }
-      return sum + convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+      const monthlyConverted = convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+      return sum + (monthlyConverted * horizonInfo.multiplier);
     }, 0);
-  }, [budgetList, isEditing, draftLimits, displayCurrency, usdArsRate]);
+  }, [budgetList, isEditing, draftLimits, displayCurrency, usdArsRate, horizonInfo.multiplier]);
 
   const totalSpentAcrossBudgets = useMemo(() => {
     return budgetList.reduce((sum, b) => {
@@ -145,6 +181,22 @@ export function BudgetTab({
   const totalRemaining = Math.max(totalBudgeted - totalSpentAcrossBudgets, 0);
   const overallPercentage = totalBudgeted > 0 ? (totalSpentAcrossBudgets / totalBudgeted) * 100 : 0;
   const isOverallOver = overallPercentage > 100;
+
+  // Year-end projection metrics if in YEAR_END horizon
+  const yearEndPace = useMemo(() => {
+    if (budgetHorizon !== 'YEAR_END') return null;
+    const elapsed = Math.max(1, horizonInfo.elapsedMonths);
+    const projectedTotal = (totalSpentAcrossBudgets / elapsed) * 12;
+    const projectedPercentage = totalBudgeted > 0 ? (projectedTotal / totalBudgeted) * 100 : 0;
+    const projectedOverrun = Math.max(0, projectedTotal - totalBudgeted);
+    return {
+      elapsed,
+      projectedTotal,
+      projectedPercentage,
+      projectedOverrun,
+      isProjectedOver: projectedTotal > totalBudgeted,
+    };
+  }, [budgetHorizon, horizonInfo.elapsedMonths, totalSpentAcrossBudgets, totalBudgeted]);
 
   // Initialize draft values when entering edit mode
   const handleStartEdit = () => {
@@ -292,64 +344,149 @@ export function BudgetTab({
   return (
     <div className="space-y-6">
       {/* Header Bar */}
-      <div className="bg-[#111622] p-4 sm:p-5 rounded-2xl border border-slate-800/90 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <h3 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
-            <Target className="w-5 h-5 text-emerald-400" />
-            <span>{t('budget.monthly_goals')}</span>
-          </h3>
-          <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{t('budget.control_spending')}</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
-          {/* Month Selector */}
-          <div className="flex items-center space-x-2 bg-[#161d2b] px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs flex-1 sm:flex-none justify-center sm:justify-start">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent border-none py-0 text-xs text-slate-100 font-bold focus:outline-none cursor-pointer"
-            >
-              <option value="ALL" className="bg-[#161d2b] text-slate-100">{t('budget.all_time')}</option>
-              {availableMonths.map((m) => (
-                <option key={m} value={m} className="bg-[#161d2b] text-slate-100">
-                  {m}
-                </option>
-              ))}
-            </select>
+      <div className="bg-[#111622] p-4 sm:p-5 rounded-2xl border border-slate-800/90 shadow-sm flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h3 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
+              <Target className="w-5 h-5 text-emerald-400" />
+              <span>{t('budget.monthly_goals')}</span>
+            </h3>
+            <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{t('budget.control_spending')}</p>
           </div>
 
-          <div className="flex-1 sm:flex-none">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Category Trends Modal Trigger */}
+            <button
+              type="button"
+              onClick={() => {
+                setTrendsInitialCategory(undefined);
+                setIsCategoryTrendsOpen(true);
+              }}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#161d2b] border border-slate-700/80 hover:border-emerald-500/40 text-slate-200 hover:text-emerald-400 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              title={t('budget.view_category_trends_desc') || 'Ver tendencias históricas de cualquier categoría'}
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{t('budget.category_trends') || 'Tendencia por Categoría'}</span>
+            </button>
+
+            {/* Action Buttons: Configure / Save / Cancel */}
             {isEditing ? (
               <div className="flex space-x-2">
                 <button
                   onClick={handleSmartSuggest}
-                  className="flex-1 sm:flex-none px-3 py-1.5 border border-amber-500/50 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 border border-amber-500/50 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5 inline mr-1" />
                   Smart Suggest
                 </button>
                 <button
                   onClick={handleCancel}
-                  className="flex-1 sm:flex-none px-3 py-1.5 border border-slate-700 rounded-xl text-xs font-medium text-slate-300 bg-[#161d2b] hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 border border-slate-700 rounded-xl text-xs font-medium text-slate-300 bg-[#161d2b] hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   {t('budget.cancel')}
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex-1 sm:flex-none px-3 py-1.5 bg-emerald-600 border border-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-500 transition-colors shadow-sm cursor-pointer"
+                  className="px-3 py-1.5 bg-emerald-600 border border-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-500 transition-colors shadow-sm cursor-pointer"
                 >
                   {t('budget.save')}
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleStartEdit}
-                  className="flex-1 sm:flex-none px-3.5 py-1.5 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 bg-[#161d2b] hover:bg-slate-800 transition-colors cursor-pointer"
+              <button
+                onClick={handleStartEdit}
+                className="px-3.5 py-1.5 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 bg-[#161d2b] hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                {t('budget.configure')}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* View Horizon Selector & Date Scope */}
+        <div className="pt-2 border-t border-slate-800/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          {/* Horizon Pills */}
+          <div className="flex items-center bg-[#0d111a] p-1 rounded-xl border border-slate-800 text-xs w-full md:w-auto overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setBudgetHorizon('CURRENT_MONTH')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                budgetHorizon === 'CURRENT_MONTH'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t('budget.horizon_current_month') || 'Mes Actual'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setBudgetHorizon('YTD')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                budgetHorizon === 'YTD'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t('budget.horizon_ytd') || 'YTD'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setBudgetHorizon('6M')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                budgetHorizon === '6M'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              6M
+            </button>
+            <button
+              type="button"
+              onClick={() => setBudgetHorizon('12M')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                budgetHorizon === '12M'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              12M
+            </button>
+            <button
+              type="button"
+              onClick={() => setBudgetHorizon('YEAR_END')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                budgetHorizon === 'YEAR_END'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t('budget.horizon_year_end') || 'Cierre de Año'}
+            </button>
+          </div>
+
+          {/* Contextual Date Range / Month selector */}
+          <div className="flex items-center space-x-2 text-xs text-slate-300">
+            {budgetHorizon === 'CURRENT_MONTH' ? (
+              <div className="flex items-center space-x-2 bg-[#161d2b] px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="bg-transparent border-none py-0 text-xs text-slate-100 font-bold focus:outline-none cursor-pointer"
                 >
-                  {t('budget.configure')}
-                </button>
+                  <option value="ALL" className="bg-[#161d2b] text-slate-100">{t('budget.all_time')}</option>
+                  {availableMonths.map((m) => (
+                    <option key={m} value={m} className="bg-[#161d2b] text-slate-100">
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2 bg-[#161d2b] px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs font-medium text-slate-300">
+                <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="font-semibold text-slate-200">{horizonInfo.label}</span>
+                <span className="text-[10px] text-slate-400 font-mono">({horizonInfo.months.length} {t('common.months') || 'meses'})</span>
               </div>
             )}
           </div>
@@ -360,9 +497,18 @@ export function BudgetTab({
       {budgetList.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="p-4 bg-[#111622] border border-slate-800/90 rounded-2xl shadow-xs">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              {t('budget.total_budgeted')}
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                {budgetHorizon === 'CURRENT_MONTH' 
+                  ? t('budget.total_budgeted') 
+                  : `${t('budget.limit') || 'Presupuesto'} (${budgetHorizon})`}
+              </span>
+              {horizonInfo.multiplier > 1 && (
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                  x{horizonInfo.multiplier}m
+                </span>
+              )}
+            </div>
             <span className="text-lg sm:text-xl font-black text-slate-100 mt-1 block font-mono">
               {formatCurrency(totalBudgeted, displayCurrency)}
             </span>
@@ -373,7 +519,7 @@ export function BudgetTab({
 
           <div className="p-4 bg-[#111622] border border-slate-800/90 rounded-2xl shadow-xs">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              {t('budget.spent')} ({selectedMonth === 'ALL' ? t('budget.all_time') : selectedMonth})
+              {t('budget.spent')} ({budgetHorizon === 'CURRENT_MONTH' ? (selectedMonth === 'ALL' ? t('budget.all_time') : selectedMonth) : budgetHorizon})
             </span>
             <span className="text-lg sm:text-xl font-black text-rose-400 mt-1 block font-mono">
               {formatCurrency(totalSpentAcrossBudgets, displayCurrency)}
@@ -405,9 +551,15 @@ export function BudgetTab({
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 ${isOverallOver ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
                 {isOverallOver ? t('budget.exceeded') : t('budget.on_track')}
               </span>
-              <span className="text-[10px] text-slate-500 block mt-1">
-                {formatCurrency(totalRemaining, displayCurrency)} {t('budget.capacity_remaining')}
-              </span>
+              {yearEndPace ? (
+                <span className="text-[10px] text-amber-400 block mt-1 font-mono font-medium">
+                  {t('budget.year_end_projected') || 'Proy. Cierre'}: {formatCurrency(yearEndPace.projectedTotal, displayCurrency)} ({yearEndPace.projectedPercentage.toFixed(0)}%)
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-500 block mt-1">
+                  {formatCurrency(totalRemaining, displayCurrency)} {t('budget.capacity_remaining')}
+                </span>
+              )}
             </div>
 
             <div className="shrink-0">
@@ -510,26 +662,34 @@ export function BudgetTab({
             
             // In edit mode, compute percentage using draft value
             const draftVal = draftLimits[budget.category];
-            const activeLimitDisplay = isEditing && draftVal !== undefined
+            const monthlyBaseLimitDisplay = isEditing && draftVal !== undefined
               ? (parseFloat(draftVal) || 0)
               : convertCurrency(budget.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+
+            // Active limit scaled by time horizon multiplier
+            const activeLimitDisplay = monthlyBaseLimitDisplay * horizonInfo.multiplier;
 
             const percentage = activeLimitDisplay > 0 ? (categorySpent / activeLimitDisplay) * 100 : 0;
             const isOver = percentage > 100;
             const remainingCapacity = Math.max(activeLimitDisplay - categorySpent, 0);
             const txCount = categoryTransactionCounts[budget.category] || 0;
 
-            // Velocity prediction helper calculation
+            // Velocity prediction helper calculation (for single month)
             const velocityPred = predictCategoryBudgetVelocity(
               budget.category,
-              activeLimitDisplay,
+              monthlyBaseLimitDisplay,
               transactions,
               displayCurrency,
               usdArsRate,
               selectedMonth
             );
 
-            const showVelocityWarning = velocityPred.willExceed && !isOver && selectedMonth === currentMonthKey;
+            const showVelocityWarning = budgetHorizon === 'CURRENT_MONTH' && velocityPred.willExceed && !isOver && selectedMonth === currentMonthKey;
+
+            // Year-end projection for category in YEAR_END horizon
+            const catElapsed = Math.max(1, horizonInfo.elapsedMonths);
+            const catProjectedYearEnd = (categorySpent / catElapsed) * 12;
+            const catYearEndOver = catProjectedYearEnd > activeLimitDisplay;
 
             return (
               <div 
@@ -586,6 +746,22 @@ export function BudgetTab({
                   </div>
 
                   <div className="flex items-center space-x-2 shrink-0">
+                    {/* Category Trend Button */}
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTrendsInitialCategory(budget.category);
+                          setIsCategoryTrendsOpen(true);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800/80 transition-colors cursor-pointer"
+                        title={t('budget.view_category_trends') || 'Ver tendencia histórica'}
+                      >
+                        <TrendingUp className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
                     {isOver ? (
                       <span className="px-2 py-0.5 bg-rose-950/80 border border-rose-800/50 text-rose-300 text-[10px] font-bold rounded-lg">{t('budget.over')}</span>
                     ) : showVelocityWarning ? (
@@ -629,7 +805,7 @@ export function BudgetTab({
                   </span>
                   {isEditing ? (
                     <div className="flex items-center space-x-1.5" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-slate-400 font-medium">{t('budget.limit') || 'Limit'} ({displayCurrency}):</span>
+                      <span className="text-slate-400 font-medium">{t('budget.monthly_base_limit') || 'Límite mensual'} ({displayCurrency}):</span>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -640,11 +816,28 @@ export function BudgetTab({
                       />
                     </div>
                   ) : (
-                    <span className="text-slate-400">
-                      {t('budget.limit') || 'Limit'}: <strong className="text-slate-100 font-mono">{formatCurrency(activeLimitDisplay, displayCurrency)}</strong>
-                    </span>
+                    <div className="text-right">
+                      <span className="text-slate-400">
+                        {t('budget.limit') || 'Limit'}: <strong className="text-slate-100 font-mono">{formatCurrency(activeLimitDisplay, displayCurrency)}</strong>
+                      </span>
+                      {horizonInfo.multiplier > 1 && (
+                        <span className="block text-[10px] text-slate-500 font-mono">
+                          ({formatCurrency(monthlyBaseLimitDisplay, displayCurrency)}/mes × {horizonInfo.multiplier}m)
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
+
+                {/* Year-End Projection Banner when in YEAR_END horizon */}
+                {budgetHorizon === 'YEAR_END' && !isEditing && (
+                  <div className="p-2 rounded-xl bg-[#141a27] border border-slate-800 text-[10px] flex items-center justify-between text-slate-300">
+                    <span className="text-slate-400">{t('budget.year_end_projected') || 'Proy. Cierre de Año'}:</span>
+                    <span className={`font-mono font-bold ${catYearEndOver ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      {formatCurrency(catProjectedYearEnd, displayCurrency)} ({activeLimitDisplay > 0 ? ((catProjectedYearEnd / activeLimitDisplay) * 100).toFixed(0) : 0}%)
+                    </span>
+                  </div>
+                )}
 
                 {/* Progress bar */}
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
@@ -769,6 +962,22 @@ export function BudgetTab({
           onEditTransaction={onEditTransaction}
         />
       )}
+
+      {/* Category Trends Modal for All Categories & Historical Analysis */}
+      <RecurringCategoryTrendModal
+        isOpen={isCategoryTrendsOpen}
+        onClose={() => {
+          setIsCategoryTrendsOpen(false);
+          setTrendsInitialCategory(undefined);
+        }}
+        transactions={transactions}
+        categoriesList={categoriesList}
+        displayCurrency={displayCurrency}
+        usdArsRate={usdArsRate}
+        historyData={historyData}
+        initialCategory={trendsInitialCategory}
+        defaultScope="all"
+      />
     </div>
   );
 }

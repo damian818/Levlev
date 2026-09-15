@@ -1,4 +1,4 @@
-import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem, AccountCustomBalance, ProjectedBalancePoint, ProjectedBalanceCalculation, BudgetStreakAlert, BudgetUtilizationMonthPoint } from '../types';
+import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem, TrendPoint, PredictiveMetrics, BudgetGoal, IdentifiedRecurringItem, RecurringOccurrence, InflationPoint, CreditCardStatement, CreditCardClosingRule, ClosingRuleType, AccountItem, AccountCustomBalance, ProjectedBalancePoint, ProjectedBalanceCalculation, BudgetStreakAlert, BudgetUtilizationMonthPoint, BudgetHorizon, BudgetHorizonInfo } from '../types';
 
 export function isCreditCardAccount(
   accountName: string, 
@@ -1032,7 +1032,7 @@ export function analyzeSpending(
   transactions: Transaction[], 
   displayCurrency: DisplayCurrency, 
   usdArsRate: number,
-  targetMonth?: string
+  targetMonth?: string | string[]
 ) {
   let totalIncome = 0;
   let totalExpenses = 0;
@@ -1055,7 +1055,13 @@ export function analyzeSpending(
     }
 
     // Only count towards totals, categories and merchants if targetMonth matches or targetMonth is 'ALL'
-    if (!targetMonth || targetMonth === 'ALL' || monthKey === targetMonth) {
+    const isTargetMatch = !targetMonth || targetMonth === 'ALL' || (
+      Array.isArray(targetMonth)
+        ? targetMonth.includes(monthKey)
+        : monthKey === targetMonth
+    );
+
+    if (isTargetMatch) {
       if (tx.type === 'INCOME') {
         totalIncome += converted;
       } else if (tx.type === 'EXPENSE') {
@@ -3004,6 +3010,117 @@ export function computeBudgetStreakAlerts(
   });
 
   return alerts;
+}
+
+/**
+  * Shifts a YYYY-MM month key by a relative integer month offset (positive or negative).
+  */
+export function shiftMonthKey(monthKey: string, offset: number): string {
+  if (!monthKey || !monthKey.includes('-')) return monthKey;
+  const [yearStr, monthStr] = monthKey.split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10) - 1;
+  const d = new Date(year, month + offset, 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+/**
+ * Computes configuration, date ranges, and scaling multipliers for Budget Horizon views
+ * (CURRENT_MONTH, 6M, 12M, YTD, YEAR_END).
+ */
+export function getBudgetHorizonInfo(
+  horizon: BudgetHorizon,
+  referenceMonth: string = getCurrentMonthKey(),
+  selectedSingleMonth?: string
+): BudgetHorizonInfo {
+  const currentKey = getCurrentMonthKey();
+  const baseMonth = referenceMonth || currentKey;
+  const currentYear = parseInt(baseMonth.substring(0, 4), 10);
+  const currentMonthNum = parseInt(baseMonth.substring(5, 7), 10);
+
+  if (horizon === 'CURRENT_MONTH') {
+    const month = selectedSingleMonth && selectedSingleMonth !== 'ALL' ? selectedSingleMonth : baseMonth;
+    return {
+      horizon: 'CURRENT_MONTH',
+      months: selectedSingleMonth === 'ALL' ? [] : [month],
+      multiplier: 1,
+      elapsedMonths: 1,
+      label: selectedSingleMonth === 'ALL' ? 'All Time' : month,
+      sublabel: 'Single Month View',
+      isProjection: false,
+    };
+  }
+
+  if (horizon === '6M') {
+    const months: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      months.push(shiftMonthKey(baseMonth, -i));
+    }
+    const first = months[0];
+    const last = months[months.length - 1];
+    return {
+      horizon: '6M',
+      months,
+      multiplier: 6,
+      elapsedMonths: 6,
+      label: `6M: ${first} – ${last}`,
+      sublabel: 'Rolling 6 Months Aggregate',
+      isProjection: false,
+    };
+  }
+
+  if (horizon === '12M') {
+    const months: string[] = [];
+    for (let i = 11; i >= 0; i--) {
+      months.push(shiftMonthKey(baseMonth, -i));
+    }
+    const first = months[0];
+    const last = months[months.length - 1];
+    return {
+      horizon: '12M',
+      months,
+      multiplier: 12,
+      elapsedMonths: 12,
+      label: `12M: ${first} – ${last}`,
+      sublabel: 'Rolling 12 Months Aggregate',
+      isProjection: false,
+    };
+  }
+
+  if (horizon === 'YTD') {
+    const months: string[] = [];
+    for (let m = 1; m <= currentMonthNum; m++) {
+      months.push(`${currentYear}-${String(m).padStart(2, '0')}`);
+    }
+    const first = months[0];
+    const last = months[months.length - 1];
+    return {
+      horizon: 'YTD',
+      months,
+      multiplier: currentMonthNum,
+      elapsedMonths: currentMonthNum,
+      label: `YTD: ${first} – ${last}`,
+      sublabel: `Year-to-Date (${currentMonthNum} Months Elapsed)`,
+      isProjection: false,
+    };
+  }
+
+  // YEAR_END
+  const months: string[] = [];
+  for (let m = 1; m <= 12; m++) {
+    months.push(`${currentYear}-${String(m).padStart(2, '0')}`);
+  }
+  return {
+    horizon: 'YEAR_END',
+    months,
+    multiplier: 12,
+    elapsedMonths: currentMonthNum,
+    label: `Year End ${currentYear} (12M)`,
+    sublabel: `Full Year Plan & Projections (${currentMonthNum} Months Elapsed)`,
+    isProjection: true,
+  };
 }
 
 
