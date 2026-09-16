@@ -513,7 +513,7 @@ export function BudgetTab({
               {formatCurrency(totalBudgeted, displayCurrency)}
             </span>
             <span className="text-[10px] text-slate-500 block mt-0.5">
-              Across {budgetList.length} categories
+              {t('budget.categories_count', { count: budgetList.length, defaultValue: `Across ${budgetList.length} categories` })}
             </span>
           </div>
 
@@ -822,7 +822,7 @@ export function BudgetTab({
                       </span>
                       {horizonInfo.multiplier > 1 && (
                         <span className="block text-[10px] text-slate-500 font-mono">
-                          ({formatCurrency(monthlyBaseLimitDisplay, displayCurrency)}/mes × {horizonInfo.multiplier}m)
+                          ({formatCurrency(monthlyBaseLimitDisplay, displayCurrency)}/{t('common.month').toLowerCase()} × {horizonInfo.multiplier}m)
                         </span>
                       )}
                     </div>
