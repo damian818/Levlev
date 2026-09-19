@@ -53,6 +53,7 @@ export interface SupabaseUserData {
     ccRulesMap?: Record<string, CreditCardClosingRule>;
     ccMap?: Record<string, boolean>;
     ccPeriodStatuses?: Record<string, 'PAID' | 'OPEN'>;
+    ccClosingDateOverrides?: Record<string, Record<string, string>>;
     customBalances?: Record<string, AccountCustomBalance>;
     accountConfigs?: Record<string, { order?: number; isHiddenFromNewTx?: boolean; icon?: any }>;
     accountsList?: AccountItem[];
@@ -785,6 +786,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
       ccRulesMap: { ...ccRulesMapFromAccs, ...(data.settings?.ccRulesMap || {}) },
       ccMap: { ...ccMapFromAccs, ...(data.settings?.ccMap || {}) },
       ccPeriodStatuses: data.settings?.ccPeriodStatuses || {},
+      ccClosingDateOverrides: data.settings?.ccClosingDateOverrides || {},
       customBalances: data.settings?.customBalances || {},
       workspaceSharing: data.settings?.workspaceSharing || {},
       accountConfigs: accountConfigs,

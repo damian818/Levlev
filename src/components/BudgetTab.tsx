@@ -486,7 +486,7 @@ export function BudgetTab({
               <div className="flex items-center space-x-2 bg-[#161d2b] px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs font-medium text-slate-300">
                 <Clock className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="font-semibold text-slate-200">{horizonInfo.label}</span>
-                <span className="text-[10px] text-slate-400 font-mono">({horizonInfo.months.length} {t('common.months') || 'meses'})</span>
+                <span className="text-[10px] text-slate-400 font-mono">({horizonInfo.months.length} {t('common.months', { defaultValue: 'months' })})</span>
               </div>
             )}
           </div>
@@ -822,7 +822,7 @@ export function BudgetTab({
                       </span>
                       {horizonInfo.multiplier > 1 && (
                         <span className="block text-[10px] text-slate-500 font-mono">
-                          ({formatCurrency(monthlyBaseLimitDisplay, displayCurrency)}/{t('common.month').toLowerCase()} × {horizonInfo.multiplier}m)
+                          ({formatCurrency(monthlyBaseLimitDisplay, displayCurrency)}/{t('common.month', { defaultValue: 'month' }).toLowerCase()} × {horizonInfo.multiplier}m)
                         </span>
                       )}
                     </div>

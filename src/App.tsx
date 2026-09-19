@@ -788,6 +788,12 @@ export default function App() {
               localStorage.setItem('finance_app_cc_period_statuses', JSON.stringify(data.settings.ccPeriodStatuses));
             } catch (e) {}
           }
+          if (data.settings.ccClosingDateOverrides) {
+            setClosingDateOverrides(data.settings.ccClosingDateOverrides);
+            try {
+              localStorage.setItem('finance_app_cc_closing_date_overrides', JSON.stringify(data.settings.ccClosingDateOverrides));
+            } catch (e) {}
+          }
           if (data.settings.customBalances) {
             setCustomBalances(data.settings.customBalances);
             try {
@@ -996,6 +1002,17 @@ export default function App() {
     return {};
   });
 
+  // Credit card manual closing date overrides
+  const [closingDateOverrides, setClosingDateOverrides] = useState<Record<string, Record<string, string>>>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_cc_closing_date_overrides');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed to load credit card closing date overrides from localStorage');
+    }
+    return {};
+  });
+
   // Recurring rules and exclusions state
   const [recurringRules, setRecurringRules] = useState<RecurringRule[]>(() => {
     try {
@@ -1079,7 +1096,11 @@ export default function App() {
     today.setHours(0, 0, 0, 0);
 
     ccAccounts.forEach(acc => {
-        const statements = getCreditCardStatements(transactions, acc.name, acc.closingRule, periodStatusOverrides);
+        const accClosingOverrides = {
+            ...(acc.closingRule?.closingDateOverrides || {}),
+            ...(closingDateOverrides?.[acc.name] || {}),
+        };
+        const statements = getCreditCardStatements(transactions, acc.name, acc.closingRule, periodStatusOverrides, accClosingOverrides);
         statements.forEach(stmt => {
             if (!stmt.isPaid && stmt.netDue > 0 && stmt.dueDate) {
                 const due = new Date(stmt.dueDate + 'T00:00:00'); // parse safely
@@ -1102,7 +1123,7 @@ export default function App() {
         });
     });
 
-  }, [transactions, budgets, recurringRules, accounts, periodStatusOverrides, notificationsEnabled, permission]);
+  }, [transactions, budgets, recurringRules, accounts, periodStatusOverrides, closingDateOverrides, notificationsEnabled, permission]);
 
   const handleSaveRecurringThreshold = (title: string, threshold: number) => {
     setRecurringThresholds(prev => {
@@ -1168,6 +1189,64 @@ export default function App() {
     });
   };
 
+  const handleUpdatePeriodClosingDate = (accountName: string, periodOrOldCloseDate: string, newCloseDate?: string) => {
+    setClosingDateOverrides(prev => {
+      const accOverrides = { ...(prev[accountName] || {}) };
+      if (newCloseDate) {
+        accOverrides[periodOrOldCloseDate] = newCloseDate;
+        if (periodOrOldCloseDate.length >= 7) {
+          accOverrides[periodOrOldCloseDate.substring(0, 7)] = newCloseDate;
+        }
+      } else {
+        delete accOverrides[periodOrOldCloseDate];
+        if (periodOrOldCloseDate.length >= 7) {
+          delete accOverrides[periodOrOldCloseDate.substring(0, 7)];
+        }
+      }
+      const updated = { ...prev, [accountName]: accOverrides };
+      try {
+        localStorage.setItem('finance_app_cc_closing_date_overrides', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to save credit card closing date overrides to localStorage');
+      }
+      return updated;
+    });
+
+    setAccounts(prevAccounts => {
+      const nextAccounts = prevAccounts.map(acc => {
+        if (acc.name.toLowerCase() === accountName.toLowerCase()) {
+          const existingRule = acc.closingRule || { ruleType: 'FIXED_DAY', fixedDay: 25 };
+          const existingAccOverrides = { ...(existingRule.closingDateOverrides || {}) };
+          if (newCloseDate) {
+            existingAccOverrides[periodOrOldCloseDate] = newCloseDate;
+            if (periodOrOldCloseDate.length >= 7) {
+              existingAccOverrides[periodOrOldCloseDate.substring(0, 7)] = newCloseDate;
+            }
+          } else {
+            delete existingAccOverrides[periodOrOldCloseDate];
+            if (periodOrOldCloseDate.length >= 7) {
+              delete existingAccOverrides[periodOrOldCloseDate.substring(0, 7)];
+            }
+          }
+          const updatedRule = {
+            ...existingRule,
+            closingDateOverrides: existingAccOverrides,
+          };
+          return {
+            ...acc,
+            closingRule: updatedRule,
+            closingDateOverrides: existingAccOverrides,
+          };
+        }
+        return acc;
+      });
+      try {
+        localStorage.setItem('finance_app_custom_accounts', JSON.stringify(nextAccounts));
+      } catch (e) {}
+      return nextAccounts;
+    });
+  };
+
   const handleReassignTransactionPeriod = (txId: string, statementCloseDate: string | undefined) => {
     setTransactions(prev => prev.map(t => {
       if (t.id === txId) {
@@ -1230,6 +1309,7 @@ export default function App() {
           displayCurrency,
           enabledCurrencies,
           ccPeriodStatuses: periodStatusOverrides,
+          ccClosingDateOverrides: closingDateOverrides,
           customBalances,
           workspaceSharing: {
             isShared: isWorkspaceShared,
@@ -1247,7 +1327,7 @@ export default function App() {
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [transactions, categories, accounts, budgets, installmentPlans, periodStatusOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold, hiddenCategoryIds, debts, debtStrategy, debtExtraPayment, dismissedRecurring, tabCustomization, reportSettings]);
+  }, [transactions, categories, accounts, budgets, installmentPlans, periodStatusOverrides, closingDateOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold, hiddenCategoryIds, debts, debtStrategy, debtExtraPayment, dismissedRecurring, tabCustomization, reportSettings]);
 
   if (authLoading) {
     return (
@@ -1609,10 +1689,12 @@ export default function App() {
               customBalances={customBalances}
               accounts={accounts}
               periodStatusOverrides={periodStatusOverrides}
+              closingDateOverrides={closingDateOverrides}
               isWorkspaceShared={isWorkspaceShared}
               workspaceMembersCount={workspaceMembers.length}
               onOpenShareWorkspaceModal={() => setIsShareWorkspaceModalOpen(true)}
               onUpdatePeriodStatus={handleUpdatePeriodStatus}
+              onUpdatePeriodClosingDate={handleUpdatePeriodClosingDate}
               onUpdateAccountBalance={handleUpdateAccountBalance}
               onNavigateToTransactionsWithFilter={handleNavigateToTransactionsWithFilter}
               onAddTransaction={handleAddTransaction}

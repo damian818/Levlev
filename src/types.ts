@@ -73,6 +73,9 @@ export interface CreditCardStatement {
   isPaid?: boolean;
   isManualOverride?: boolean;
   overrideStatus?: 'PAID' | 'OPEN';
+  startDate?: string; // e.g. "2026-07-26"
+  isManualCloseDate?: boolean;
+  defaultCloseDate?: string; // original close date computed by rule before override
 }
 
 export type ClosingRuleType = 
@@ -87,6 +90,7 @@ export interface CreditCardClosingRule {
   weekday?: number; // 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
   nth?: number; // 1=1st, 2=2nd, 3=3rd, 4=4th
   dueDaysAfterClose?: number; // default 5
+  closingDateOverrides?: Record<string, string>; // e.g. { "2026-05": "2026-05-26" }
 }
 
 export interface CreditCardAccountConfig {
@@ -209,6 +213,7 @@ export interface AccountItem {
   currency: string;
   initialBalance?: number;
   closingRule?: CreditCardClosingRule;
+  closingDateOverrides?: Record<string, string>;
   description?: string;
   isShared?: boolean;
   sharedMembers?: SharedMember[];

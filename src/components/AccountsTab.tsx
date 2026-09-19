@@ -16,10 +16,12 @@ interface AccountsTabProps {
   customBalances: Record<string, AccountCustomBalance>;
   accounts?: AccountItem[];
   periodStatusOverrides?: Record<string, 'PAID' | 'OPEN'>;
+  closingDateOverrides?: Record<string, Record<string, string>>;
   isWorkspaceShared?: boolean;
   workspaceMembersCount?: number;
   onOpenShareWorkspaceModal?: () => void;
   onUpdatePeriodStatus?: (accountName: string, closeDate: string, status?: 'PAID' | 'OPEN') => void;
+  onUpdatePeriodClosingDate?: (accountName: string, periodOrOldCloseDate: string, newCloseDate?: string) => void;
   onUpdateAccountBalance: (accountName: string, currentBalance: number, currency: string) => void;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
   onAddTransaction: (tx: Transaction) => void;
@@ -56,10 +58,12 @@ export const AccountsTab = React.memo(function AccountsTab({
   customBalances,
   accounts = [],
   periodStatusOverrides,
+  closingDateOverrides,
   isWorkspaceShared = false,
   workspaceMembersCount = 0,
   onOpenShareWorkspaceModal,
   onUpdatePeriodStatus,
+  onUpdatePeriodClosingDate,
   onUpdateAccountBalance,
   onNavigateToTransactionsWithFilter,
   onAddTransaction,
@@ -209,9 +213,13 @@ export const AccountsTab = React.memo(function AccountsTab({
       const icon = accItem?.icon;
 
       // If it's a credit card, compute statement summary based on current date & time
-      const statements = isCC ? getCreditCardStatements(filteredTransactions, name, accountRule, periodStatusOverrides) : [];
-      const currentStatement = isCC ? getCurrentStatement(statements, accountRule) : undefined;
-      const nextCloseDate = isCC ? getNextCloseDate(accountRule) : undefined;
+      const accClosingOverrides = {
+        ...(accountRule?.closingDateOverrides || {}),
+        ...(closingDateOverrides?.[name] || {}),
+      };
+      const statements = isCC ? getCreditCardStatements(filteredTransactions, name, accountRule, periodStatusOverrides, accClosingOverrides) : [];
+      const currentStatement = isCC ? getCurrentStatement(statements, accountRule, accClosingOverrides) : undefined;
+      const nextCloseDate = isCC ? getNextCloseDate(accountRule, undefined, accClosingOverrides) : undefined;
 
       return {
         accountName: name,
@@ -957,8 +965,10 @@ export const AccountsTab = React.memo(function AccountsTab({
           displayCurrency={displayCurrency}
           usdArsRate={usdArsRate}
           closingRule={accounts.find(a => a.name === selectedCardAccount)?.closingRule || { ruleType: 'FIXED_DAY', fixedDay: 25 }}
+          closingDateOverrides={closingDateOverrides?.[selectedCardAccount]}
           periodStatusOverrides={periodStatusOverrides}
           onUpdatePeriodStatus={onUpdatePeriodStatus}
+          onUpdatePeriodClosingDate={onUpdatePeriodClosingDate}
           onUpdateClosingRule={(rule) => handleSaveCcRule(selectedCardAccount, rule)}
           onAddTransaction={onAddTransaction}
           onNavigateToTransactionsWithFilter={onNavigateToTransactionsWithFilter}

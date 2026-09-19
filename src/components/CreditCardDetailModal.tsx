@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, TransactionFilter, CreditCardClosingRule, ClosingRuleType } from '../types';
-import { getCreditCardStatements, getCurrentStatementIndex, getNextCloseDate, formatCurrency, getStatementCloseDateForTx, getStatementCloseDateForPayment, getClosingRuleLabel, getCloseDateForMonthAndYear } from '../utils/financeUtils';
+import { getCreditCardStatements, getCurrentStatementIndex, getNextCloseDate, formatCurrency, getStatementCloseDateForTx, getStatementCloseDateForPayment, getClosingRuleLabel, getCloseDateForMonthAndYear, getNextDayStr, getPreviousDayStr } from '../utils/financeUtils';
 import { exportCreditCardResumeCSV, exportAllCreditCardExpensesCSV } from '../utils/exportUtils';
-import { X, CreditCard, Calendar, ArrowRightLeft, Plus, CheckCircle, AlertCircle, FileText, ChevronRight, Settings, Edit3, Download } from 'lucide-react';
+import { X, CreditCard, Calendar, ArrowRightLeft, Plus, CheckCircle, AlertCircle, FileText, ChevronRight, Settings, Edit3, Download, Sparkles, RotateCcw } from 'lucide-react';
 
 interface CreditCardDetailModalProps {
   isOpen: boolean;
@@ -14,8 +14,10 @@ interface CreditCardDetailModalProps {
   displayCurrency: DisplayCurrency;
   usdArsRate: number;
   closingRule?: CreditCardClosingRule;
+  closingDateOverrides?: Record<string, string>;
   periodStatusOverrides?: Record<string, 'PAID' | 'OPEN'>;
   onUpdatePeriodStatus?: (accountName: string, closeDate: string, status?: 'PAID' | 'OPEN') => void;
+  onUpdatePeriodClosingDate?: (accountName: string, periodOrOldCloseDate: string, newCloseDate?: string) => void;
   onUpdateClosingRule?: (rule: CreditCardClosingRule) => void;
   onAddTransaction: (tx: Transaction) => void;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
@@ -31,8 +33,10 @@ export function CreditCardDetailModal({
   displayCurrency,
   usdArsRate,
   closingRule,
+  closingDateOverrides,
   periodStatusOverrides,
   onUpdatePeriodStatus,
+  onUpdatePeriodClosingDate,
   onUpdateClosingRule,
   onAddTransaction,
   onNavigateToTransactionsWithFilter,
@@ -42,9 +46,18 @@ export function CreditCardDetailModal({
   const [selectedStatementIdx, setSelectedStatementIdx] = useState<number>(0);
   const [showPaymentForm, setShowPaymentForm] = useState<boolean>(false);
   const [isEditingRule, setIsEditingRule] = useState<boolean>(false);
+  const [isAdjustingCloseDate, setIsAdjustingCloseDate] = useState<boolean>(false);
+  const [customCloseDateInput, setCustomCloseDateInput] = useState<string>('');
 
   const currentRule: CreditCardClosingRule = closingRule || { ruleType: 'FIXED_DAY', fixedDay: 25 };
   const [tempRule, setTempRule] = useState<CreditCardClosingRule>(currentRule);
+
+  const effectiveClosingDateOverrides = useMemo(() => {
+    return {
+      ...(currentRule.closingDateOverrides || {}),
+      ...(closingDateOverrides || {}),
+    };
+  }, [currentRule.closingDateOverrides, closingDateOverrides]);
 
   const [selectedPreset, setSelectedPreset] = useState<string>(() => {
     if (currentRule.ruleType === 'PREVIOUS_TO_LAST_WEEKDAY' && currentRule.weekday === 4) return 'PREVIOUS_THU';
@@ -109,16 +122,16 @@ export function CreditCardDetailModal({
   const [paymentNote, setPaymentNote] = useState('');
 
   const statements = useMemo(() => {
-    return getCreditCardStatements(transactions, accountName, currentRule, periodStatusOverrides);
-  }, [transactions, accountName, currentRule, periodStatusOverrides]);
+    return getCreditCardStatements(transactions, accountName, currentRule, periodStatusOverrides, effectiveClosingDateOverrides);
+  }, [transactions, accountName, currentRule, periodStatusOverrides, effectiveClosingDateOverrides]);
 
   const currentCloseDate = useMemo(() => {
-    return getNextCloseDate(currentRule);
-  }, [currentRule]);
+    return getNextCloseDate(currentRule, undefined, effectiveClosingDateOverrides);
+  }, [currentRule, effectiveClosingDateOverrides]);
 
   const currentIdx = useMemo(() => {
-    return getCurrentStatementIndex(statements, currentRule);
-  }, [statements, currentRule]);
+    return getCurrentStatementIndex(statements, currentRule, effectiveClosingDateOverrides);
+  }, [statements, currentRule, effectiveClosingDateOverrides]);
 
   useEffect(() => {
     if (isOpen) {
@@ -136,6 +149,22 @@ export function CreditCardDetailModal({
   const activeStatement = (selectedStatementIdx >= 0 && selectedStatementIdx < statements.length)
     ? statements[selectedStatementIdx]
     : (statements[currentIdx] || statements[0]);
+
+  useEffect(() => {
+    if (activeStatement) {
+      setCustomCloseDateInput(activeStatement.closeDate);
+    }
+  }, [activeStatement?.closeDate]);
+
+  const adjustedOverridesList = useMemo(() => {
+    const list: { key: string; customDate: string }[] = [];
+    Object.entries(effectiveClosingDateOverrides).forEach(([k, v]) => {
+      if (v && typeof v === 'string') {
+        list.push({ key: k, customDate: v });
+      }
+    });
+    return list;
+  }, [effectiveClosingDateOverrides]);
 
   const availablePeriods = useMemo(() => {
     const datesSet = new Set<string>();
@@ -163,6 +192,22 @@ export function CreditCardDetailModal({
   }, [statements, currentRule]);
 
   if (!isOpen || !accountName) return null;
+
+  const handleSaveCustomCloseDate = () => {
+    if (!activeStatement || !onUpdatePeriodClosingDate) return;
+    const trimmed = (customCloseDateInput || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return;
+    onUpdatePeriodClosingDate(accountName, activeStatement.closeDate, trimmed);
+    setIsAdjustingCloseDate(false);
+  };
+
+  const handleResetCustomCloseDate = (closeDateToReset?: string) => {
+    if (!onUpdatePeriodClosingDate) return;
+    const target = closeDateToReset || activeStatement?.closeDate;
+    if (!target) return;
+    onUpdatePeriodClosingDate(accountName, target, undefined);
+    setIsAdjustingCloseDate(false);
+  };
 
   const handleRecordPaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,13 +290,19 @@ export function CreditCardDetailModal({
         </div>
 
         {/* Closing Date Rule Bar */}
-        <div className="px-4 py-2 bg-[#121620] border-b border-slate-800 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
+        <div className="px-4 py-2 bg-[#121620] border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
             <Settings className="w-3.5 h-3.5 text-purple-400" />
             <span className="text-slate-400 font-medium">{t('cc_modal.closing_rule')}</span>
             <span className="font-bold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded text-[11px]">
               {getClosingRuleLabel(currentRule)}
             </span>
+            {adjustedOverridesList.length > 0 && (
+              <span className="flex items-center gap-1 font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[11px]">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>{t('cc_modal.adjusted_periods_count', { count: adjustedOverridesList.length })}</span>
+              </span>
+            )}
           </div>
           <button
             onClick={() => {
@@ -385,6 +436,40 @@ export function CreditCardDetailModal({
                 </div>
               </div>
 
+              {/* Manually Adjusted Periods in Rule Editor */}
+              {adjustedOverridesList.length > 0 && (
+                <div className="p-3 bg-[#161b22] rounded-lg border border-amber-500/20 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] uppercase font-bold text-amber-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{t('cc_modal.adjusted_periods_title', { defaultValue: 'Manually Adjusted Periods' })}</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500">{adjustedOverridesList.length} override(s)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {adjustedOverridesList.map(({ key, customDate }) => (
+                      <div key={key} className="flex items-center justify-between px-2.5 py-1.5 bg-[#0f131a] border border-slate-800 rounded text-[11px]">
+                        <div>
+                          <span className="text-slate-400 font-mono text-[10px]">{key} &rarr; </span>
+                          <span className="font-bold text-amber-300 font-mono">{customDate}</span>
+                        </div>
+                        {onUpdatePeriodClosingDate && (
+                          <button
+                            type="button"
+                            onClick={() => handleResetCustomCloseDate(key)}
+                            className="text-slate-400 hover:text-slate-200 text-[10px] underline ml-2 flex items-center gap-1"
+                            title="Reset to default schedule date"
+                          >
+                            <RotateCcw className="w-2.5 h-2.5" />
+                            <span>{t('cc_modal.reset')}</span>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex justify-end gap-2 pt-1">
                 <button
@@ -413,7 +498,10 @@ export function CreditCardDetailModal({
             <span className="text-xs font-semibold text-slate-300">{t('cc_modal.statement_period')}:</span>
             <select
               value={selectedStatementIdx}
-              onChange={(e) => setSelectedStatementIdx(Number(e.target.value))}
+              onChange={(e) => {
+                setSelectedStatementIdx(Number(e.target.value));
+                setIsAdjustingCloseDate(false);
+              }}
               className="px-3 py-1.5 bg-[#161b22] border border-slate-700 text-slate-100 font-semibold rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 flex-1 sm:flex-none"
             >
               {statements.map((stmt, idx) => {
@@ -429,39 +517,70 @@ export function CreditCardDetailModal({
                 } else {
                   tag = stmt.netDue <= 0 ? `${t('cc_modal.current')} (${t('cc_modal.paid')})` : `${t('cc_modal.current')} (${t('cc_modal.open')})`;
                 }
+                const adjustPrefix = stmt.isManualCloseDate ? `[${t('cc_modal.adjusted_badge', { defaultValue: 'Adjusted' })}] ` : '';
                 return (
                   <option key={stmt.closeDate} value={idx}>
-                    {t('cc_modal.closing_date')} {stmt.closeDate} — {formatCurrency(stmt.totalExpenses, stmt.currency as DisplayCurrency)} [{tag}]
+                    {adjustPrefix}{t('cc_modal.closing_date')} {stmt.closeDate} — {formatCurrency(stmt.totalExpenses, stmt.currency as DisplayCurrency)} [{tag}]
                   </option>
                 );
               })}
             </select>
 
-            {activeStatement && onUpdatePeriodStatus && (
-              <div className="flex items-center gap-1.5 ml-1">
-                <span className="text-slate-600 hidden sm:inline">|</span>
-                <button
-                  type="button"
-                  onClick={() => onUpdatePeriodStatus(accountName, activeStatement.closeDate, activeStatement.isPaid ? 'OPEN' : 'PAID')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 border transition-all ${
-                    activeStatement.isPaid
-                      ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
-                      : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
-                  }`}
-                  title={activeStatement.isPaid ? 'Mark period as Open / Unpaid' : 'Mark period as Paid'}
-                >
-                  <Edit3 className="w-3 h-3" />
-                  <span>{activeStatement.isPaid ? t('cc_modal.toggle_open') : t('cc_modal.toggle_paid')}</span>
-                </button>
-                {activeStatement.isManualOverride && (
+            {/* Quick Actions for Selected Period */}
+            {activeStatement && (
+              <div className="flex flex-wrap items-center gap-1.5 ml-1">
+                {onUpdatePeriodClosingDate && (
                   <button
                     type="button"
-                    onClick={() => onUpdatePeriodStatus(accountName, activeStatement.closeDate, undefined)}
-                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[10px] rounded-lg border border-slate-700"
-                    title="Reset to automatic calculation"
+                    onClick={() => {
+                      setIsAdjustingCloseDate(!isAdjustingCloseDate);
+                      setCustomCloseDateInput(activeStatement.closeDate);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 border transition-all ${
+                      activeStatement.isManualCloseDate
+                        ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+                        : isAdjustingCloseDate
+                        ? 'bg-purple-600 text-white border-purple-500'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                    }`}
+                    title={t('cc_modal.adjust_period_closing_date')}
                   >
-                    {t('cc_modal.reset')}
+                    <Calendar className="w-3 h-3 text-purple-400" />
+                    <span>
+                      {activeStatement.isManualCloseDate
+                        ? t('cc_modal.adjusted_badge')
+                        : t('cc_modal.adjust_closing_date')}
+                    </span>
                   </button>
+                )}
+
+                {onUpdatePeriodStatus && (
+                  <>
+                    <span className="text-slate-600 hidden sm:inline">|</span>
+                    <button
+                      type="button"
+                      onClick={() => onUpdatePeriodStatus(accountName, activeStatement.closeDate, activeStatement.isPaid ? 'OPEN' : 'PAID')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 border transition-all ${
+                        activeStatement.isPaid
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+                          : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
+                      }`}
+                      title={activeStatement.isPaid ? 'Mark period as Open / Unpaid' : 'Mark period as Paid'}
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>{activeStatement.isPaid ? t('cc_modal.toggle_open') : t('cc_modal.toggle_paid')}</span>
+                    </button>
+                    {activeStatement.isManualOverride && (
+                      <button
+                        type="button"
+                        onClick={() => onUpdatePeriodStatus(accountName, activeStatement.closeDate, undefined)}
+                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[10px] rounded-lg border border-slate-700"
+                        title="Reset to automatic calculation"
+                      >
+                        {t('cc_modal.reset')}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -489,11 +608,147 @@ export function CreditCardDetailModal({
           </div>
         </div>
 
+        {/* Adjust Period Closing Date Drawer Panel */}
+        {isAdjustingCloseDate && activeStatement && (
+          <div className="p-4 bg-[#121622] border-b border-amber-500/30 space-y-3 text-xs animate-in fade-in duration-200">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-amber-400" />
+                <h4 className="font-bold text-slate-100">
+                  {t('cc_modal.adjust_closing_date')} — <span className="text-amber-300">{activeStatement.statementPeriod || activeStatement.closeDate.substring(0, 7)}</span>
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAdjustingCloseDate(false)}
+                className="text-slate-400 hover:text-slate-200 text-xs"
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+
+            <p className="text-slate-400 text-xs">
+              {t('cc_modal.adjust_closing_date_help')}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  {t('cc_modal.new_closing_date')}:
+                </label>
+                <input
+                  type="date"
+                  value={customCloseDateInput}
+                  onChange={(e) => setCustomCloseDateInput(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#161b22] border border-slate-700 text-slate-100 font-mono font-bold rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
+
+              <div className="space-y-1 text-[11px] text-slate-400 bg-[#0f131a] p-2.5 rounded-lg border border-slate-800">
+                <div>
+                  <span className="text-slate-500">{t('cc_modal.default_scheduled_date')}:</span>{' '}
+                  <strong className="text-slate-300 font-mono">{activeStatement.defaultCloseDate || '—'}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500">{t('cc_modal.following_period_start')}:</span>{' '}
+                  <strong className="text-emerald-300 font-mono">
+                    {customCloseDateInput ? getNextDayStr(customCloseDateInput) : '—'}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveCustomCloseDate}
+                  disabled={!customCloseDateInput}
+                  className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold rounded-lg text-xs transition-colors shadow-sm"
+                >
+                  {t('cc_modal.save_closing_date')}
+                </button>
+                {activeStatement.isManualCloseDate && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetCustomCloseDate()}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition-colors border border-slate-700"
+                    title={t('cc_modal.reset_to_default')}
+                  >
+                    {t('cc_modal.reset')}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Content Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
-          {/* Cycle Metrics Header */}
+          {/* Cycle Metrics Header: 4 responsive cards */}
           {activeStatement && (
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Card 1: Closing Date & Cycle Boundaries */}
+              <div className="p-4 rounded-xl bg-[#121620] border border-slate-800 space-y-2 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">
+                      {t('cc_modal.closing_date')}
+                    </span>
+                    {activeStatement.isManualCloseDate ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        <Sparkles className="w-3 h-3 text-amber-400" />
+                        {t('cc_modal.adjusted_badge')}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {t('cc_modal.schedule_badge', { defaultValue: 'Scheduled' })}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-slate-100 mt-1 font-mono">
+                    {activeStatement.closeDate}
+                  </div>
+                  {activeStatement.startDate && (
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      {activeStatement.startDate} &rarr; {activeStatement.closeDate}
+                    </div>
+                  )}
+                  {activeStatement.defaultCloseDate && activeStatement.isManualCloseDate && (
+                    <div className="text-[10px] text-slate-500 mt-0.5 line-through">
+                      {t('cc_modal.default_scheduled_date')}: {activeStatement.defaultCloseDate}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between gap-1">
+                  {onUpdatePeriodClosingDate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdjustingCloseDate(!isAdjustingCloseDate);
+                        setCustomCloseDateInput(activeStatement.closeDate);
+                      }}
+                      className="px-2 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                      title={t('cc_modal.adjust_closing_date')}
+                    >
+                      <Calendar className="w-3 h-3 text-purple-400" />
+                      <span>{t('cc_modal.adjust_closing_date')}</span>
+                    </button>
+                  )}
+
+                  {activeStatement.isManualCloseDate && onUpdatePeriodClosingDate && (
+                    <button
+                      type="button"
+                      onClick={() => handleResetCustomCloseDate()}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 rounded-lg text-[10px] transition-colors"
+                      title={t('cc_modal.reset_to_default')}
+                    >
+                      {t('cc_modal.reset')}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Card 2: Statement Expenses */}
               <div className="p-4 rounded-xl bg-[#121620] border border-slate-800 space-y-1">
                 <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">{t('cc_modal.statement_expenses')}</span>
                 <div className="text-xl font-bold text-slate-100">
@@ -504,6 +759,7 @@ export function CreditCardDetailModal({
                 </div>
               </div>
 
+              {/* Card 3: Payments Applied */}
               <div className="p-4 rounded-xl bg-[#121620] border border-slate-800 space-y-1">
                 <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">{t('cc_modal.payments_applied')}</span>
                 <div className="text-xl font-bold text-emerald-400">
@@ -514,6 +770,7 @@ export function CreditCardDetailModal({
                 </div>
               </div>
 
+              {/* Card 4: Net Due & Payment Status */}
               <div className={`p-4 rounded-xl border space-y-2 ${
                 activeStatement.netDue <= 0 
                   ? 'bg-emerald-950/20 border-emerald-800/40' 
@@ -700,7 +957,7 @@ export function CreditCardDetailModal({
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 text-slate-200">
                       {activeStatement?.expenses.map((tx) => {
-                        const autoClose = getStatementCloseDateForTx(tx.date, currentRule);
+                        const autoClose = getStatementCloseDateForTx(tx.date, currentRule, effectiveClosingDateOverrides);
                         const isReassigned = tx.statementCloseDate && tx.statementCloseDate !== autoClose;
                         return (
                           <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
@@ -836,13 +1093,13 @@ export function CreditCardDetailModal({
                                     }`}
                                   >
                                     <option value="AUTO">
-                                      {t('common.auto')} ({autoClose})
+                                      {t('common.auto', { defaultValue: 'Auto' })} ({autoClose})
                                     </option>
                                     {availablePeriods.map((cDate) => {
                                       const isAutoOption = cDate === autoClose;
                                       return (
                                         <option key={cDate} value={cDate}>
-                                          {t('cc_modal.closing_date')} {cDate} {isAutoOption ? `(${t('common.auto_default')})` : ''}
+                                          {t('cc_modal.closing_date')} {cDate} {isAutoOption ? `(${t('common.auto_default', { defaultValue: 'Auto Default' })})` : ''}
                                         </option>
                                       );
                                     })}
@@ -852,7 +1109,7 @@ export function CreditCardDetailModal({
                                       title="Payment reassigned to a custom statement period" 
                                       className="px-1.5 py-0.5 text-[9px] bg-purple-500/20 text-purple-300 rounded border border-purple-500/30 font-semibold"
                                     >
-                                      {t('common.reassigned')}
+                                      {t('common.reassigned', { defaultValue: 'Reassigned' })}
                                     </span>
                                   )}
                                 </div>
