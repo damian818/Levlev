@@ -22,8 +22,10 @@ import {
   Trash2,
   FileText,
   Upload,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
+import { processAttachmentFile, formatFileSize, getReductionPercentage } from '../utils/attachmentCompression';
 import { 
   isCreditCardAccount, 
   getStatementCloseDateForTx, 
@@ -399,31 +401,44 @@ export function AddTransactionModal({
   // Attachments state
   const [attachments, setAttachments] = useState<TransactionAttachment[]>(() => editingTx?.attachments || []);
   const [isDragOverAtt, setIsDragOverAtt] = useState(false);
+  const [isOptimizingAtt, setIsOptimizingAtt] = useState(false);
+  const [attOptimizingProgress, setAttOptimizingProgress] = useState('');
   const attFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAttachFiles = (files: FileList | null) => {
+  const handleAttachFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const maxFileSize = 8 * 1024 * 1024;
-    Array.from(files).forEach(file => {
-      if (file.size > maxFileSize) {
-        alert(`"${file.name}" is larger than 8MB. Please select a smaller file.`);
-        return;
+    setIsOptimizingAtt(true);
+    const maxFileSize = 20 * 1024 * 1024;
+    const fileList = Array.from(files);
+    const newItems: TransactionAttachment[] = [];
+
+    try {
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        if (file.size > maxFileSize) {
+          alert(`"${file.name}" is larger than 20MB. Please select a smaller file.`);
+          continue;
+        }
+
+        setAttOptimizingProgress(`Reducing ${i + 1}/${fileList.length}: ${file.name}...`);
+        const processed = await processAttachmentFile(file, {
+          maxWidth: 1280,
+          maxHeight: 1280,
+          quality: 0.72,
+        });
+        newItems.push(processed);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = reader.result as string;
-        const newAtt: TransactionAttachment = {
-          id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          name: file.name,
-          size: file.size,
-          type: file.type || 'application/octet-stream',
-          dataUrl,
-          uploadedAt: new Date().toISOString(),
-        };
-        setAttachments(prev => [...prev, newAtt]);
-      };
-      reader.readAsDataURL(file);
-    });
+
+      if (newItems.length > 0) {
+        setAttachments(prev => [...prev, ...newItems]);
+      }
+    } catch (e) {
+      console.warn('Error compressing attachment in AddTransactionModal:', e);
+    } finally {
+      setIsOptimizingAtt(false);
+      setAttOptimizingProgress('');
+      if (attFileInputRef.current) attFileInputRef.current.value = '';
+    }
   };
 
   const handleRemoveAttachment = (id: string) => {
@@ -1727,48 +1742,69 @@ export function AddTransactionModal({
                 setIsDragOverAtt(false);
                 if (e.dataTransfer.files) handleAttachFiles(e.dataTransfer.files);
               }}
-              onClick={() => attFileInputRef.current?.click()}
+              onClick={() => !isOptimizingAtt && attFileInputRef.current?.click()}
               className={`border border-dashed rounded-xl p-3 text-center cursor-pointer transition-colors ${
-                isDragOverAtt 
-                  ? 'border-blue-500 bg-blue-500/10' 
-                  : 'border-slate-800 hover:border-slate-700 bg-slate-900/40 hover:bg-slate-900/60'
+                isOptimizingAtt
+                  ? 'border-blue-500/60 bg-blue-500/5 cursor-wait'
+                  : isDragOverAtt 
+                    ? 'border-blue-500 bg-blue-500/10' 
+                    : 'border-slate-800 hover:border-slate-700 bg-slate-900/40 hover:bg-slate-900/60'
               }`}
             >
               <input
                 ref={attFileInputRef}
                 type="file"
                 multiple
+                disabled={isOptimizingAtt}
                 accept="image/*,.pdf,application/pdf"
                 className="hidden"
                 onChange={(e) => handleAttachFiles(e.target.files)}
               />
-              <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-                <Upload className="w-3.5 h-3.5 text-blue-400" />
-                <span>Click to attach receipts or drag & drop (Images, PDF)</span>
-              </div>
+              {isOptimizingAtt ? (
+                <div className="flex items-center justify-center gap-2 text-xs text-blue-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>{attOptimizingProgress || 'Compressing & reducing file size...'}</span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Click to attach receipts or drag & drop (Auto-compressed for Database)</span>
+                </div>
+              )}
             </div>
 
             {attachments.length > 0 && (
               <div className="mt-2 space-y-1.5 max-h-28 overflow-y-auto pr-1">
-                {attachments.map((att) => (
-                  <div 
-                    key={att.id}
-                    className="flex items-center justify-between p-1.5 bg-slate-900/80 border border-slate-800 rounded-lg text-xs"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span className="text-slate-300 truncate max-w-[200px]" title={att.name}>{att.name}</span>
-                      <span className="text-[10px] text-slate-500">({Math.round(att.size / 1024)} KB)</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleRemoveAttachment(att.id); }}
-                      className="text-slate-500 hover:text-red-400 p-1"
+                {attachments.map((att) => {
+                  const redPct = getReductionPercentage(att.originalSize, att.size);
+                  return (
+                    <div 
+                      key={att.id}
+                      className="flex items-center justify-between p-1.5 bg-slate-900/80 border border-slate-800 rounded-lg text-xs"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span className="text-slate-300 truncate max-w-[170px]" title={att.name}>{att.name}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">({formatFileSize(att.size)})</span>
+                        {redPct > 0 && (
+                          <span 
+                            className="text-[9px] text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20 font-semibold"
+                            title={`Reduced from ${formatFileSize(att.originalSize!)} (-${redPct}%)`}
+                          >
+                            -{redPct}%
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleRemoveAttachment(att.id); }}
+                        className="text-slate-500 hover:text-red-400 p-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

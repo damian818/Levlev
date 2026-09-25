@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     receive_amount NUMERIC,
     receive_currency TEXT,
     notes TEXT,
+    attachments JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -39,6 +40,7 @@ ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS transfer_amount NUMERIC
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS transfer_currency TEXT;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS receive_amount NUMERIC;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS receive_currency TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
 
 DO $$
 BEGIN
@@ -96,6 +98,19 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 6.1 TRANSACTION ATTACHMENTS TABLE (Receipts, invoices, documents)
+CREATE TABLE IF NOT EXISTS public.transaction_attachments (
+    id TEXT PRIMARY KEY,
+    transaction_id TEXT NOT NULL REFERENCES public.transactions(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    original_size INTEGER,
+    type TEXT NOT NULL,
+    data_url TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- 7. INDEXES FOR HIGH-PERFORMANCE QUERIES
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions(date);
@@ -103,6 +118,8 @@ CREATE INDEX IF NOT EXISTS idx_categories_user_id ON public.categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON public.accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_budgets_user_id ON public.budgets(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON public.user_settings(user_id);
+CREATE INDEX IF NOT EXISTS idx_transaction_attachments_user_id ON public.transaction_attachments(user_id);
+CREATE INDEX IF NOT EXISTS idx_transaction_attachments_tx_id ON public.transaction_attachments(transaction_id);
 
 -- 8. SECURITY DEFINER FUNCTION FOR WORKSPACE SHARING
 -- This function allows checking if a user has shared their workspace with the current user,
@@ -130,6 +147,7 @@ ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transaction_attachments ENABLE ROW LEVEL SECURITY;
 
 -- Transactions Policies
 DROP POLICY IF EXISTS "Users can select own or shared transactions" ON public.transactions;
@@ -225,4 +243,24 @@ CREATE POLICY "Users can update own or shared settings" ON public.user_settings
     FOR UPDATE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
 CREATE POLICY "Users can delete own or shared settings" ON public.user_settings 
     FOR DELETE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+
+-- Transaction Attachments Policies
+DROP POLICY IF EXISTS "Users can select own or shared attachments" ON public.transaction_attachments;
+DROP POLICY IF EXISTS "Users can insert own or shared attachments" ON public.transaction_attachments;
+DROP POLICY IF EXISTS "Users can update own or shared attachments" ON public.transaction_attachments;
+DROP POLICY IF EXISTS "Users can delete own or shared attachments" ON public.transaction_attachments;
+DROP POLICY IF EXISTS "Users can select own attachments" ON public.transaction_attachments;
+DROP POLICY IF EXISTS "Users can insert own attachments" ON public.transaction_attachments;
+DROP POLICY IF EXISTS "Users can update own attachments" ON public.transaction_attachments;
+DROP POLICY IF EXISTS "Users can delete own attachments" ON public.transaction_attachments;
+
+CREATE POLICY "Users can select own or shared attachments" ON public.transaction_attachments 
+    FOR SELECT USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can insert own or shared attachments" ON public.transaction_attachments 
+    FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can update own or shared attachments" ON public.transaction_attachments 
+    FOR UPDATE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+CREATE POLICY "Users can delete own or shared attachments" ON public.transaction_attachments 
+    FOR DELETE USING (auth.uid() = user_id OR public.is_workspace_shared_with_me(user_id));
+
 

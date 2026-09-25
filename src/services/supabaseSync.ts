@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../lib/supabase';
-import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, TabCustomizationItem, InstallmentPlan } from '../types';
+import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, TabCustomizationItem, InstallmentPlan, TransactionAttachment } from '../types';
 
 const DELETED_TX_KEY = 'finance_app_deleted_tx_ids';
 
@@ -94,16 +94,36 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
   const userId = session.user.id;
 
   try {
-    const [catRes, accRes, budRes, setRes] = await Promise.all([
+    const [catRes, accRes, budRes, setRes, attRes] = await Promise.all([
       client.from('categories').select('*'),
       client.from('accounts').select('*'),
       client.from('budgets').select('*'),
       client.from('user_settings').select('*').eq('user_id', session.user.id).maybeSingle(),
+      client.from('transaction_attachments').select('*'),
     ]);
 
     if (catRes.error) console.warn('Supabase fetch categories error:', catRes.error);
     if (accRes.error) console.warn('Supabase fetch accounts error:', accRes.error);
     if (budRes.error) console.warn('Supabase fetch budgets error:', budRes.error);
+
+    const dbAttachmentsByTxId: Record<string, TransactionAttachment[]> = {};
+    if (attRes && attRes.data && Array.isArray(attRes.data)) {
+      attRes.data.forEach((row: any) => {
+        const txId = row.transaction_id;
+        if (txId) {
+          if (!dbAttachmentsByTxId[txId]) dbAttachmentsByTxId[txId] = [];
+          dbAttachmentsByTxId[txId].push({
+            id: row.id,
+            name: row.name,
+            size: row.size,
+            originalSize: row.original_size,
+            type: row.type,
+            dataUrl: row.data_url,
+            uploadedAt: row.created_at,
+          });
+        }
+      });
+    }
 
     let userSettings: SupabaseUserData['settings'] = undefined;
     if (setRes && setRes.data && setRes.data.settings) {
@@ -270,7 +290,12 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
           description: rawNotes,
           planId: row.plan_id || (userSettings?.txPlanIds ? userSettings.txPlanIds[row.id] : undefined),
           installmentPlanId: row.plan_id || (userSettings?.txPlanIds ? userSettings.txPlanIds[row.id] : undefined),
-          attachments: row.attachments || (userSettings?.txAttachments ? userSettings.txAttachments[row.id] : undefined) || [],
+          attachments: (row.attachments && Array.isArray(row.attachments) && row.attachments.length > 0)
+            ? row.attachments
+            : (dbAttachmentsByTxId[row.id] && dbAttachmentsByTxId[row.id].length > 0)
+            ? dbAttachmentsByTxId[row.id]
+            : (userSettings?.txAttachments ? userSettings.txAttachments[row.id] : undefined)
+            || [],
         };
       });
 
@@ -580,6 +605,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           receive_currency: t.receiveCurrency || null,
           plan_id: t.planId || t.installmentPlanId || null,
           notes: t.description || null,
+          attachments: (t.attachments && t.attachments.length > 0) ? t.attachments : [],
         };
       });
 
@@ -621,9 +647,9 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
               }
             }
 
-            // 2. Fallback retry stripping transfer_amount/transfer_currency/plan_id if column missing in DB schema cache
-            if (!success && (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency') || txErr.message?.includes('plan_id'))) {
-              const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, plan_id, ...rest }) => rest);
+            // 2. Fallback retry stripping transfer_amount/transfer_currency/plan_id/attachments if column missing in DB schema cache
+            if (!success && (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency') || txErr.message?.includes('plan_id') || txErr.message?.includes('attachments'))) {
+              const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, plan_id, attachments, ...rest }) => rest);
               const { error: fbErr } = await client.from('transactions').upsert(fallbackBatch, { onConflict: 'id' });
               if (!fbErr) {
                 success = true;
@@ -636,12 +662,15 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
             if (!success && attempt === 3) {
               for (const row of batch) {
                 const { error: singleErr } = await client.from('transactions').upsert(row, { onConflict: 'id' });
-                if (singleErr && (singleErr.code === '23514' || singleErr.message?.includes('check constraint') || row.type === 'CC_PAYMENT')) {
-                  const safeRow = {
-                    ...row,
-                    type: 'TRANSFER',
-                    notes: row.notes ? (row.notes.startsWith('[CC_PAYMENT]') ? row.notes : `[CC_PAYMENT] ${row.notes}`) : '[CC_PAYMENT]',
-                  };
+                if (singleErr) {
+                  let safeRow: any = { ...row };
+                  if (singleErr.message?.includes('attachments') || singleErr.code === 'PGRST204') {
+                    delete safeRow.attachments;
+                  }
+                  if (singleErr.code === '23514' || singleErr.message?.includes('check constraint') || row.type === 'CC_PAYMENT') {
+                    safeRow.type = 'TRANSFER';
+                    safeRow.notes = safeRow.notes ? (safeRow.notes.startsWith('[CC_PAYMENT]') ? safeRow.notes : `[CC_PAYMENT] ${safeRow.notes}`) : '[CC_PAYMENT]';
+                  }
                   await client.from('transactions').upsert(safeRow, { onConflict: 'id' });
                 }
               }
@@ -653,6 +682,38 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
             }
           }
         }
+      }
+
+      // Dedicated transaction_attachments table sync
+      try {
+        const attRows: any[] = [];
+        (data.transactions || []).forEach(t => {
+          const { id: rowId, userId: targetUserId } = resolveSyncId(t.id, userId, firstForeignOwner);
+          if (t.attachments && t.attachments.length > 0) {
+            t.attachments.forEach(att => {
+              attRows.push({
+                id: att.id,
+                transaction_id: rowId,
+                user_id: targetUserId,
+                name: att.name,
+                size: att.size,
+                original_size: att.originalSize || att.size,
+                type: att.type,
+                data_url: att.dataUrl,
+                created_at: att.uploadedAt || new Date().toISOString(),
+              });
+            });
+          }
+        });
+
+        if (attRows.length > 0) {
+          for (let i = 0; i < attRows.length; i += 100) {
+            const attBatch = attRows.slice(i, i + 100);
+            await client.from('transaction_attachments').upsert(attBatch, { onConflict: 'id' });
+          }
+        }
+      } catch (attErr) {
+        // Table might not exist yet, user_settings and/or transactions column provides storage
       }
     }
 
@@ -956,10 +1017,115 @@ export async function deleteTransactionFromSupabase(txId: string | string[]): Pr
       return false;
     }
 
+    try {
+      await client
+        .from('transaction_attachments')
+        .delete()
+        .in('transaction_id', queryIds);
+    } catch (e) {
+      // Ignored if table does not exist
+    }
+
     removeDeletedTxIds(idsArr);
     return true;
   } catch (e) {
     console.error('Exception deleting transaction from Supabase:', e);
+    return false;
+  }
+}
+
+/**
+ * Direct sync for transaction attachments.
+ * Updates the transaction record, dedicated transaction_attachments table,
+ * and user_settings fallback for immediate persistence.
+ */
+export async function saveTransactionAttachmentsToSupabase(
+  txId: string,
+  attachments: TransactionAttachment[]
+): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.user) return false;
+
+    const userId = session.user.id;
+    const targetTxId = txId.startsWith(userId) ? txId : `${userId}_${txId}`;
+
+    // 1. Update transactions table attachments column directly
+    try {
+      await client
+        .from('transactions')
+        .update({ attachments: attachments && attachments.length > 0 ? attachments : [] })
+        .or(`id.eq.${txId},id.eq.${targetTxId}`);
+    } catch (e) {
+      // Ignored if column doesn't exist
+    }
+
+    // 2. Sync to dedicated transaction_attachments table
+    try {
+      // Clean up previous attachments for this transaction
+      await client
+        .from('transaction_attachments')
+        .delete()
+        .or(`transaction_id.eq.${txId},transaction_id.eq.${targetTxId}`);
+
+      if (attachments && attachments.length > 0) {
+        const rows = attachments.map(att => ({
+          id: att.id,
+          transaction_id: txId,
+          user_id: userId,
+          name: att.name,
+          size: att.size,
+          original_size: att.originalSize || att.size,
+          type: att.type,
+          data_url: att.dataUrl,
+          created_at: att.uploadedAt || new Date().toISOString(),
+        }));
+        await client.from('transaction_attachments').upsert(rows, { onConflict: 'id' });
+      }
+    } catch (e) {
+      // Ignored if table doesn't exist
+    }
+
+    // 3. Keep user_settings txAttachments map in sync as fallback
+    try {
+      const { data: setRow } = await client
+        .from('user_settings')
+        .select('settings')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const currSettings = (setRow && setRow.settings)
+        ? (typeof setRow.settings === 'string' ? JSON.parse(setRow.settings) : setRow.settings)
+        : {};
+
+      const txAttachments = currSettings.txAttachments || {};
+      if (attachments && attachments.length > 0) {
+        txAttachments[txId] = attachments;
+        if (targetTxId !== txId) txAttachments[targetTxId] = attachments;
+      } else {
+        delete txAttachments[txId];
+        delete txAttachments[targetTxId];
+      }
+
+      await client.from('user_settings').upsert({
+        id: `${userId}_settings`,
+        user_id: userId,
+        settings: {
+          ...currSettings,
+          txAttachments,
+        },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+    } catch (e) {
+      // Fallback
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('saveTransactionAttachmentsToSupabase failed:', err);
     return false;
   }
 }

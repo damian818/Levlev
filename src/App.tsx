@@ -680,7 +680,25 @@ export default function App() {
       }
       localStorage.setItem('finance_app_transactions', JSON.stringify(transactions));
     } catch (e) {
-      console.warn('Failed to save transactions to localStorage', e);
+      console.warn('Failed to save full transactions to localStorage, falling back to lightweight cache:', e);
+      try {
+        // If quota exceeded, strip dataUrl from local storage cache to keep transactions intact without crashing
+        const lightweightTxs = transactions.map(t => {
+          if (t.attachments && t.attachments.length > 0) {
+            return {
+              ...t,
+              attachments: t.attachments.map(a => ({
+                ...a,
+                dataUrl: a.dataUrl && a.dataUrl.length > 1000 ? '' : a.dataUrl,
+              })),
+            };
+          }
+          return t;
+        });
+        localStorage.setItem('finance_app_transactions', JSON.stringify(lightweightTxs));
+      } catch (innerErr) {
+        console.warn('LocalStorage quota limit reached:', innerErr);
+      }
     }
   }, [transactions]);
 

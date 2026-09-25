@@ -2,6 +2,7 @@ export interface TransactionAttachment {
   id: string;
   name: string;
   size: number;
+  originalSize?: number;
   type: string; // e.g. 'image/jpeg', 'image/png', 'application/pdf'
   dataUrl: string; // Base64 data URL
   uploadedAt: string;
