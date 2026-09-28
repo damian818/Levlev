@@ -94,12 +94,11 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
   const userId = session.user.id;
 
   try {
-    const [catRes, accRes, budRes, setRes, attRes] = await Promise.all([
+    const [catRes, accRes, budRes, setRes] = await Promise.all([
       client.from('categories').select('*'),
       client.from('accounts').select('*'),
       client.from('budgets').select('*'),
       client.from('user_settings').select('*').eq('user_id', session.user.id).maybeSingle(),
-      client.from('transaction_attachments').select('*'),
     ]);
 
     if (catRes.error) console.warn('Supabase fetch categories error:', catRes.error);
@@ -107,23 +106,6 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     if (budRes.error) console.warn('Supabase fetch budgets error:', budRes.error);
 
     const dbAttachmentsByTxId: Record<string, TransactionAttachment[]> = {};
-    if (attRes && attRes.data && Array.isArray(attRes.data)) {
-      attRes.data.forEach((row: any) => {
-        const txId = row.transaction_id;
-        if (txId) {
-          if (!dbAttachmentsByTxId[txId]) dbAttachmentsByTxId[txId] = [];
-          dbAttachmentsByTxId[txId].push({
-            id: row.id,
-            name: row.name,
-            size: row.size,
-            originalSize: row.original_size,
-            type: row.type,
-            dataUrl: row.data_url,
-            uploadedAt: row.created_at,
-          });
-        }
-      });
-    }
 
     let userSettings: SupabaseUserData['settings'] = undefined;
     if (setRes && setRes.data && setRes.data.settings) {
@@ -468,38 +450,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
 
     const recurringRules: RecurringRule[] = Array.isArray(userSettings?.recurringRules) ? userSettings.recurringRules : [];
     const nonRecurringKeys: string[] = Array.isArray(userSettings?.nonRecurringKeys) ? userSettings.nonRecurringKeys : [];
-
-    let installmentPlans: InstallmentPlan[] = Array.isArray(userSettings?.installmentPlans) ? userSettings.installmentPlans : [];
-    try {
-      const planRes = await client.from('installment_plans').select('*');
-      if (planRes.data && planRes.data.length > 0) {
-        const tablePlans: InstallmentPlan[] = planRes.data.map((r: any) => ({
-          id: r.id,
-          ownerId: r.user_id,
-          title: r.title || 'Plan',
-          category: r.category || 'General',
-          account: r.account || '',
-          totalAmount: Number(r.total_amount) || 0,
-          installmentAmount: Number(r.installment_amount) || 0,
-          currency: r.currency || 'ARS',
-          totalInstallments: Number(r.total_installments) || 1,
-          paidInstallments: r.paid_installments !== undefined ? Number(r.paid_installments) : undefined,
-          startDate: r.start_date || new Date().toISOString().substring(0, 10),
-          status: r.status || 'ACTIVE',
-          description: r.description || undefined,
-          notes: r.notes || undefined,
-          statementCloseDate: r.statement_close_date || undefined,
-          createdAt: r.created_at || new Date().toISOString(),
-          updatedAt: r.updated_at || new Date().toISOString(),
-        }));
-        const pMap = new Map<string, InstallmentPlan>();
-        installmentPlans.forEach(p => pMap.set(p.id, p));
-        tablePlans.forEach(p => pMap.set(p.id, p));
-        installmentPlans = Array.from(pMap.values());
-      }
-    } catch (e) {
-      // Table may not exist yet in Supabase schema, rely on user_settings
-    }
+    const installmentPlans: InstallmentPlan[] = Array.isArray(userSettings?.installmentPlans) ? userSettings.installmentPlans : [];
 
     return { transactions, categories, accounts, budgets, recurringRules, nonRecurringKeys, installmentPlans, settings: userSettings };
   } catch (err) {
@@ -605,7 +556,6 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           receive_currency: t.receiveCurrency || null,
           plan_id: t.planId || t.installmentPlanId || null,
           notes: t.description || null,
-          attachments: (t.attachments && t.attachments.length > 0) ? t.attachments : [],
         };
       });
 
@@ -618,8 +568,6 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           if (!txErr) {
             success = true;
           } else {
-            console.error(`Error upserting transactions batch ${i} (attempt ${attempt}) to Supabase:`, txErr);
-
             // 1. Fallback for CC_PAYMENT constraint in older Supabase databases
             const isTypeConstraintErr = txErr.code === '23514' || 
               txErr.message?.includes('check constraint') || 
@@ -642,19 +590,15 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
               const { error: typeFbErr } = await client.from('transactions').upsert(fallbackTypeBatch, { onConflict: 'id' });
               if (!typeFbErr) {
                 success = true;
-              } else {
-                console.error(`Fallback CC_PAYMENT->TRANSFER batch ${i} error:`, typeFbErr);
               }
             }
 
-            // 2. Fallback retry stripping transfer_amount/transfer_currency/plan_id/attachments if column missing in DB schema cache
-            if (!success && (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency') || txErr.message?.includes('plan_id') || txErr.message?.includes('attachments'))) {
-              const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, plan_id, attachments, ...rest }) => rest);
+            // 2. Fallback retry stripping transfer_amount/transfer_currency/plan_id if column missing in DB schema cache
+            if (!success && (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency') || txErr.message?.includes('plan_id'))) {
+              const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, plan_id, ...rest }) => rest);
               const { error: fbErr } = await client.from('transactions').upsert(fallbackBatch, { onConflict: 'id' });
               if (!fbErr) {
                 success = true;
-              } else {
-                console.error(`Fallback transactions batch ${i} error:`, fbErr);
               }
             }
 
@@ -664,9 +608,6 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
                 const { error: singleErr } = await client.from('transactions').upsert(row, { onConflict: 'id' });
                 if (singleErr) {
                   let safeRow: any = { ...row };
-                  if (singleErr.message?.includes('attachments') || singleErr.code === 'PGRST204') {
-                    delete safeRow.attachments;
-                  }
                   if (singleErr.code === '23514' || singleErr.message?.includes('check constraint') || row.type === 'CC_PAYMENT') {
                     safeRow.type = 'TRANSFER';
                     safeRow.notes = safeRow.notes ? (safeRow.notes.startsWith('[CC_PAYMENT]') ? safeRow.notes : `[CC_PAYMENT] ${safeRow.notes}`) : '[CC_PAYMENT]';
@@ -674,7 +615,7 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
                   await client.from('transactions').upsert(safeRow, { onConflict: 'id' });
                 }
               }
-              success = true; // Avoid infinite retries
+              success = true;
             }
 
             if (!success && attempt < 3) {
@@ -682,38 +623,6 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
             }
           }
         }
-      }
-
-      // Dedicated transaction_attachments table sync
-      try {
-        const attRows: any[] = [];
-        (data.transactions || []).forEach(t => {
-          const { id: rowId, userId: targetUserId } = resolveSyncId(t.id, userId, firstForeignOwner);
-          if (t.attachments && t.attachments.length > 0) {
-            t.attachments.forEach(att => {
-              attRows.push({
-                id: att.id,
-                transaction_id: rowId,
-                user_id: targetUserId,
-                name: att.name,
-                size: att.size,
-                original_size: att.originalSize || att.size,
-                type: att.type,
-                data_url: att.dataUrl,
-                created_at: att.uploadedAt || new Date().toISOString(),
-              });
-            });
-          }
-        });
-
-        if (attRows.length > 0) {
-          for (let i = 0; i < attRows.length; i += 100) {
-            const attBatch = attRows.slice(i, i + 100);
-            await client.from('transaction_attachments').upsert(attBatch, { onConflict: 'id' });
-          }
-        }
-      } catch (attErr) {
-        // Table might not exist yet, user_settings and/or transactions column provides storage
       }
     }
 
@@ -727,19 +636,12 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           name: c.name,
           type: c.type || 'BOTH',
           color: c.description || '#64748b',
-          is_hidden_from_new_tx: !!c.isHiddenFromNewTx,
         };
       });
 
       const { error: catErr } = await client.from('categories').upsert(catRows, { onConflict: 'id' });
       if (catErr) {
-        console.error('Error upserting categories to Supabase:', catErr);
-        // Fallback retry if is_hidden_from_new_tx column does not exist in target database schema
-        if (catErr.code === 'PGRST204' || catErr.message?.includes('is_hidden_from_new_tx')) {
-          const fallbackCatRows = catRows.map(({ is_hidden_from_new_tx, ...rest }) => rest);
-          const { error: fbCatErr } = await client.from('categories').upsert(fallbackCatRows, { onConflict: 'id' });
-          if (fbCatErr) console.error('Fallback categories upsert error:', fbCatErr);
-        }
+        console.warn('Categories upsert notice:', catErr.message || catErr);
       }
     }
 
@@ -919,34 +821,6 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
         return Object.keys(attMap).length > 0 ? attMap : undefined;
       })(),
     };
-
-    // Save installment plans to dedicated Supabase table if available
-    const plansToSave: InstallmentPlan[] = data.installmentPlans || data.settings?.installmentPlans || [];
-    if (plansToSave.length > 0) {
-      try {
-        const planRows = plansToSave.map(p => ({
-          id: p.id,
-          user_id: userId,
-          title: p.title,
-          category: p.category || 'General',
-          account: p.account,
-          total_amount: p.totalAmount,
-          installment_amount: p.installmentAmount,
-          currency: p.currency || 'ARS',
-          total_installments: p.totalInstallments,
-          paid_installments: p.paidInstallments || 0,
-          start_date: p.startDate,
-          status: p.status,
-          description: p.description || null,
-          notes: p.notes || null,
-          statement_close_date: p.statementCloseDate || null,
-          updated_at: new Date().toISOString(),
-        }));
-        await client.from('installment_plans').upsert(planRows, { onConflict: 'id' });
-      } catch (err) {
-        // Fallback: table may not exist yet; user_settings will securely store it
-      }
-    }
 
     try {
       const { error: setErr } = await client.from('user_settings').upsert({

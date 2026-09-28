@@ -2,11 +2,7 @@ import express from "express";
 import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { createRequire } from "module";
 import { parseStatementTextDeterministically } from "./deterministicStatementParser";
-
-const require = createRequire(import.meta.url);
-const { PDFParse } = require("pdf-parse");
 
 dotenv.config();
 
@@ -703,33 +699,26 @@ app.post(["/api/parse-statement-pdf", "/parse-statement-pdf"], checkAiRateLimit,
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!pdfBase64 && !statementText) {
-      return res.status(400).json({ error: "Please provide either pdfBase64 or statementText." });
+      return res.status(400).json({ error: "Please provide either a PDF statement or pasted statement text." });
     }
 
-    // Step 1: Pre-extract raw text from PDF if pdfBase64 is provided
-    let extractedPdfText = (statementText || '').trim();
-    if (pdfBase64) {
-      try {
-        const cleanBase64 = String(pdfBase64).replace(/^data:application\/pdf;base64,/, '').replace(/\s/g, '');
-        const pdfBuffer = Buffer.from(cleanBase64, 'base64');
-        const parser = new PDFParse({ data: pdfBuffer });
-        const parsedTextObj = await parser.getText();
-        const rawText = (parsedTextObj?.text || '').trim();
-        await parser.destroy();
-        if (rawText.length > 30) {
-          extractedPdfText = rawText;
-          console.log(`Successfully extracted ${rawText.length} characters of text from statement PDF.`);
-        }
-      } catch (pdfErr) {
-        console.warn('PDF text pre-extraction error, will proceed to multimodal or fallback:', pdfErr);
+    const categoriesList = Array.isArray(categories) && categories.length > 0
+      ? categories.join(', ')
+      : 'Food, Groceries, Services, Shopping, Transport, Entertainment, Healthcare, Utilities, Education, Travel, Housing, Subscriptions';
+    const accountsList = Array.isArray(accounts) && accounts.length > 0 ? accounts.join(', ') : 'Credit Card';
+
+    // If pure text is provided, try deterministic extraction first if text has high confidence
+    const trimmedText = (statementText || '').trim();
+    if (trimmedText && trimmedText.length > 20) {
+      const fastParsed = parseStatementTextDeterministically(trimmedText, categories, accounts, cardHint);
+      if (fastParsed.items && fastParsed.items.length >= 3) {
+        console.log(`Deterministic parser extracted ${fastParsed.items.length} items instantly from text.`);
+        return res.json(fastParsed);
       }
     }
 
-    const categoriesList = Array.isArray(categories) && categories.length > 0 ? categories.join(', ') : 'Food, Groceries, Services, Shopping, Transport, Entertainment, Healthcare, Utilities, Education, Travel, Housing, Subscriptions';
-    const accountsList = Array.isArray(accounts) && accounts.length > 0 ? accounts.join(', ') : 'Credit Card';
-
-    const systemInstruction = `You are a certified financial auditor and automated statement reconciliation engine.
-Your task is to thoroughly analyze the provided credit card statement document or text (e.g. Visa, Mastercard, American Express, Santander, BBVA, Galicia, Macro, Chase, Citibank, etc.) and extract all transactional data.
+    const systemInstruction = `You are an expert financial auditor and automated statement reconciliation engine.
+Your task is to analyze the provided credit card statement document or text (e.g. Visa, Mastercard, American Express, Santander, BBVA, Galicia, Macro, etc.) and extract all transactional data.
 
 User's App Context:
 - Available categories: ${categoriesList}
@@ -740,34 +729,34 @@ Extraction Rules:
 1. Credit Card & Statement Metadata:
    - "issuer": Name of the bank and card brand (e.g. "Visa Santander", "Mastercard BBVA", "American Express")
    - "cardLast4": Last 4 digits of the card number if visible, or null
-   - "periodStart": Start date of the billing cycle (YYYY-MM-DD). If year is not printed, infer from cycle or latest transactions.
-   - "periodEnd": Statement closing date (Fecha de Cierre) (YYYY-MM-DD).
-   - "closeDate": Statement closing date (YYYY-MM-DD).
-   - "dueDate": Due date for payment (Fecha de Vencimiento) (YYYY-MM-DD), or null if not found.
-   - "currency": Primary currency ("ARS" or "USD"). If there are charges in both currencies, extract the currency of each individual charge.
-   - "statementTotal": The total charges/balance due for the period (positive number).
+   - "periodStart": Start date of billing cycle (YYYY-MM-DD)
+   - "periodEnd": Statement closing date (Fecha de Cierre) (YYYY-MM-DD)
+   - "closeDate": Statement closing date (YYYY-MM-DD)
+   - "dueDate": Due date for payment (Fecha de Vencimiento) (YYYY-MM-DD), or null
+   - "currency": Primary currency ("ARS" or "USD")
+   - "statementTotal": The total balance/charges due (positive number)
 
 2. Individual Transactions ("items"):
-   Extract EVERY individual purchase, charge, fee, tax, or expense line item on the statement:
-   - "date": Date of transaction in "YYYY-MM-DD". If only day/month is shown (e.g. 14/08 or 14-AGO), use the statement period year.
-   - "rawDescription": Exact text as printed on the statement line.
-   - "cleanTitle": Clean, concise human-readable merchant name (e.g. remove store IDs, tax codes, prefixes like 'MP*', 'MERPAG*', 'PAYPAL*', strip trailing installment notations like '01/03'). Example: "000213 COTO SUC 14" -> "Coto", "UBER *PENDING BA" -> "Uber", "NETFLIX.COM" -> "Netflix".
-   - "amount": Positive numeric value (e.g. 15420.50). Never negative.
-   - "currency": "ARS" or "USD" depending on the column/currency of the charge.
-   - "category": Match to the most appropriate category from the user's available categories list.
-   - "installmentCurrent": Current installment number if item is paid in installments (e.g. for "02/06" or "Cuota 2/6", this is 2). If not in installments, null.
-   - "installmentTotal": Total installments (e.g. for "02/06", this is 6). If not in installments, null.
-   - "cardholder": Name of cardholder if multi-card statement, otherwise null.
+   Extract EVERY individual purchase, charge, fee, tax, or expense item:
+   - "date": Date in "YYYY-MM-DD"
+   - "rawDescription": Exact text printed on statement line
+   - "cleanTitle": Clean, readable merchant name (strip IDs, tax codes, prefixes like 'MP*', strip installment notations)
+   - "amount": Positive numeric value
+   - "currency": "ARS" or "USD"
+   - "category": Match to the most appropriate category from available categories list
+   - "installmentCurrent": Current installment number if in installments (e.g. 2 for "02/06"), otherwise null
+   - "installmentTotal": Total installments (e.g. 6 for "02/06"), otherwise null
+   - "cardholder": Name of cardholder if multi-card statement, otherwise null
 
 3. Payments ("payments"):
-   Extract payments or credits applied towards the card (e.g. "Su pago en pesos", "Pago recibido", "Direct Debit payment"):
+   Extract payments or credits applied towards the card (e.g. "Su pago en pesos", "Pago recibido"):
    - "date": YYYY-MM-DD
    - "description": description string
    - "amount": positive number
    - "currency": "ARS" or "USD"
 
 Output Format:
-You MUST return ONLY a single valid JSON object. Do not include markdown formatting or backticks.
+You MUST return ONLY a single valid JSON object. Do not include markdown backticks or commentary.
 Schema:
 {
   "issuer": string,
@@ -801,14 +790,8 @@ Schema:
   ]
 }`;
 
-    let contentsParts: any[] = [];
-
-    // Prefer text prompt if we extracted text (100x faster, no OCR vision capacity limits)
-    if (extractedPdfText && extractedPdfText.length > 30) {
-      contentsParts.push({
-        text: `Statement Text Content:\n\n${extractedPdfText.slice(0, 40000)}\n\nPlease extract all expense transactions, installments, and period dates from this statement as specified in the instructions.`
-      });
-    } else if (pdfBase64) {
+    const contentsParts: any[] = [];
+    if (pdfBase64) {
       const cleanBase64 = String(pdfBase64).replace(/^data:application\/pdf;base64,/, '').replace(/\s/g, '');
       contentsParts.push({
         inlineData: {
@@ -817,18 +800,19 @@ Schema:
         }
       });
       contentsParts.push({
-        text: "Please extract all expense transactions, installments, and period dates from this credit card statement PDF as specified."
+        text: "Please extract all expense transactions, installments, payments, and period dates from this credit card statement PDF as specified."
       });
     } else {
       contentsParts.push({
-        text: `Statement Content:\n\n${statementText}\n\nPlease extract all expense transactions, installments, and period dates from this statement as specified.`
+        text: `Statement Content:\n\n${statementText}\n\nPlease extract all expense transactions, installments, payments, and period dates from this statement as specified.`
       });
     }
 
-    // Simpler, lightweight model priority to avoid 503 high demand spikes
+    // Models to try with graceful fallback
     const candidateModels = [
-      'gemini-3.1-flash-lite',
       'gemini-flash-latest',
+      'gemini-3.1-flash-lite',
+      'gemini-3.8-flash',
     ];
 
     let aiResponseText: string | null = null;
@@ -844,7 +828,7 @@ Schema:
 
       for (const model of candidateModels) {
         try {
-          console.log(`Attempting statement analysis with model: ${model}...`);
+          console.log(`Calling Gemini with model ${model} for statement reconciliation...`);
           const response = await ai.models.generateContent({
             model,
             contents: [
@@ -870,17 +854,11 @@ Schema:
           }
         } catch (modelErr: any) {
           lastAiError = modelErr;
-          console.warn(`Model ${model} error (${modelErr.message})`);
-          // If we have extracted text and model is 503 unavailable, break to immediate deterministic parsing
-          if (extractedPdfText && extractedPdfText.length > 30 && modelErr?.message?.includes('503')) {
-            console.log('503 demand spike detected on Gemini. Routing to instant deterministic parser fallback...');
-            break;
-          }
+          console.warn(`Model ${model} error:`, modelErr?.message || modelErr);
         }
       }
     }
 
-    // If Gemini succeeded, parse JSON output
     if (aiResponseText) {
       const cleanedText = aiResponseText
         .replace(/^```json\s*/i, '')
@@ -898,15 +876,14 @@ Schema:
         }
         return res.json(parsedData);
       } catch (parseErr) {
-        console.warn("AI JSON parse error, falling back to deterministic extraction:", parseErr);
+        console.warn("AI JSON parse error:", parseErr);
       }
     }
 
-    // Step 3: High-Accuracy Deterministic Fallback if AI models are experiencing 503 high demand
-    if (extractedPdfText && extractedPdfText.length > 30) {
-      console.log('Using deterministic statement parser fallback on extracted PDF text...');
+    // Fallback: If text was provided, use deterministic parser
+    if (trimmedText && trimmedText.length > 20) {
       const fallbackResult = parseStatementTextDeterministically(
-        extractedPdfText,
+        trimmedText,
         categories,
         accounts,
         cardHint
@@ -916,11 +893,19 @@ Schema:
       }
     }
 
-    if (lastAiError) {
-      throw lastAiError;
+    const isQuotaOrDemand = lastAiError?.message?.includes('503') ||
+      lastAiError?.message?.includes('resource_exhausted') ||
+      lastAiError?.message?.includes('high demand') ||
+      lastAiError?.status === 429;
+
+    if (isQuotaOrDemand) {
+      return res.status(503).json({
+        error: "The AI service is currently experiencing temporary high demand or quota limits. You can paste your statement text directly into the 'Paste Text' tab, or test with the Demo Statement.",
+        isOverloaded: true
+      });
     }
 
-    throw new Error("Unable to extract transactions from the provided statement.");
+    throw lastAiError || new Error("Unable to parse transactions from this statement. Please check the document or paste the text.");
   } catch (err: any) {
     console.error("Parse statement PDF error:", err);
     res.status(500).json({

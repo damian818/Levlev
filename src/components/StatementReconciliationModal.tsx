@@ -117,6 +117,11 @@ export function StatementReconciliationModal({
       return;
     }
 
+    if (file.size > 5 * 1024 * 1024) {
+      setAnalysisError('The PDF file is too large (max 5 MB). Please compress the PDF or paste the text directly.');
+      return;
+    }
+
     setUploadedFileName(file.name);
     setUploadedFileSize(file.size);
     setIsAnalyzing(true);
@@ -128,7 +133,7 @@ export function StatementReconciliationModal({
       reader.onload = async () => {
         try {
           const base64Data = (reader.result as string) || '';
-          setAnalyzingMessage(t('reconciliation.ai_analyzing', { defaultValue: 'Gemini AI is extracting statement expenses, installments & dates...' }));
+          setAnalyzingMessage(t('reconciliation.ai_analyzing', { defaultValue: 'Analyzing statement expenses, installments & dates...' }));
 
           const response = await fetch('/api/parse-statement-pdf', {
             method: 'POST',
@@ -148,7 +153,7 @@ export function StatementReconciliationModal({
 
           const statementData: StatementParsedData = await response.json();
           if (!statementData.items || statementData.items.length === 0) {
-            throw new Error('No expenses or transactions could be detected in this document. Please check the PDF.');
+            throw new Error('No expenses or transactions could be detected in this document. Please check the PDF or paste the statement text.');
           }
 
           setAnalyzingMessage(t('reconciliation.matching_expenses', { defaultValue: 'Comparing against recorded app expenses...' }));
@@ -527,11 +532,42 @@ export function StatementReconciliationModal({
 
               {/* Error Message */}
               {analysisError && (
-                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start space-x-3">
-                  <AlertCircle className="w-5 h-5 shrink-0 text-rose-400 mt-0.5" />
-                  <div>
-                    <strong className="font-bold">Error analyzing statement:</strong>
-                    <p className="mt-0.5">{analysisError}</p>
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-3">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 shrink-0 text-rose-400 mt-0.5" />
+                    <div className="flex-1">
+                      <strong className="font-bold text-rose-200">{t('reconciliation.error_title', { defaultValue: 'Statement Analysis Notice' })}</strong>
+                      <p className="mt-0.5 text-rose-300 leading-relaxed">{analysisError}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-rose-500/20">
+                    <button
+                      type="button"
+                      onClick={handleLoadDemo}
+                      className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>{t('reconciliation.load_demo', { defaultValue: 'Load Demo Statement' })}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPasteArea(true);
+                        setAnalysisError(null);
+                      }}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-purple-400" />
+                      <span>{t('reconciliation.paste_text_manually', { defaultValue: 'Paste Statement Text' })}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnalysisError(null)}
+                      className="px-3 py-1.5 text-slate-400 hover:text-slate-200 text-xs transition-colors cursor-pointer"
+                    >
+                      {t('common.dismiss', { defaultValue: 'Dismiss' })}
+                    </button>
                   </div>
                 </div>
               )}
