@@ -147,8 +147,15 @@ export function StatementReconciliationModal({
           });
 
           if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error || `Server responded with status ${response.status}`);
+            let errorMsg = `Server error (${response.status})`;
+            try {
+              const errData = await response.json();
+              if (errData?.error) errorMsg = errData.error;
+            } catch {
+              const text = await response.text().catch(() => '');
+              if (text && text.length < 300) errorMsg = text;
+            }
+            throw new Error(errorMsg);
           }
 
           const statementData: StatementParsedData = await response.json();
@@ -210,8 +217,15 @@ export function StatementReconciliationModal({
       });
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to analyze statement text.');
+        let errorMsg = `Server error (${response.status})`;
+        try {
+          const errData = await response.json();
+          if (errData?.error) errorMsg = errData.error;
+        } catch {
+          const text = await response.text().catch(() => '');
+          if (text && text.length < 300) errorMsg = text;
+        }
+        throw new Error(errorMsg);
       }
 
       const statementData: StatementParsedData = await response.json();

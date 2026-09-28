@@ -1314,16 +1314,19 @@ export default function App() {
   useEffect(() => {
     // Fetch live FX rates on app mount
     fetch('/api/fx-rates')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        return res.json();
+      })
       .then(data => {
-        if (data.rates) {
+        if (data && data.rates) {
           const liveMep = data.rates.bolsa?.sell || data.rates.blue?.sell || data.rates.oficial?.sell;
           if (liveMep && liveMep > 0) {
             setUsdArsRate(liveMep);
           }
         }
       })
-      .catch(err => console.warn('Using default exchange rate fallback:', err));
+      .catch(err => console.warn('Using default exchange rate fallback:', err?.message || err));
 
     // Fetch historical inflation and FX history
     const oldestDate = transactions.length > 0
@@ -1332,13 +1335,16 @@ export default function App() {
     const startDate = oldestDate.toISOString().substring(0, 10);
     
     fetch(`/api/inflation-fx-history?startDate=${startDate}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        return res.json();
+      })
       .then(data => {
-        if (data.points && data.points.length > 0) {
+        if (data && data.points && data.points.length > 0) {
           setHistoryData(data.points);
         }
       })
-      .catch(err => console.warn('Using default historical data fallback:', err));
+      .catch(err => console.warn('Using default historical data fallback:', err?.message || err));
   }, []);
 
   // Save changes to Supabase when user is authenticated

@@ -792,7 +792,7 @@ Schema:
 
     const contentsParts: any[] = [];
     if (pdfBase64) {
-      const cleanBase64 = String(pdfBase64).replace(/^data:application\/pdf;base64,/, '').replace(/\s/g, '');
+      const cleanBase64 = String(pdfBase64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
       contentsParts.push({
         inlineData: {
           mimeType: "application/pdf",
@@ -838,10 +838,8 @@ Schema:
               }
             ],
             config: {
-              systemInstruction: {
-                role: "system",
-                parts: [{ text: systemInstruction }],
-              },
+              systemInstruction,
+              responseMimeType: "application/json",
               temperature: 0.1,
             }
           });
