@@ -7,7 +7,7 @@ dotenv.config();
 
 const app = express();
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '30mb' }));
 
 // Helper function to fetch with timeout
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = 8000): Promise<Response> {
@@ -689,6 +689,167 @@ Recent Transactions: ${JSON.stringify(financialContext?.recentTransactions || []
       return res.status(429).json({ error: "AI quota temporarily exceeded. Please try again shortly." });
     }
     res.status(500).json({ error: error.message || "Failed to generate AI response" });
+  }
+});
+
+app.post(["/api/parse-statement-pdf", "/parse-statement-pdf"], checkAiRateLimit, async (req, res) => {
+  try {
+    const { pdfBase64, statementText, accounts = [], categories = [], cardHint = '' } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Gemini API key is not configured on the server." });
+    }
+
+    if (!pdfBase64 && !statementText) {
+      return res.status(400).json({ error: "Please provide either pdfBase64 or statementText." });
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: { 'User-Agent': 'aistudio-build' },
+      },
+    });
+
+    const categoriesList = Array.isArray(categories) && categories.length > 0 ? categories.join(', ') : 'Food, Groceries, Services, Shopping, Transport, Entertainment, Healthcare, Utilities, Education, Travel, Housing, Subscriptions';
+    const accountsList = Array.isArray(accounts) && accounts.length > 0 ? accounts.join(', ') : 'Credit Card';
+
+    const systemInstruction = `You are a certified financial auditor and automated statement reconciliation engine.
+Your task is to thoroughly analyze the provided credit card statement document or text (e.g. Visa, Mastercard, American Express, Santander, BBVA, Galicia, Macro, Chase, Citibank, etc.) and extract all transactional data.
+
+User's App Context:
+- Available categories: ${categoriesList}
+- Available accounts: ${accountsList}
+- Card hint: ${cardHint || 'Credit Card'}
+
+Extraction Rules:
+1. Credit Card & Statement Metadata:
+   - "issuer": Name of the bank and card brand (e.g. "Visa Santander", "Mastercard BBVA", "American Express")
+   - "cardLast4": Last 4 digits of the card number if visible, or null
+   - "periodStart": Start date of the billing cycle (YYYY-MM-DD). If year is not printed, infer from cycle or latest transactions.
+   - "periodEnd": Statement closing date (Fecha de Cierre) (YYYY-MM-DD).
+   - "closeDate": Statement closing date (YYYY-MM-DD).
+   - "dueDate": Due date for payment (Fecha de Vencimiento) (YYYY-MM-DD), or null if not found.
+   - "currency": Primary currency ("ARS" or "USD"). If there are charges in both currencies, extract the currency of each individual charge.
+   - "statementTotal": The total charges/balance due for the period (positive number).
+
+2. Individual Transactions ("items"):
+   Extract EVERY individual purchase, charge, fee, tax, or expense line item on the statement:
+   - "date": Date of transaction in "YYYY-MM-DD". If only day/month is shown (e.g. 14/08 or 14-AGO), use the statement period year.
+   - "rawDescription": Exact text as printed on the statement line.
+   - "cleanTitle": Clean, concise human-readable merchant name (e.g. remove store IDs, tax codes, prefixes like 'MP*', 'MERPAG*', 'PAYPAL*', strip trailing installment notations like '01/03'). Example: "000213 COTO SUC 14" -> "Coto", "UBER *PENDING BA" -> "Uber", "NETFLIX.COM" -> "Netflix".
+   - "amount": Positive numeric value (e.g. 15420.50). Never negative.
+   - "currency": "ARS" or "USD" depending on the column/currency of the charge.
+   - "category": Match to the most appropriate category from the user's available categories list.
+   - "installmentCurrent": Current installment number if item is paid in installments (e.g. for "02/06" or "Cuota 2/6", this is 2). If not in installments, null.
+   - "installmentTotal": Total installments (e.g. for "02/06", this is 6). If not in installments, null.
+   - "cardholder": Name of cardholder if multi-card statement, otherwise null.
+
+3. Payments ("payments"):
+   Extract payments or credits applied towards the card (e.g. "Su pago en pesos", "Pago recibido", "Direct Debit payment"):
+   - "date": YYYY-MM-DD
+   - "description": description string
+   - "amount": positive number
+   - "currency": "ARS" or "USD"
+
+Output Format:
+You MUST return ONLY a single valid JSON object. Do not include markdown formatting or backticks.
+Schema:
+{
+  "issuer": string,
+  "cardLast4": string | null,
+  "periodStart": string,
+  "periodEnd": string,
+  "closeDate": string,
+  "dueDate": string | null,
+  "currency": string,
+  "statementTotal": number,
+  "items": [
+    {
+      "date": string,
+      "rawDescription": string,
+      "cleanTitle": string,
+      "amount": number,
+      "currency": string,
+      "category": string,
+      "installmentCurrent": number | null,
+      "installmentTotal": number | null,
+      "cardholder": string | null
+    }
+  ],
+  "payments": [
+    {
+      "date": string,
+      "description": string,
+      "amount": number,
+      "currency": string
+    }
+  ]
+}`;
+
+    let contentsParts: any[] = [];
+
+    if (pdfBase64) {
+      const cleanBase64 = String(pdfBase64).replace(/^data:application\/pdf;base64,/, '').replace(/\s/g, '');
+      contentsParts.push({
+        inlineData: {
+          mimeType: "application/pdf",
+          data: cleanBase64,
+        }
+      });
+      contentsParts.push({
+        text: "Please extract all expense transactions, installments, and period dates from this credit card statement PDF as specified."
+      });
+    } else if (statementText) {
+      contentsParts.push({
+        text: `Statement Content:\n\n${statementText}\n\nPlease extract all expense transactions, installments, and period dates from this statement as specified.`
+      });
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: [
+        {
+          role: "user",
+          parts: contentsParts,
+        }
+      ],
+      config: {
+        systemInstruction: {
+          role: "system",
+          parts: [{ text: systemInstruction }],
+        },
+        temperature: 0.1,
+      }
+    });
+
+    const outputText = response.text?.trim() || "{}";
+    const cleanedText = outputText
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```$/i, '')
+      .trim();
+
+    try {
+      const parsedData = JSON.parse(cleanedText);
+      // Validate structure
+      if (!Array.isArray(parsedData.items)) {
+        parsedData.items = [];
+      }
+      if (!Array.isArray(parsedData.payments)) {
+        parsedData.payments = [];
+      }
+      res.json(parsedData);
+    } catch (parseErr: any) {
+      console.error("JSON parse error from Gemini response:", parseErr, outputText.slice(0, 500));
+      res.status(500).json({
+        error: "Failed to parse statement analysis into structured JSON.",
+        raw: outputText.slice(0, 1000)
+      });
+    }
+  } catch (err: any) {
+    console.error("Parse statement PDF error:", err);
+    res.status(500).json({ error: err.message || "Failed to process statement." });
   }
 });
 

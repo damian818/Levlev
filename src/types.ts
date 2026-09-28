@@ -373,4 +373,69 @@ export interface IdentifiedRecurringItem {
   }[];
 }
 
+export interface StatementParsedItem {
+  date: string; // YYYY-MM-DD
+  rawDescription: string;
+  cleanTitle: string;
+  amount: number;
+  currency: string; // ARS or USD
+  category: string;
+  installmentCurrent?: number | null;
+  installmentTotal?: number | null;
+  cardholder?: string | null;
+}
+
+export interface StatementParsedData {
+  issuer: string;
+  cardLast4?: string | null;
+  periodStart: string; // YYYY-MM-DD
+  periodEnd: string; // YYYY-MM-DD
+  closeDate: string; // YYYY-MM-DD
+  dueDate?: string | null;
+  currency: string;
+  statementTotal: number;
+  items: StatementParsedItem[];
+  payments?: {
+    date: string;
+    description: string;
+    amount: number;
+    currency: string;
+  }[];
+}
+
+export interface StatementItemDiff {
+  field: 'amount' | 'date' | 'title' | 'installments' | 'category' | 'account';
+  label: string;
+  oldVal: any;
+  newVal: any;
+  highlight?: boolean;
+}
+
+export interface StatementReconciliationItem {
+  id: string;
+  status: 'NEW' | 'MODIFIED' | 'MATCHED' | 'APP_ONLY';
+  confidence: 'EXACT' | 'HIGH' | 'MEDIUM';
+  selected: boolean;
+  statementItem?: StatementParsedItem;
+  existingTx?: Transaction;
+  draftTx: Transaction;
+  diffs: StatementItemDiff[];
+  explanation?: string;
+}
+
+export interface StatementReconciliationSummary {
+  statementTotal: number;
+  statementCount: number;
+  appTotal: number;
+  appCount: number;
+  difference: number;
+  newCount: number;
+  newTotal: number;
+  modifiedCount: number;
+  matchedCount: number;
+  matchedTotal: number;
+  appOnlyCount: number;
+  appOnlyTotal: number;
+}
+
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Upload, X, Download, AlertCircle, CheckCircle, FileText, ChevronRight, Sparkles } from 'lucide-react';
+import { Upload, X, Download, AlertCircle, CheckCircle, FileText, ChevronRight, Sparkles, CreditCard } from 'lucide-react';
 import Papa from 'papaparse';
 import { Transaction, AccountItem, CategoryItem, BudgetGoal } from '../types';
 import { adjustDateToTimezone } from '../utils/timezoneUtils';
@@ -12,6 +12,7 @@ interface ImportWizardModalProps {
   existingAccounts: AccountItem[];
   existingCategories: CategoryItem[];
   userTimezone?: string;
+  onOpenReconciliationModal?: () => void;
 }
 
 interface ParsedData {
@@ -28,7 +29,7 @@ interface ValidationError {
   type: 'error' | 'warning';
 }
 
-export default function ImportWizardModal({ isOpen, onClose, onImport, existingAccounts, existingCategories, userTimezone = 'America/Argentina/Buenos_Aires' }: ImportWizardModalProps) {
+export default function ImportWizardModal({ isOpen, onClose, onImport, existingAccounts, existingCategories, userTimezone = 'America/Argentina/Buenos_Aires', onOpenReconciliationModal }: ImportWizardModalProps) {
   const { t } = useTranslation();
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
@@ -423,7 +424,7 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
         <div className="flex-1 overflow-y-auto p-6">
           {step === 'upload' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-[#121620] border border-slate-800 rounded-xl p-5 hover:border-emerald-500/30 transition-colors">
                   <h3 className="font-bold text-slate-200 mb-2 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-emerald-400" />
@@ -451,6 +452,27 @@ export default function ImportWizardModal({ isOpen, onClose, onImport, existingA
                     {t('import.select_ivy')}
                     <input type="file" accept=".csv" onChange={handleIvyWalletChange} className="hidden" />
                   </label>
+                </div>
+
+                <div className="bg-[#121620] border border-slate-800 rounded-xl p-5 border-purple-500/40 hover:bg-purple-500/5 transition-colors">
+                  <h3 className="font-bold text-slate-200 mb-2 flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-purple-400" />
+                    <span>Statement PDF</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mb-4 h-12">
+                    Compare statement expenses against app records & draft modifications.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      if (onOpenReconciliationModal) onOpenReconciliationModal();
+                    }}
+                    className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm shadow-purple-900/20 uppercase tracking-wider"
+                  >
+                    <Upload className="w-3 h-3" />
+                    <span>Reconcile PDF</span>
+                  </button>
                 </div>
                 
                 <div className="bg-[#121620] border border-slate-800 rounded-xl p-5 hover:border-emerald-500/30 transition-colors">

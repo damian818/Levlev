@@ -22,6 +22,7 @@ interface CreditCardDetailModalProps {
   onAddTransaction: (tx: Transaction) => void;
   onNavigateToTransactionsWithFilter: (filter: TransactionFilter) => void;
   onReassignTransactionPeriod?: (txId: string, statementCloseDate: string | undefined) => void;
+  onOpenReconciliationModal?: (accountName: string, closeDate?: string) => void;
 }
 
 export function CreditCardDetailModal({
@@ -41,6 +42,7 @@ export function CreditCardDetailModal({
   onAddTransaction,
   onNavigateToTransactionsWithFilter,
   onReassignTransactionPeriod,
+  onOpenReconciliationModal,
 }: CreditCardDetailModalProps) {
   const { t } = useTranslation();
   const [selectedStatementIdx, setSelectedStatementIdx] = useState<number>(0);
@@ -586,7 +588,19 @@ export function CreditCardDetailModal({
             )}
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+            {onOpenReconciliationModal && (
+              <button
+                type="button"
+                onClick={() => onOpenReconciliationModal(accountName, activeStatement?.closeDate)}
+                className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                title="Upload Credit Card Statement PDF to compare with this period's expenses and draft new transactions or modifications"
+              >
+                <FileText className="w-3.5 h-3.5 text-purple-400" />
+                <span>Reconcile PDF</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleExportStatementCSV}

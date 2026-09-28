@@ -35,6 +35,7 @@ const AiChatWidget = lazy(() => import('./components/AiChatWidget').then(m => ({
 const ImportWizardModal = lazy(() => import('./components/ImportWizardModal'));
 const InstallmentPlansModal = lazy(() => import('./components/InstallmentPlansModal').then(m => ({ default: m.InstallmentPlansModal })));
 const TransactionAttachmentsModal = lazy(() => import('./components/TransactionAttachmentsModal').then(m => ({ default: m.TransactionAttachmentsModal })));
+const StatementReconciliationModal = lazy(() => import('./components/StatementReconciliationModal').then(m => ({ default: m.StatementReconciliationModal })));
 
 import { LandingPage } from './components/LandingPage';
 import { LevLevIcon, LevLevLogo } from './components/LevLevLogo';
@@ -593,6 +594,39 @@ export default function App() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isReconciliationModalOpen, setIsReconciliationModalOpen] = useState(false);
+  const [reconciliationInitialAccount, setReconciliationInitialAccount] = useState<string | undefined>(undefined);
+  const [reconciliationInitialCloseDate, setReconciliationInitialCloseDate] = useState<string | undefined>(undefined);
+
+  const handleOpenReconciliationModal = (accountName?: string, closeDate?: string) => {
+    setReconciliationInitialAccount(accountName);
+    setReconciliationInitialCloseDate(closeDate);
+    setIsReconciliationModalOpen(true);
+  };
+
+  const handleProcessReconciledStatement = ({
+    newTransactions,
+    updatedTransactions,
+    accountName,
+    statementCloseDate,
+  }: {
+    newTransactions: Transaction[];
+    updatedTransactions: Transaction[];
+    accountName: string;
+    statementCloseDate?: string;
+  }) => {
+    setTransactions(prev => {
+      const updatedMap = new Map(updatedTransactions.map(t => [t.id, t]));
+      const modified = prev.map(t => updatedMap.get(t.id) || t);
+      const existingIds = new Set(modified.map(t => t.id));
+      const toAdd = newTransactions.filter(t => !existingIds.has(t.id));
+      const merged = [...toAdd, ...modified];
+      try {
+        localStorage.setItem('finance_app_transactions', JSON.stringify(merged));
+      } catch (e) {}
+      return merged;
+    });
+  };
   const [historyData, setHistoryData] = useState<InflationPoint[]>(historicalInflationAndFX);
   const hasHandledShareRef = useRef(false);
   const lastAddedTxRef = useRef<{ txHash: string; time: number } | null>(null);
@@ -1690,6 +1724,7 @@ export default function App() {
               installmentPlans={installmentPlans}
               onOpenInstallmentPlansModal={handleOpenInstallmentPlansModal}
               onOpenAttachmentsModal={handleOpenAttachmentsModal}
+              onOpenReconciliationModal={handleOpenReconciliationModal}
               onOpenAddModal={() => setIsAddModalOpen(true)}
               onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
               activeFilter={activeFilter}
@@ -1721,6 +1756,7 @@ export default function App() {
               onEditAccount={handleEditAccount}
               onAddAccount={handleAddAccount}
               onReorderAccounts={handleReorderAccounts}
+              onOpenReconciliationModal={handleOpenReconciliationModal}
               currentUserId={authUser?.id}
               showSharedData={showSharedData}
               userTimezone={userTimezone}
@@ -1927,6 +1963,26 @@ export default function App() {
             existingAccounts={accounts}
             existingCategories={categories}
             userTimezone={userTimezone}
+            onOpenReconciliationModal={() => handleOpenReconciliationModal()}
+          />
+        )}
+
+        {isReconciliationModalOpen && (
+          <StatementReconciliationModal
+            isOpen={isReconciliationModalOpen}
+            onClose={() => {
+              setIsReconciliationModalOpen(false);
+              setReconciliationInitialAccount(undefined);
+              setReconciliationInitialCloseDate(undefined);
+            }}
+            accounts={accounts}
+            categories={categories}
+            transactions={transactions}
+            initialAccountName={reconciliationInitialAccount}
+            initialCloseDate={reconciliationInitialCloseDate}
+            displayCurrency={displayCurrency}
+            usdArsRate={usdArsRate}
+            onProcessBatchRecords={handleProcessReconciledStatement}
           />
         )}
 

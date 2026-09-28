@@ -19,6 +19,7 @@ interface TransactionsTabProps {
   installmentPlans?: InstallmentPlan[];
   onOpenInstallmentPlansModal?: (planId?: string) => void;
   onOpenAttachmentsModal?: (tx: Transaction) => void;
+  onOpenReconciliationModal?: (accountName?: string, closeDate?: string) => void;
   onOpenAddModal: () => void;
   onOpenDeleteModal?: () => void;
   onEditTransaction?: (tx: Transaction) => void;
@@ -47,6 +48,7 @@ export const TransactionsTab = React.memo(function TransactionsTab({
   installmentPlans = [],
   onOpenInstallmentPlansModal,
   onOpenAttachmentsModal,
+  onOpenReconciliationModal,
   onOpenAddModal,
   onOpenDeleteModal,
   onEditTransaction,
@@ -634,6 +636,18 @@ export const TransactionsTab = React.memo(function TransactionsTab({
                   {installmentPlans.filter(p => p.status === 'ACTIVE').length || installmentPlans.length}
                 </span>
               )}
+            </button>
+          )}
+
+          {onOpenReconciliationModal && (
+            <button
+              type="button"
+              onClick={() => onOpenReconciliationModal()}
+              title="Upload Credit Card Statement PDF to compare and batch add/modify expenses"
+              className="inline-flex items-center px-3 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 mr-1.5 text-purple-400" />
+              <span>Reconcile PDF</span>
             </button>
           )}
 

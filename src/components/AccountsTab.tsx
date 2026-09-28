@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, AccountCustomBalance, TransactionFilter, CreditCardClosingRule, AccountItem, SharedMember } from '../types';
 import { computeAccountBalances, formatCurrency, isCreditCardAccount, getCreditCardStatements, getCurrentStatement, getNextCloseDate, getClosingRuleLabel, getTodayString, getTransferOutflow, getTransferInflow } from '../utils/financeUtils';
 import { exportAllCreditCardExpensesCSV } from '../utils/exportUtils';
-import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, ChevronUp, ChevronDown, ArrowUpDown, Eye, EyeOff, MoreVertical, Trash2, Building2, Coins, GripVertical, Download } from 'lucide-react';
+import { Wallet, DollarSign, Landmark, Edit3, Check, RotateCcw, HelpCircle, History, ArrowRightLeft, ExternalLink, CreditCard, ChevronRight, AlertCircle, Sparkles, Calendar, Settings, Users, Share2, UserPlus, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, ChevronUp, ChevronDown, ArrowUpDown, Eye, EyeOff, MoreVertical, Trash2, Building2, Coins, GripVertical, Download, FileText } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { motion } from 'motion/react';
 import { CreditCardDetailModal } from './CreditCardDetailModal';
@@ -30,6 +30,7 @@ interface AccountsTabProps {
   onEditAccount?: (oldName: string, updatedAcc: AccountItem, updateTransactions: boolean) => void;
   onAddAccount?: (newAcc: AccountItem) => void;
   onReorderAccounts?: (accounts: AccountItem[]) => void;
+  onOpenReconciliationModal?: (accountName?: string, closeDate?: string) => void;
   currentUserId?: string;
   showSharedData?: boolean;
   userTimezone?: string;
@@ -72,6 +73,7 @@ export const AccountsTab = React.memo(function AccountsTab({
   onEditAccount,
   onAddAccount,
   onReorderAccounts,
+  onOpenReconciliationModal,
   currentUserId,
   showSharedData = true,
   userTimezone = 'America/Argentina/Buenos_Aires',
@@ -804,6 +806,19 @@ export const AccountsTab = React.memo(function AccountsTab({
                           <span>{t('accounts.details')}</span>
                           <ChevronRight className="w-3 h-3" />
                         </button>
+                        {onOpenReconciliationModal && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenReconciliationModal(acc.accountName, acc.currentStatement?.closeDate);
+                            }}
+                            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 rounded-lg text-xs font-medium transition-all flex items-center justify-center cursor-pointer"
+                            title="Reconcile Statement PDF"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -973,6 +988,7 @@ export const AccountsTab = React.memo(function AccountsTab({
           onAddTransaction={onAddTransaction}
           onNavigateToTransactionsWithFilter={onNavigateToTransactionsWithFilter}
           onReassignTransactionPeriod={onReassignTransactionPeriod}
+          onOpenReconciliationModal={onOpenReconciliationModal}
         />
       )}
 
