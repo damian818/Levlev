@@ -554,7 +554,6 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
           transfer_currency: t.transferCurrency || null,
           receive_amount: t.receiveAmount !== undefined && t.receiveAmount !== null ? Math.round(t.receiveAmount * 100) / 100 : null,
           receive_currency: t.receiveCurrency || null,
-          plan_id: t.planId || t.installmentPlanId || null,
           notes: t.description || null,
         };
       });
@@ -593,33 +592,39 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
               }
             }
 
-            // 2. Fallback retry stripping transfer_amount/transfer_currency/plan_id if column missing in DB schema cache
-            if (!success && (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency') || txErr.message?.includes('plan_id'))) {
-              const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, plan_id, ...rest }) => rest);
+            // 2. Fallback retry stripping transfer / receive / statement_close_date if column missing in DB schema cache
+            if (!success && (txErr.code === 'PGRST204' || txErr.message?.includes('transfer_amount') || txErr.message?.includes('transfer_currency') || txErr.message?.includes('receive_amount') || txErr.message?.includes('receive_currency') || txErr.message?.includes('statement_close_date'))) {
+              const fallbackBatch = batch.map(({ transfer_amount, transfer_currency, receive_amount, receive_currency, statement_close_date, ...rest }) => rest);
               const { error: fbErr } = await client.from('transactions').upsert(fallbackBatch, { onConflict: 'id' });
               if (!fbErr) {
                 success = true;
               }
             }
 
-            // 3. Fallback row-by-row on final attempt to prevent losing other transactions in the batch
+            // 3. Fallback minimal columns on final attempt
             if (!success && attempt === 3) {
               for (const row of batch) {
-                const { error: singleErr } = await client.from('transactions').upsert(row, { onConflict: 'id' });
-                if (singleErr) {
-                  let safeRow: any = { ...row };
-                  if (singleErr.code === '23514' || singleErr.message?.includes('check constraint') || row.type === 'CC_PAYMENT') {
-                    safeRow.type = 'TRANSFER';
-                    safeRow.notes = safeRow.notes ? (safeRow.notes.startsWith('[CC_PAYMENT]') ? safeRow.notes : `[CC_PAYMENT] ${safeRow.notes}`) : '[CC_PAYMENT]';
-                  }
-                  await client.from('transactions').upsert(safeRow, { onConflict: 'id' });
-                }
+                const minimalRow: any = {
+                  id: row.id,
+                  user_id: row.user_id,
+                  date: row.date,
+                  title: row.title,
+                  amount: row.amount,
+                  currency: row.currency,
+                  category: row.category,
+                  account: row.account,
+                  type: row.type === 'CC_PAYMENT' ? 'TRANSFER' : row.type,
+                  to_account: row.to_account,
+                  installments: row.installments,
+                  notes: row.type === 'CC_PAYMENT' ? `[CC_PAYMENT] ${row.notes || ''}`.trim() : row.notes,
+                };
+                await client.from('transactions').upsert(minimalRow, { onConflict: 'id' });
               }
               success = true;
             }
 
             if (!success && attempt < 3) {
-              await new Promise(r => setTimeout(r, attempt * 300));
+              await new Promise(r => setTimeout(r, attempt * 200));
             }
           }
         }
