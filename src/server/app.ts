@@ -2,6 +2,11 @@ import express from "express";
 import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import { createRequire } from "module";
+import { parseStatementTextDeterministically } from "./deterministicStatementParser";
+
+const require = createRequire(import.meta.url);
+const { PDFParse } = require("pdf-parse");
 
 dotenv.config();
 
@@ -696,20 +701,29 @@ app.post(["/api/parse-statement-pdf", "/parse-statement-pdf"], checkAiRateLimit,
   try {
     const { pdfBase64, statementText, accounts = [], categories = [], cardHint = '' } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: "Gemini API key is not configured on the server." });
-    }
 
     if (!pdfBase64 && !statementText) {
       return res.status(400).json({ error: "Please provide either pdfBase64 or statementText." });
     }
 
-    const ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: { 'User-Agent': 'aistudio-build' },
-      },
-    });
+    // Step 1: Pre-extract raw text from PDF if pdfBase64 is provided
+    let extractedPdfText = (statementText || '').trim();
+    if (pdfBase64) {
+      try {
+        const cleanBase64 = String(pdfBase64).replace(/^data:application\/pdf;base64,/, '').replace(/\s/g, '');
+        const pdfBuffer = Buffer.from(cleanBase64, 'base64');
+        const parser = new PDFParse({ data: pdfBuffer });
+        const parsedTextObj = await parser.getText();
+        const rawText = (parsedTextObj?.text || '').trim();
+        await parser.destroy();
+        if (rawText.length > 30) {
+          extractedPdfText = rawText;
+          console.log(`Successfully extracted ${rawText.length} characters of text from statement PDF.`);
+        }
+      } catch (pdfErr) {
+        console.warn('PDF text pre-extraction error, will proceed to multimodal or fallback:', pdfErr);
+      }
+    }
 
     const categoriesList = Array.isArray(categories) && categories.length > 0 ? categories.join(', ') : 'Food, Groceries, Services, Shopping, Transport, Entertainment, Healthcare, Utilities, Education, Travel, Housing, Subscriptions';
     const accountsList = Array.isArray(accounts) && accounts.length > 0 ? accounts.join(', ') : 'Credit Card';
@@ -789,7 +803,12 @@ Schema:
 
     let contentsParts: any[] = [];
 
-    if (pdfBase64) {
+    // Prefer text prompt if we extracted text (100x faster, no OCR vision capacity limits)
+    if (extractedPdfText && extractedPdfText.length > 30) {
+      contentsParts.push({
+        text: `Statement Text Content:\n\n${extractedPdfText.slice(0, 40000)}\n\nPlease extract all expense transactions, installments, and period dates from this statement as specified in the instructions.`
+      });
+    } else if (pdfBase64) {
       const cleanBase64 = String(pdfBase64).replace(/^data:application\/pdf;base64,/, '').replace(/\s/g, '');
       contentsParts.push({
         inlineData: {
@@ -800,56 +819,113 @@ Schema:
       contentsParts.push({
         text: "Please extract all expense transactions, installments, and period dates from this credit card statement PDF as specified."
       });
-    } else if (statementText) {
+    } else {
       contentsParts.push({
         text: `Statement Content:\n\n${statementText}\n\nPlease extract all expense transactions, installments, and period dates from this statement as specified.`
       });
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: [
-        {
-          role: "user",
-          parts: contentsParts,
-        }
-      ],
-      config: {
-        systemInstruction: {
-          role: "system",
-          parts: [{ text: systemInstruction }],
+    // Simpler, lightweight model priority to avoid 503 high demand spikes
+    const candidateModels = [
+      'gemini-3.1-flash-lite',
+      'gemini-flash-latest',
+    ];
+
+    let aiResponseText: string | null = null;
+    let lastAiError: any = null;
+
+    if (apiKey) {
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: { 'User-Agent': 'aistudio-build' },
         },
-        temperature: 0.1,
-      }
-    });
-
-    const outputText = response.text?.trim() || "{}";
-    const cleanedText = outputText
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/```$/i, '')
-      .trim();
-
-    try {
-      const parsedData = JSON.parse(cleanedText);
-      // Validate structure
-      if (!Array.isArray(parsedData.items)) {
-        parsedData.items = [];
-      }
-      if (!Array.isArray(parsedData.payments)) {
-        parsedData.payments = [];
-      }
-      res.json(parsedData);
-    } catch (parseErr: any) {
-      console.error("JSON parse error from Gemini response:", parseErr, outputText.slice(0, 500));
-      res.status(500).json({
-        error: "Failed to parse statement analysis into structured JSON.",
-        raw: outputText.slice(0, 1000)
       });
+
+      for (const model of candidateModels) {
+        try {
+          console.log(`Attempting statement analysis with model: ${model}...`);
+          const response = await ai.models.generateContent({
+            model,
+            contents: [
+              {
+                role: "user",
+                parts: contentsParts,
+              }
+            ],
+            config: {
+              systemInstruction: {
+                role: "system",
+                parts: [{ text: systemInstruction }],
+              },
+              temperature: 0.1,
+            }
+          });
+
+          const text = response.text?.trim();
+          if (text && text.length > 20) {
+            aiResponseText = text;
+            console.log(`Model ${model} succeeded!`);
+            break;
+          }
+        } catch (modelErr: any) {
+          lastAiError = modelErr;
+          console.warn(`Model ${model} error (${modelErr.message})`);
+          // If we have extracted text and model is 503 unavailable, break to immediate deterministic parsing
+          if (extractedPdfText && extractedPdfText.length > 30 && modelErr?.message?.includes('503')) {
+            console.log('503 demand spike detected on Gemini. Routing to instant deterministic parser fallback...');
+            break;
+          }
+        }
+      }
     }
+
+    // If Gemini succeeded, parse JSON output
+    if (aiResponseText) {
+      const cleanedText = aiResponseText
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```$/i, '')
+        .trim();
+
+      try {
+        const parsedData = JSON.parse(cleanedText);
+        if (!Array.isArray(parsedData.items)) {
+          parsedData.items = [];
+        }
+        if (!Array.isArray(parsedData.payments)) {
+          parsedData.payments = [];
+        }
+        return res.json(parsedData);
+      } catch (parseErr) {
+        console.warn("AI JSON parse error, falling back to deterministic extraction:", parseErr);
+      }
+    }
+
+    // Step 3: High-Accuracy Deterministic Fallback if AI models are experiencing 503 high demand
+    if (extractedPdfText && extractedPdfText.length > 30) {
+      console.log('Using deterministic statement parser fallback on extracted PDF text...');
+      const fallbackResult = parseStatementTextDeterministically(
+        extractedPdfText,
+        categories,
+        accounts,
+        cardHint
+      );
+      if (fallbackResult.items && fallbackResult.items.length > 0) {
+        return res.json(fallbackResult);
+      }
+    }
+
+    if (lastAiError) {
+      throw lastAiError;
+    }
+
+    throw new Error("Unable to extract transactions from the provided statement.");
   } catch (err: any) {
     console.error("Parse statement PDF error:", err);
-    res.status(500).json({ error: err.message || "Failed to process statement." });
+    res.status(500).json({
+      error: err.message || "Failed to process statement. Please try again or use the demo statement.",
+    });
   }
 });
 
