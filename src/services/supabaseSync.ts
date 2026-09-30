@@ -106,6 +106,28 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     if (budRes.error) console.warn('Supabase fetch budgets error:', budRes.error);
 
     const dbAttachmentsByTxId: Record<string, TransactionAttachment[]> = {};
+    try {
+      const attRes = await client.from('transaction_attachments').select('*');
+      if (attRes && attRes.data && Array.isArray(attRes.data)) {
+        attRes.data.forEach((row: any) => {
+          const txId = row.transaction_id;
+          if (txId) {
+            if (!dbAttachmentsByTxId[txId]) dbAttachmentsByTxId[txId] = [];
+            dbAttachmentsByTxId[txId].push({
+              id: row.id,
+              name: row.name,
+              size: row.size,
+              originalSize: row.original_size,
+              type: row.type,
+              dataUrl: row.data_url,
+              uploadedAt: row.created_at,
+            });
+          }
+        });
+      }
+    } catch (attErr) {
+      // Table may not exist yet, fallback to user_settings and row.attachments
+    }
 
     let userSettings: SupabaseUserData['settings'] = undefined;
     if (setRes && setRes.data && setRes.data.settings) {
@@ -931,29 +953,46 @@ export async function saveTransactionAttachmentsToSupabase(
 
     const userId = session.user.id;
     const targetTxId = txId.startsWith(userId) ? txId : `${userId}_${txId}`;
+    const idCandidates = [txId, targetTxId];
+    if (txId.includes('_')) {
+      idCandidates.push(txId.split('_').slice(1).join('_'));
+    }
 
-    // 1. Update transactions table attachments column directly
+    // Resolve exact transaction row ID in database
+    let matchedTxId = txId;
+    try {
+      const { data: foundTx } = await client
+        .from('transactions')
+        .select('id')
+        .in('id', idCandidates)
+        .limit(1)
+        .maybeSingle();
+      if (foundTx?.id) {
+        matchedTxId = foundTx.id;
+      }
+    } catch {}
+
+    // 1. Update transactions table attachments column directly (if column exists)
     try {
       await client
         .from('transactions')
         .update({ attachments: attachments && attachments.length > 0 ? attachments : [] })
-        .or(`id.eq.${txId},id.eq.${targetTxId}`);
+        .in('id', idCandidates);
     } catch (e) {
       // Ignored if column doesn't exist
     }
 
-    // 2. Sync to dedicated transaction_attachments table
+    // 2. Sync to dedicated transaction_attachments table (if table exists)
     try {
-      // Clean up previous attachments for this transaction
       await client
         .from('transaction_attachments')
         .delete()
-        .or(`transaction_id.eq.${txId},transaction_id.eq.${targetTxId}`);
+        .in('transaction_id', idCandidates);
 
       if (attachments && attachments.length > 0) {
         const rows = attachments.map(att => ({
           id: att.id,
-          transaction_id: txId,
+          transaction_id: matchedTxId,
           user_id: userId,
           name: att.name,
           size: att.size,
@@ -983,10 +1022,12 @@ export async function saveTransactionAttachmentsToSupabase(
       const txAttachments = currSettings.txAttachments || {};
       if (attachments && attachments.length > 0) {
         txAttachments[txId] = attachments;
-        if (targetTxId !== txId) txAttachments[targetTxId] = attachments;
+        txAttachments[targetTxId] = attachments;
+        txAttachments[matchedTxId] = attachments;
       } else {
         delete txAttachments[txId];
         delete txAttachments[targetTxId];
+        delete txAttachments[matchedTxId];
       }
 
       await client.from('user_settings').upsert({
