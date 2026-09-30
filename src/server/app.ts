@@ -2,7 +2,7 @@ import express from "express";
 import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { parseStatementTextDeterministically } from "./deterministicStatementParser";
+import { parseStatementTextDeterministically } from "./deterministicStatementParser.ts";
 
 dotenv.config();
 
