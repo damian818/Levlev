@@ -50,6 +50,32 @@ export function InflationVsFxTab({ historyData: initialHistory }: InflationVsFxT
           setLiveRates(newLiveRates);
           success = true;
         }
+      } else {
+        // Direct browser fallback to DolarApi if proxy endpoint is warming up
+        try {
+          const directDolarRes = await fetch('https://dolarapi.com/v1/dolares');
+          if (directDolarRes.ok) {
+            const dolarData = await directDolarRes.json();
+            const mappedRates: Record<string, FxRateDetail> = {};
+            dolarData.forEach((d: any) => {
+              if (d.casa) {
+                mappedRates[d.casa.toLowerCase()] = {
+                  buy: d.compra || 0,
+                  sell: d.venta || 0,
+                  name: d.nombre || d.casa,
+                  updated: d.fechaActualizacion || new Date().toISOString(),
+                };
+              }
+            });
+            if (Object.keys(mappedRates).length > 0) {
+              newLiveRates = mappedRates;
+              setLiveRates(mappedRates);
+              success = true;
+            }
+          }
+        } catch {
+          // Ignore
+        }
       }
 
       if (inflRes && inflRes.ok) {
@@ -60,6 +86,12 @@ export function InflationVsFxTab({ historyData: initialHistory }: InflationVsFxT
           setSourceInfo(inflJson.source || 'ArgentinaDatos API');
           success = true;
         }
+      } else {
+        // Direct fallback to accurate built-in historical series
+        newHistoryData = historicalInflationAndFX;
+        setHistoryData(historicalInflationAndFX);
+        setSourceInfo('ArgentinaDatos & INDEC Historical Data');
+        success = true;
       }
 
       if (success) {

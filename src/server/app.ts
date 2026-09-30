@@ -112,31 +112,39 @@ const FALLBACK_GLOBAL_RATES: Record<string, number> = {
 };
 
 const FALLBACK_INFLATION_HISTORY = [
-  { month: '2024-09', inflationIndex: 100, usdArsRate: 1250 },
-  { month: '2024-10', inflationIndex: 103.5, usdArsRate: 1280 },
-  { month: '2024-11', inflationIndex: 106.2, usdArsRate: 1310 },
-  { month: '2024-12', inflationIndex: 109.0, usdArsRate: 1350 },
-  { month: '2025-01', inflationIndex: 112.2, usdArsRate: 1380 },
-  { month: '2025-02', inflationIndex: 115.0, usdArsRate: 1400 },
-  { month: '2025-03', inflationIndex: 117.8, usdArsRate: 1430 },
-  { month: '2025-04', inflationIndex: 120.5, usdArsRate: 1460 },
-  { month: '2025-05', inflationIndex: 123.1, usdArsRate: 1490 },
-  { month: '2025-06', inflationIndex: 125.8, usdArsRate: 1520 },
-  { month: '2025-07', inflationIndex: 128.5, usdArsRate: 1550 },
-  { month: '2025-08', inflationIndex: 131.2, usdArsRate: 1580 },
-  { month: '2025-09', inflationIndex: 134.0, usdArsRate: 1610 },
-  { month: '2025-10', inflationIndex: 136.8, usdArsRate: 1640 },
-  { month: '2025-11', inflationIndex: 139.7, usdArsRate: 1670 },
-  { month: '2025-12', inflationIndex: 142.6, usdArsRate: 1700 },
-  { month: '2026-01', inflationIndex: 145.8, usdArsRate: 1450 },
-  { month: '2026-02', inflationIndex: 149.0, usdArsRate: 1400 },
-  { month: '2026-03', inflationIndex: 152.2, usdArsRate: 1380 },
-  { month: '2026-04', inflationIndex: 155.5, usdArsRate: 1448.5 },
-  { month: '2026-05', inflationIndex: 158.8, usdArsRate: 1410 },
-  { month: '2026-06', inflationIndex: 162.2, usdArsRate: 1480 },
-  { month: '2026-07', inflationIndex: 165.6, usdArsRate: 1485 },
-  { month: '2026-08', inflationIndex: 169.1, usdArsRate: 1496 },
-  { month: '2026-09', inflationIndex: 172.5, usdArsRate: 1510 },
+  { month: '2024-01', monthlyInflation: 20.6, inflationIndex: 100.0, usdArsRate: 1177.0 },
+  { month: '2024-02', monthlyInflation: 13.2, inflationIndex: 113.2, usdArsRate: 1031.0 },
+  { month: '2024-03', monthlyInflation: 11.0, inflationIndex: 125.7, usdArsRate: 1020.5 },
+  { month: '2024-04', monthlyInflation: 8.8, inflationIndex: 136.8, usdArsRate: 1044.7 },
+  { month: '2024-05', monthlyInflation: 4.2, inflationIndex: 142.5, usdArsRate: 1215.5 },
+  { month: '2024-06', monthlyInflation: 4.6, inflationIndex: 149.1, usdArsRate: 1348.6 },
+  { month: '2024-07', monthlyInflation: 4.0, inflationIndex: 155.1, usdArsRate: 1307.7 },
+  { month: '2024-08', monthlyInflation: 4.2, inflationIndex: 161.6, usdArsRate: 1284.8 },
+  { month: '2024-09', monthlyInflation: 3.5, inflationIndex: 167.3, usdArsRate: 1213.3 },
+  { month: '2024-10', monthlyInflation: 2.7, inflationIndex: 171.8, usdArsRate: 1128.7 },
+  { month: '2024-11', monthlyInflation: 2.4, inflationIndex: 175.9, usdArsRate: 1075.9 },
+  { month: '2024-12', monthlyInflation: 2.7, inflationIndex: 180.7, usdArsRate: 1169.5 },
+  { month: '2025-01', monthlyInflation: 2.2, inflationIndex: 184.7, usdArsRate: 1168.2 },
+  { month: '2025-02', monthlyInflation: 2.4, inflationIndex: 189.1, usdArsRate: 1231.3 },
+  { month: '2025-03', monthlyInflation: 3.7, inflationIndex: 196.1, usdArsRate: 1319.6 },
+  { month: '2025-04', monthlyInflation: 2.8, inflationIndex: 201.6, usdArsRate: 1182.8 },
+  { month: '2025-05', monthlyInflation: 1.5, inflationIndex: 204.6, usdArsRate: 1193.5 },
+  { month: '2025-06', monthlyInflation: 1.6, inflationIndex: 207.9, usdArsRate: 1211.3 },
+  { month: '2025-07', monthlyInflation: 1.9, inflationIndex: 211.9, usdArsRate: 1363.8 },
+  { month: '2025-08', monthlyInflation: 1.9, inflationIndex: 215.9, usdArsRate: 1371.9 },
+  { month: '2025-09', monthlyInflation: 2.1, inflationIndex: 220.4, usdArsRate: 1503.2 },
+  { month: '2025-10', monthlyInflation: 2.3, inflationIndex: 225.5, usdArsRate: 1495.2 },
+  { month: '2025-11', monthlyInflation: 2.5, inflationIndex: 231.1, usdArsRate: 1482.9 },
+  { month: '2025-12', monthlyInflation: 2.8, inflationIndex: 237.6, usdArsRate: 1501.5 },
+  { month: '2026-01', monthlyInflation: 2.9, inflationIndex: 244.5, usdArsRate: 1464.6 },
+  { month: '2026-02', monthlyInflation: 2.9, inflationIndex: 251.6, usdArsRate: 1427.4 },
+  { month: '2026-03', monthlyInflation: 3.4, inflationIndex: 260.2, usdArsRate: 1430.8 },
+  { month: '2026-04', monthlyInflation: 2.6, inflationIndex: 266.9, usdArsRate: 1448.5 },
+  { month: '2026-05', monthlyInflation: 2.1, inflationIndex: 272.5, usdArsRate: 1434.8 },
+  { month: '2026-06', monthlyInflation: 1.9, inflationIndex: 277.7, usdArsRate: 1519.0 },
+  { month: '2026-07', monthlyInflation: 2.1, inflationIndex: 283.5, usdArsRate: 1522.1 },
+  { month: '2026-08', monthlyInflation: 1.7, inflationIndex: 288.3, usdArsRate: 1538.8 },
+  { month: '2026-09', monthlyInflation: 1.8, inflationIndex: 293.5, usdArsRate: 1557.0 },
 ];
 
 // Simple in-memory cache for external API calls
@@ -333,6 +341,7 @@ app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res)
     });
 
     const startDate = (req.query.startDate as string) || '2024-01-01';
+    const fallbackMap = new Map(FALLBACK_INFLATION_HISTORY.map(item => [item.month, item]));
 
     // If live inflation data is available, compute history points from it
     if (Array.isArray(inflData) && inflData.length > 0) {
@@ -343,26 +352,16 @@ app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res)
         if (idx > 0) {
           cumulativeIndex = cumulativeIndex * (1 + item.valor / 100);
         }
-        let rate = monthlyFx[month] || null;
-        
-        // Simulation rates for 2026
-        if (month === '2026-01') rate = 1450;
-        if (month === '2026-02') rate = 1400;
-        if (month === '2026-03') rate = 1380;
-        if (month === '2026-04') rate = 1448.5;
-        if (month === '2026-05') rate = 1410;
-        if (month === '2026-06') rate = 1480;
-        if (month === '2026-07') rate = 1485;
-        if (month === '2026-08') rate = 1496;
-        if (month === '2026-09') rate = 1510;
+        const fallbackItem = fallbackMap.get(month);
+        const rate = monthlyFx[month] || fallbackItem?.usdArsRate || (idx > 0 ? null : 1177);
 
         return {
           month,
           monthlyInflation: item.valor,
           inflationIndex: Math.round(cumulativeIndex * 10) / 10,
-          usdArsRate: rate,
+          usdArsRate: rate ? Math.round(rate * 10) / 10 : (fallbackItem?.usdArsRate || 1400),
         };
-      }).filter(pt => pt.usdArsRate !== null || pt.month >= '2024-09');
+      });
 
       const responseData = {
         points: historyPoints,

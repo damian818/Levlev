@@ -186,6 +186,7 @@ export interface InflationPoint {
   month: string; // YYYY-MM
   inflationIndex: number; // Cumulative inflation index
   usdArsRate: number; // Official or MEP rate
+  monthlyInflation?: number; // Monthly inflation percentage
 }
 
 export interface CategoryItem {
