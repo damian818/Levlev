@@ -1517,8 +1517,21 @@ export default function App() {
 
   const handleUpdateTransaction = (idOrIds: string | string[], updates: Partial<Transaction>) => {
     const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+    const idSet = new Set(ids);
+    ids.forEach(id => {
+      if (id && id.includes('_')) {
+        idSet.add(id.split('_').slice(1).join('_'));
+      }
+    });
+
     setTransactions(prev => {
-      const updated = prev.map(t => ids.includes(t.id) ? { ...t, ...updates } : t);
+      const updated = prev.map(t => {
+        const cleanId = t.id && t.id.includes('_') ? t.id.split('_').slice(1).join('_') : t.id;
+        if (idSet.has(t.id) || idSet.has(cleanId)) {
+          return { ...t, ...updates };
+        }
+        return t;
+      });
       try {
         localStorage.setItem('finance_app_transactions', JSON.stringify(updated));
       } catch (e) {}
@@ -1545,8 +1558,18 @@ export default function App() {
     const idsToDelete = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
     if (idsToDelete.length === 0) return;
 
+    const idSet = new Set(idsToDelete);
+    idsToDelete.forEach(id => {
+      if (id && id.includes('_')) {
+        idSet.add(id.split('_').slice(1).join('_'));
+      }
+    });
+
     setTransactions(prev => {
-      const updated = prev.filter(t => !idsToDelete.includes(t.id));
+      const updated = prev.filter(t => {
+        const cleanId = t.id && t.id.includes('_') ? t.id.split('_').slice(1).join('_') : t.id;
+        return !idSet.has(t.id) && !idSet.has(cleanId);
+      });
       try {
         localStorage.setItem('finance_app_transactions', JSON.stringify(updated));
       } catch (e) {}
