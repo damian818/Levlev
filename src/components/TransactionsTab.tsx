@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint, CategoryItem, AccountItem, AccountCustomBalance, InstallmentPlan } from '../types';
 import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString, normalizeCleanTitle, isInstallmentTx, detectRecurringItems, isCreditCardAccount, computeAccountBalances } from '../utils/financeUtils';
 import { exportTransactionsToCSV } from '../utils/exportUtils';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2, Download, CreditCard, Landmark, Paperclip, FileText } from 'lucide-react';
 
 interface TransactionsTabProps {
@@ -74,6 +75,7 @@ export const TransactionsTab = React.memo(function TransactionsTab({
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionTarget, setBulkActionTarget] = useState<'CATEGORY' | 'ACCOUNT' | 'DELETE' | null>(null);
+  const [isConfirmBulkDeleteOpen, setIsConfirmBulkDeleteOpen] = useState(false);
 
   const toggleBulkMode = () => {
     setIsBulkMode(!isBulkMode);
@@ -104,11 +106,14 @@ export const TransactionsTab = React.memo(function TransactionsTab({
 
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (confirm(t('transactions.bulk_delete_confirm', { count: selectedIds.size }))) {
-      onDeleteTransaction(Array.from(selectedIds));
-      setSelectedIds(new Set());
-      setIsBulkMode(false);
-    }
+    setIsConfirmBulkDeleteOpen(true);
+  };
+
+  const handleConfirmBulkDelete = () => {
+    onDeleteTransaction(Array.from(selectedIds));
+    setSelectedIds(new Set());
+    setIsBulkMode(false);
+    setIsConfirmBulkDeleteOpen(false);
   };
 
   const handleBulkUpdateCategory = (category: string) => {
@@ -1309,6 +1314,16 @@ export const TransactionsTab = React.memo(function TransactionsTab({
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={isConfirmBulkDeleteOpen}
+        onClose={() => setIsConfirmBulkDeleteOpen(false)}
+        onConfirmDeleteAll={handleConfirmBulkDelete}
+        title={t('transactions.bulk_delete_title', 'Delete Selected Transactions')}
+        description={t('transactions.bulk_delete_confirm', { count: selectedIds.size })}
+        confirmLabel={t('common.delete', 'Delete')}
+      />
     </div>
   );
 });

@@ -13,6 +13,7 @@ import {
   DebtSimulationResult 
 } from '../utils/debtUtils';
 import { formatCurrency } from '../utils/financeUtils';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -208,15 +209,15 @@ export function DebtPayoffTab({
     setDebts(prev => prev.filter(d => d.id !== id));
   };
 
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
+
   const handleResetSampleDebts = () => {
     setDebts(DEFAULT_SAMPLE_DEBTS);
     setExtraPayment(150);
   };
 
   const handleClearAllDebts = () => {
-    if (window.confirm(t('debts.clear_confirm'))) {
-      setDebts([]);
-    }
+    setIsConfirmClearOpen(true);
   };
 
   const exportScheduleCsv = () => {
@@ -973,6 +974,16 @@ export function DebtPayoffTab({
           </div>
         </div>
       )}
+
+      {/* Clear All Debts Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={isConfirmClearOpen}
+        onClose={() => setIsConfirmClearOpen(false)}
+        onConfirmDeleteAll={() => setDebts([])}
+        title={t('debts.clear_debts_title', 'Clear All Debts')}
+        description={t('debts.clear_confirm')}
+        confirmLabel={t('common.delete_all', 'Delete All')}
+      />
     </div>
   );
 }

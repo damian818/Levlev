@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { X, Upload, Trash2, Download, Eye, Paperclip, FileText, Check, AlertCircle, Loader2, Database, Sparkles } from 'lucide-react';
 import { Transaction, TransactionAttachment } from '../types';
 import { processAttachmentFile, formatFileSize, getReductionPercentage } from '../utils/attachmentCompression';
-import { saveTransactionAttachmentsToSupabase } from '../services/supabaseSync';
+import { saveTransactionAttachmentsToSupabase, deleteTransactionAttachmentFromSupabase } from '../services/supabaseSync';
+import { deleteAttachmentDataUrl } from '../utils/attachmentStorage';
 
 interface TransactionAttachmentsModalProps {
   isOpen: boolean;
@@ -130,13 +131,18 @@ export const TransactionAttachmentsModal: React.FC<TransactionAttachmentsModalPr
     onUpdateTransaction(updatedTx);
 
     setSaveStatus('saving');
-    await saveTransactionAttachmentsToSupabase(transaction.id, updated);
-    setSaveStatus('saved');
+    try {
+      deleteAttachmentDataUrl(id).catch(() => {});
+      await deleteTransactionAttachmentFromSupabase(transaction.id, id, updated);
+      setSaveStatus('saved');
+    } catch {
+      setSaveStatus('error');
+    }
     setIsSaved(true);
     setTimeout(() => {
       setIsSaved(false);
       setSaveStatus('idle');
-    }, 2500);
+    }, 2000);
   };
 
   const isImage = (type?: string) => {

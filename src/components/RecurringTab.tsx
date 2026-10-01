@@ -23,6 +23,7 @@ import {
 import { RecurringTrendModal } from './RecurringTrendModal';
 import { RecurringCategoryTrendModal } from './RecurringCategoryTrendModal';
 import { RecurringRuleModal } from './RecurringRuleModal';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { 
   Repeat, 
   Calendar, 
@@ -132,6 +133,8 @@ export function RecurringTab({
       localStorage.setItem('levlev_non_recurring_keys', JSON.stringify(next));
     }
   };
+
+  const [ruleToDelete, setRuleToDelete] = useState<RecurringRule | null>(null);
 
   const handleOpenAddRule = () => {
     setEditingRule(null);
@@ -644,11 +647,7 @@ export function RecurringTab({
                           {onDeleteRecurringRule && (
                             <button
                               type="button"
-                              onClick={() => {
-                                if (confirm(`Delete rule "${rule.title}"?`)) {
-                                  onDeleteRecurringRule(rule.id);
-                                }
-                              }}
+                              onClick={() => setRuleToDelete(rule)}
                               className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
                               title="Delete rule"
                             >
@@ -1096,6 +1095,21 @@ export function RecurringTab({
         displayCurrency={displayCurrency}
         usdArsRate={usdArsRate}
         historyData={historyData}
+      />
+
+      {/* Delete Rule Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={!!ruleToDelete}
+        onClose={() => setRuleToDelete(null)}
+        onConfirmDeleteAll={() => {
+          if (ruleToDelete && onDeleteRecurringRule) {
+            onDeleteRecurringRule(ruleToDelete.id);
+            setRuleToDelete(null);
+          }
+        }}
+        title={t('recurring.delete_rule_title', 'Delete Recurring Rule')}
+        description={ruleToDelete ? `Are you sure you want to delete the rule "${ruleToDelete.title}"?` : ''}
+        confirmLabel={t('common.delete', 'Delete')}
       />
     </div>
   );

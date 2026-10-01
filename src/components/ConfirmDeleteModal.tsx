@@ -6,12 +6,18 @@ interface ConfirmDeleteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirmDeleteAll: () => void;
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
 }
 
 export function ConfirmDeleteModal({
   isOpen,
   onClose,
   onConfirmDeleteAll,
+  title,
+  description,
+  confirmLabel,
 }: ConfirmDeleteModalProps) {
   const { t } = useTranslation();
   if (!isOpen) return null;
@@ -32,21 +38,25 @@ export function ConfirmDeleteModal({
         </div>
 
         <div className="space-y-2">
-          <h3 className="text-lg font-bold text-slate-100">{t('common.delete_data_title')}</h3>
+          <h3 className="text-lg font-bold text-slate-100">
+            {title || t('common.delete_data_title')}
+          </h3>
           <p className="text-xs text-slate-400 leading-relaxed">
-            {t('common.delete_data_desc')}
+            {description || t('common.delete_data_desc')}
           </p>
         </div>
 
-        <div className="p-3.5 bg-[#0f131a] rounded-xl border border-slate-800/80 space-y-1.5 text-xs text-slate-300">
-          <div className="font-semibold text-rose-400 flex items-center gap-1.5">
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>{t('common.wipe_records')}</span>
+        {!title && (
+          <div className="p-3.5 bg-[#0f131a] rounded-xl border border-slate-800/80 space-y-1.5 text-xs text-slate-300">
+            <div className="font-semibold text-rose-400 flex items-center gap-1.5">
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{t('common.wipe_records')}</span>
+            </div>
+            <p className="text-slate-400 text-[11px]">
+              {t('common.wipe_records_desc')}
+            </p>
           </div>
-          <p className="text-slate-400 text-[11px]">
-            {t('common.wipe_records_desc')}
-          </p>
-        </div>
+        )}
 
         <div className="flex flex-col gap-2.5 pt-2">
           <button
@@ -57,7 +67,7 @@ export function ConfirmDeleteModal({
             className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm"
           >
             <Trash2 className="w-4 h-4" />
-            <span>{t('common.confirm_delete_all')}</span>
+            <span>{confirmLabel || t('common.confirm_delete_all')}</span>
           </button>
 
           <button

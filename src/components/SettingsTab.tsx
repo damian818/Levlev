@@ -8,7 +8,11 @@ import {
   CreditCardClosingRule, 
   ClosingRuleType, 
   DisplayCurrency,
-  AccountCustomBalance
+  AccountCustomBalance,
+  InstallmentPlan,
+  RecurringRule,
+  DebtItem,
+  DebtPayoffStrategy
 } from '../types';
 import { 
   Wallet, 
@@ -121,6 +125,13 @@ interface SettingsTabProps {
   onUpdateHiddenCategoryIds?: (ids: string[]) => void;
   tabCustomization?: TabCustomizationItem[];
   onUpdateTabCustomization?: (tabs: TabCustomizationItem[]) => void;
+  installmentPlans?: InstallmentPlan[];
+  recurringRules?: RecurringRule[];
+  debts?: DebtItem[];
+  debtStrategy?: DebtPayoffStrategy;
+  debtExtraPayment?: number;
+  periodStatusOverrides?: Record<string, 'PAID' | 'OPEN'>;
+  closingDateOverrides?: Record<string, Record<string, string>>;
 }
 
 export function SettingsTab({
@@ -164,6 +175,13 @@ export function SettingsTab({
   hiddenCategoryIds = [],
   onUpdateHiddenCategoryIds,
   tabCustomization: propsTabCustomization,
+  installmentPlans = [],
+  recurringRules = [],
+  debts = [],
+  debtStrategy = 'SNOWBALL',
+  debtExtraPayment = 0,
+  periodStatusOverrides = {},
+  closingDateOverrides = {},
   onUpdateTabCustomization,
 }: SettingsTabProps) {
   const { t, i18n } = useTranslation();
@@ -556,11 +574,29 @@ export function SettingsTab({
   const handleExportData = () => {
     const exportObject = {
       app: 'LevLev',
+      version: '2.0',
       exportDate: new Date().toISOString(),
       categories,
       accounts,
       transactions,
       budgets,
+      installmentPlans,
+      recurringRules,
+      debts,
+      debtStrategy,
+      debtExtraPayment,
+      customBalances: customBalances || {},
+      tabCustomization: propsTabCustomization || [],
+      periodStatusOverrides: periodStatusOverrides || {},
+      closingDateOverrides: closingDateOverrides || {},
+      hiddenCategoryIds,
+      settings: {
+        localCurrency,
+        displayCurrency,
+        enabledCurrencies,
+        userTimezone,
+        isWorkspaceShared,
+      },
     };
 
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject, null, 2));

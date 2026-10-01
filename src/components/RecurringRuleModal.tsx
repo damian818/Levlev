@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RecurringRule, AccountItem, CategoryItem } from '../types';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { 
   X, 
   Repeat, 
@@ -46,6 +47,7 @@ export const RecurringRuleModal: React.FC<RecurringRuleModalProps> = ({
   const [frequency, setFrequency] = useState<'MONTHLY' | 'WEEKLY' | 'BIWEEKLY' | 'YEARLY'>('MONTHLY');
   const [isActive, setIsActive] = useState<boolean>(true);
   const [description, setDescription] = useState('');
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
   // Visible accounts and categories, filtering out hidden ones unless currently editing a rule that uses them
   const availableAccounts = accountsList.length > 0 
@@ -386,12 +388,7 @@ export const RecurringRuleModal: React.FC<RecurringRuleModalProps> = ({
               <button
                 type="button"
                 id="delete-recurring-rule-btn"
-                onClick={() => {
-                  if (confirm(t('recurring.confirm_delete_rule') || 'Delete this recurring rule?')) {
-                    onDeleteRule(editingRule.id);
-                    onClose();
-                  }
-                }}
+                onClick={() => setIsConfirmDeleteOpen(true)}
                 className="px-3.5 py-2.5 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors flex items-center gap-1.5"
               >
                 <Trash2 className="w-4 h-4" />
@@ -421,6 +418,22 @@ export const RecurringRuleModal: React.FC<RecurringRuleModalProps> = ({
             </div>
           </div>
         </form>
+
+        {/* Delete Rule Confirmation Modal */}
+        <ConfirmDeleteModal
+          isOpen={isConfirmDeleteOpen}
+          onClose={() => setIsConfirmDeleteOpen(false)}
+          onConfirmDeleteAll={() => {
+            if (editingRule && onDeleteRule) {
+              onDeleteRule(editingRule.id);
+              setIsConfirmDeleteOpen(false);
+              onClose();
+            }
+          }}
+          title={t('recurring.delete_rule_title', 'Delete Recurring Rule')}
+          description={t('recurring.confirm_delete_rule') || `Delete rule "${title}"?`}
+          confirmLabel={t('common.delete', 'Delete')}
+        />
       </div>
     </div>
   );

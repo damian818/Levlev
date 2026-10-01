@@ -28,7 +28,7 @@ export function AiAdvisorTab({ transactions, displayCurrency, usdArsRate }: AiAd
         totalExpenses: formatCurrency(spending.totalExpenses, displayCurrency),
         savingsRate: spending.savingsRate.toFixed(1),
         topCategories: spending.topCategories.slice(0, 5),
-        topAccounts: spending.topMerchants.slice(0, 5),
+        topMerchants: spending.topMerchants.slice(0, 5),
       };
 
       const res = await fetch('/api/ai-insights', {

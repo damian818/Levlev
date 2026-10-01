@@ -106,6 +106,8 @@ export interface BudgetGoal {
   ownerId?: string;
   category: string;
   monthlyLimitARS: number;
+  currency?: string;
+  monthlyLimit?: number;
 }
 
 export interface BudgetUtilizationMonthPoint {

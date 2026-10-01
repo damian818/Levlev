@@ -7,12 +7,13 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { ViewTab, DisplayCurrency, Transaction, BudgetGoal, AccountCustomBalance, TransactionFilter, InflationPoint, CategoryItem, AccountItem, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, InstallmentPlan, TransactionAttachment } from './types';
 import { Loader2, Heart, ShieldCheck, TrendingUp, Wallet, Sparkles, Globe, ArrowRight, Lock, CheckCircle2, DollarSign } from 'lucide-react';
 import { parseTransactions, historicalInflationAndFX, defaultCategoryItems, defaultAccountItems } from './data/defaultTransactions';
-import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount, detectFinancialAnomalies, getCreditCardStatements, getPendingRecurringForMonth, getCurrentMonthKey, getSavedDismissedRecurring, saveDismissedRecurring, computeAccountBalances } from './utils/financeUtils';
+import { deriveBudgetsFromTransactions, getGlobalPrivacyMode, setGlobalPrivacyMode, recalculateAccountBalancesFromTransactions, isCreditCardAccount, detectFinancialAnomalies, getCreditCardStatements, getPendingRecurringForMonth, getCurrentMonthKey, getSavedDismissedRecurring, saveDismissedRecurring, computeAccountBalances, convertCurrency } from './utils/financeUtils';
 import { TabCustomizationItem, getSavedTabCustomization, saveTabCustomizationToStorage, mergeTabOrder } from './utils/tabUtils';
 import { getSavedSelectedReports, saveSelectedReports } from './utils/reportsCatalog';
 import { getSavedDebts, saveDebtsToStorage, getSavedDebtStrategy, saveDebtStrategyToStorage, getSavedExtraPayment, saveExtraPaymentToStorage } from './utils/debtUtils';
 import { useBrowserNotifications } from './hooks/useBrowserNotifications';
 import { initializeGlobalFxRates } from './utils/currencyUtils';
+import { persistAttachmentDataUrl, retrieveAttachmentDataUrl } from './utils/attachmentStorage';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
 import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase, getDeletedTxIds } from './services/supabaseSync';
 import { Navbar } from './components/Navbar';
@@ -449,6 +450,54 @@ export default function App() {
       if (data.categories) setCategories(data.categories);
       if (data.accounts) setAccounts(data.accounts);
       if (data.budgets) setBudgets(data.budgets);
+
+      const anyData = data as any;
+      if (Array.isArray(anyData.installmentPlans)) {
+        setInstallmentPlans(anyData.installmentPlans);
+        try {
+          localStorage.setItem('finance_app_installment_plans', JSON.stringify(anyData.installmentPlans));
+        } catch (e) {}
+      }
+      if (Array.isArray(anyData.recurringRules)) {
+        setRecurringRules(anyData.recurringRules);
+        try {
+          localStorage.setItem('finance_app_recurring_rules', JSON.stringify(anyData.recurringRules));
+        } catch (e) {}
+      }
+      if (Array.isArray(anyData.debts)) {
+        setDebts(anyData.debts);
+        saveDebtsToStorage(anyData.debts);
+      }
+      if (anyData.debtStrategy) {
+        setDebtStrategy(anyData.debtStrategy);
+        saveDebtStrategyToStorage(anyData.debtStrategy);
+      }
+      if (typeof anyData.debtExtraPayment === 'number') {
+        setDebtExtraPayment(anyData.debtExtraPayment);
+        saveExtraPaymentToStorage(anyData.debtExtraPayment);
+      }
+      if (anyData.customBalances && typeof anyData.customBalances === 'object') {
+        setCustomBalances(anyData.customBalances);
+        try {
+          localStorage.setItem('finance_app_account_balances', JSON.stringify(anyData.customBalances));
+        } catch (e) {}
+      }
+      if (anyData.periodStatusOverrides && typeof anyData.periodStatusOverrides === 'object') {
+        setPeriodStatusOverrides(anyData.periodStatusOverrides);
+        try {
+          localStorage.setItem('finance_app_cc_period_statuses', JSON.stringify(anyData.periodStatusOverrides));
+        } catch (e) {}
+      }
+      if (anyData.closingDateOverrides && typeof anyData.closingDateOverrides === 'object') {
+        setClosingDateOverrides(anyData.closingDateOverrides);
+        try {
+          localStorage.setItem('finance_app_cc_closing_date_overrides', JSON.stringify(anyData.closingDateOverrides));
+        } catch (e) {}
+      }
+      if (Array.isArray(anyData.tabCustomization)) {
+        setTabCustomization(anyData.tabCustomization);
+        saveTabCustomizationToStorage(anyData.tabCustomization);
+      }
     } else {
       if (data.transactions && data.transactions.length > 0) {
         setTransactions(prev => {
@@ -706,12 +755,24 @@ export default function App() {
     handleSharedData();
   }, [accounts, categories]);
 
-  // Sync transactions to localStorage on update
+  // Sync transactions to localStorage on update and persist attachments to IndexedDB
   useEffect(() => {
     try {
       if (transactions.length > 0) {
         localStorage.removeItem('finance_app_is_cleared');
       }
+
+      // Persist attachments with valid dataUrl to IndexedDB
+      transactions.forEach(t => {
+        if (t.attachments && t.attachments.length > 0) {
+          t.attachments.forEach(a => {
+            if (a.id && a.dataUrl && a.dataUrl.length > 50) {
+              persistAttachmentDataUrl(a.id, a.dataUrl);
+            }
+          });
+        }
+      });
+
       localStorage.setItem('finance_app_transactions', JSON.stringify(transactions));
     } catch (e) {
       console.warn('Failed to save full transactions to localStorage, falling back to lightweight cache:', e);
@@ -735,6 +796,40 @@ export default function App() {
       }
     }
   }, [transactions]);
+
+  // Rehydrate missing attachment dataUrls from IndexedDB on startup
+  useEffect(() => {
+    let hasMissingDataUrls = false;
+    transactions.forEach(t => {
+      if (t.attachments && t.attachments.some(a => !a.dataUrl)) {
+        hasMissingDataUrls = true;
+      }
+    });
+
+    if (hasMissingDataUrls) {
+      Promise.all(
+        transactions.map(async t => {
+          if (!t.attachments || t.attachments.length === 0) return t;
+          let changed = false;
+          const hydratedAttachments = await Promise.all(
+            t.attachments.map(async a => {
+              if (!a.dataUrl && a.id) {
+                const recovered = await retrieveAttachmentDataUrl(a.id);
+                if (recovered) {
+                  changed = true;
+                  return { ...a, dataUrl: recovered };
+                }
+              }
+              return a;
+            })
+          );
+          return changed ? { ...t, attachments: hydratedAttachments } : t;
+        })
+      ).then(hydrated => {
+        setTransactions(hydrated);
+      });
+    }
+  }, []);
 
   // Privacy Mode State
   const [privacyMode, setPrivacyMode] = useState<boolean>(() => {
@@ -1106,33 +1201,37 @@ export default function App() {
   useEffect(() => {
     if (!notificationsEnabled || permission !== 'granted') return;
 
-    // Check anomalies
-    const anomalies = detectFinancialAnomalies(transactions, displayCurrency, 1, 'ALL');
+    const currentMonthKey = getCurrentMonthKey();
+
+    // Check anomalies with active usdArsRate
+    const anomalies = detectFinancialAnomalies(transactions, displayCurrency, usdArsRate, 'ALL');
     anomalies.forEach(anomaly => {
-        const key = `notified_anomaly_${anomaly.category}`;
+        const key = `notified_anomaly_${anomaly.category}_${currentMonthKey}`;
         if (!localStorage.getItem(key)) {
             sendNotification('Anomaly Detected', `Category "${anomaly.category}" has unusual spending.`);
             localStorage.setItem(key, 'true');
         }
     });
 
-    // Check budget caps
+    // Check budget caps for current month only with currency conversion
     budgets.forEach(budget => {
         const spent = transactions
-            .filter(t => t.category === budget.category)
-            .reduce((sum, t) => sum + t.amount, 0);
+            .filter(t => t.type === 'EXPENSE' && t.category === budget.category && t.date && t.date.startsWith(currentMonthKey))
+            .reduce((sum, t) => {
+              const amtInARS = t.currency === 'ARS' ? t.amount : convertCurrency(t.amount, t.currency, 'ARS', usdArsRate, t.date);
+              return sum + amtInARS;
+            }, 0);
         
         if (spent > budget.monthlyLimitARS * 0.9) {
-            const key = `notified_budget_${budget.category}`;
+            const key = `notified_budget_${budget.category}_${currentMonthKey}`;
             if (!localStorage.getItem(key)) {
-                sendNotification('Budget Alert', `You have spent over 90% of your ${budget.category} budget.`);
+                sendNotification('Budget Alert', `You have spent over 90% of your ${budget.category} budget for ${currentMonthKey}.`);
                 localStorage.setItem(key, 'true');
             }
         }
     });
     
     // Check pending recurring
-    const currentMonthKey = getCurrentMonthKey();
     const pendingResult = getPendingRecurringForMonth(currentMonthKey, transactions, recurringRules);
     pendingResult.pendingItems.forEach(item => {
         const key = `notified_recurring_${item.title}_${currentMonthKey}`;
@@ -1142,7 +1241,7 @@ export default function App() {
         }
     });
     
-    // Check credit card due dates
+    // Check credit card due dates (guarding against historical statements older than 2 days ago)
     const ccAccounts = accounts.filter(acc => isCreditCardAccount(acc.name, accounts));
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -1159,7 +1258,7 @@ export default function App() {
                 due.setHours(0, 0, 0, 0);
                 const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 3600 * 24));
                 
-                if (diffDays <= 5) {
+                if (diffDays >= -2 && diffDays <= 5) {
                     const key = `notified_cc_due_${acc.name}_${stmt.closeDate}`;
                     if (!localStorage.getItem(key)) {
                         let daysText = '';
@@ -1175,7 +1274,7 @@ export default function App() {
         });
     });
 
-  }, [transactions, budgets, recurringRules, accounts, periodStatusOverrides, closingDateOverrides, notificationsEnabled, permission]);
+  }, [transactions, budgets, recurringRules, accounts, periodStatusOverrides, closingDateOverrides, notificationsEnabled, permission, usdArsRate, displayCurrency]);
 
   const handleSaveRecurringThreshold = (title: string, threshold: number) => {
     setRecurringThresholds(prev => {
@@ -1326,15 +1425,23 @@ export default function App() {
           }
         }
       })
-      .catch(err => console.warn('Using default exchange rate fallback:', err?.message || err));
+      .catch(async err => {
+        console.warn('Using default exchange rate fallback:', err?.message || err);
+        try {
+          const directDolarRes = await fetch('https://dolarapi.com/v1/dolares/bolsa');
+          if (directDolarRes.ok) {
+            const data = await directDolarRes.json();
+            if (data && data.venta && data.venta > 0) {
+              setUsdArsRate(data.venta);
+            }
+          }
+        } catch {
+          // keep current rate
+        }
+      });
 
-    // Fetch historical inflation and FX history
-    const oldestDate = transactions.length > 0
-      ? new Date(Math.min(...transactions.map(t => new Date(t.date).getTime())))
-      : new Date('2024-01-01');
-    const startDate = oldestDate.toISOString().substring(0, 10);
-    
-    fetch(`/api/inflation-fx-history?startDate=${startDate}`)
+    // Fetch full historical inflation and FX history (2024 - 2026)
+    fetch('/api/inflation-fx-history')
       .then(res => {
         if (!res.ok) throw new Error(`Status ${res.status}`);
         return res.json();
@@ -1344,7 +1451,10 @@ export default function App() {
           setHistoryData(data.points);
         }
       })
-      .catch(err => console.warn('Using default historical data fallback:', err?.message || err));
+      .catch(err => {
+        console.warn('Using default historical data fallback:', err?.message || err);
+        setHistoryData(historicalInflationAndFX);
+      });
   }, []);
 
   // Save changes to Supabase when user is authenticated

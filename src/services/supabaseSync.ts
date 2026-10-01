@@ -251,6 +251,8 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
         return !deletedIds.has(rowId) && !deletedIds.has(cleanId);
       })
       .map((row: any) => {
+        const rowId = row.id || '';
+        const cleanId = rowId.includes('_') ? rowId.split('_').slice(1).join('_') : rowId;
         const tAccount = row.user_id !== userId ? `${row.account || 'Main'} (Shared)` : (row.account || 'Main');
         const tToAccount = row.to_account ? (row.user_id !== userId ? `${row.to_account} (Shared)` : row.to_account) : undefined;
         
@@ -292,13 +294,15 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
           receiveAmount: row.receive_amount !== undefined && row.receive_amount !== null ? Number(row.receive_amount) : undefined,
           receiveCurrency: row.receive_currency || undefined,
           description: rawNotes,
-          planId: row.plan_id || (userSettings?.txPlanIds ? userSettings.txPlanIds[row.id] : undefined),
-          installmentPlanId: row.plan_id || (userSettings?.txPlanIds ? userSettings.txPlanIds[row.id] : undefined),
+          planId: row.plan_id || (userSettings?.txPlanIds ? (userSettings.txPlanIds[row.id] || userSettings.txPlanIds[cleanId]) : undefined),
+          installmentPlanId: row.plan_id || (userSettings?.txPlanIds ? (userSettings.txPlanIds[row.id] || userSettings.txPlanIds[cleanId]) : undefined),
           attachments: (row.attachments && Array.isArray(row.attachments) && row.attachments.length > 0)
             ? row.attachments
             : (dbAttachmentsByTxId[row.id] && dbAttachmentsByTxId[row.id].length > 0)
             ? dbAttachmentsByTxId[row.id]
-            : (userSettings?.txAttachments ? userSettings.txAttachments[row.id] : undefined)
+            : (dbAttachmentsByTxId[cleanId] && dbAttachmentsByTxId[cleanId].length > 0)
+            ? dbAttachmentsByTxId[cleanId]
+            : (userSettings?.txAttachments ? (userSettings.txAttachments[row.id] || userSettings.txAttachments[cleanId] || userSettings.txAttachments[`${userId}_${cleanId}`]) : undefined)
             || [],
         };
       });
@@ -942,7 +946,8 @@ export async function deleteTransactionFromSupabase(txId: string | string[]): Pr
  */
 export async function saveTransactionAttachmentsToSupabase(
   txId: string,
-  attachments: TransactionAttachment[]
+  attachments: TransactionAttachment[],
+  deletedAttachmentId?: string
 ): Promise<boolean> {
   const client = getSupabaseClient();
   if (!client) return false;
@@ -953,10 +958,8 @@ export async function saveTransactionAttachmentsToSupabase(
 
     const userId = session.user.id;
     const targetTxId = txId.startsWith(userId) ? txId : `${userId}_${txId}`;
-    const idCandidates = [txId, targetTxId];
-    if (txId.includes('_')) {
-      idCandidates.push(txId.split('_').slice(1).join('_'));
-    }
+    const cleanId = txId.includes('_') ? txId.split('_').slice(1).join('_') : txId;
+    const idCandidates = Array.from(new Set([txId, targetTxId, cleanId]));
 
     // Resolve exact transaction row ID in database
     let matchedTxId = txId;
@@ -969,10 +972,21 @@ export async function saveTransactionAttachmentsToSupabase(
         .maybeSingle();
       if (foundTx?.id) {
         matchedTxId = foundTx.id;
+        idCandidates.push(matchedTxId);
       }
     } catch {}
 
-    // 1. Update transactions table attachments column directly (if column exists)
+    // 1. If an attachment was explicitly deleted, delete it directly by its unique attachment id
+    if (deletedAttachmentId) {
+      try {
+        await client
+          .from('transaction_attachments')
+          .delete()
+          .eq('id', deletedAttachmentId);
+      } catch {}
+    }
+
+    // 2. Update transactions table attachments column directly (if column exists)
     try {
       await client
         .from('transactions')
@@ -982,8 +996,9 @@ export async function saveTransactionAttachmentsToSupabase(
       // Ignored if column doesn't exist
     }
 
-    // 2. Sync to dedicated transaction_attachments table (if table exists)
+    // 3. Sync to dedicated transaction_attachments table (if table exists)
     try {
+      // Delete any removed attachments for this transaction
       await client
         .from('transaction_attachments')
         .delete()
@@ -1007,7 +1022,7 @@ export async function saveTransactionAttachmentsToSupabase(
       // Ignored if table doesn't exist
     }
 
-    // 3. Keep user_settings txAttachments map in sync as fallback
+    // 4. Keep user_settings txAttachments map in sync as fallback
     try {
       const { data: setRow } = await client
         .from('user_settings')
@@ -1021,13 +1036,13 @@ export async function saveTransactionAttachmentsToSupabase(
 
       const txAttachments = currSettings.txAttachments || {};
       if (attachments && attachments.length > 0) {
-        txAttachments[txId] = attachments;
-        txAttachments[targetTxId] = attachments;
-        txAttachments[matchedTxId] = attachments;
+        idCandidates.forEach(candidate => {
+          txAttachments[candidate] = attachments;
+        });
       } else {
-        delete txAttachments[txId];
-        delete txAttachments[targetTxId];
-        delete txAttachments[matchedTxId];
+        idCandidates.forEach(candidate => {
+          delete txAttachments[candidate];
+        });
       }
 
       await client.from('user_settings').upsert({
@@ -1048,6 +1063,17 @@ export async function saveTransactionAttachmentsToSupabase(
     console.warn('saveTransactionAttachmentsToSupabase failed:', err);
     return false;
   }
+}
+
+/**
+ * Explicit helper to delete a transaction attachment from Supabase with full atomicity.
+ */
+export async function deleteTransactionAttachmentFromSupabase(
+  txId: string,
+  attachmentId: string,
+  remainingAttachments: TransactionAttachment[]
+): Promise<boolean> {
+  return saveTransactionAttachmentsToSupabase(txId, remainingAttachments, attachmentId);
 }
 
 export async function deleteCategoryFromSupabase(catName: string): Promise<boolean> {

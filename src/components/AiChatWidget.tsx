@@ -64,7 +64,10 @@ export function AiChatWidget({
         },
         monthlyTrend: spending.monthlyTrend,
         topCategories: spending.topCategories.slice(0, 8),
-        recentTransactions: transactions.slice(0, 15).map(t => ({
+        recentTransactions: [...transactions]
+          .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+          .slice(0, 15)
+          .map(t => ({
           date: t.date,
           title: t.title,
           category: t.category,

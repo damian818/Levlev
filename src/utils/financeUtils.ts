@@ -851,6 +851,7 @@ export function getTransferOutflow(
     receiveCurrency?: string;
     account?: string;
     toAccount?: string;
+    date?: string;
   },
   usdArsRate: number = 1200,
   originCurrency?: string,
@@ -860,19 +861,23 @@ export function getTransferOutflow(
   const destCurr = (destCurrency || tx.receiveCurrency || (tx.toAccount?.toLowerCase().includes('usd') ? 'USD' : 'ARS')).toUpperCase();
 
   if (tx.transferAmount !== undefined && tx.transferAmount !== null && Number(tx.transferAmount) > 0) {
+    const transCurr = (tx.transferCurrency || originCurr).toUpperCase();
+    if (transCurr !== originCurr) {
+      return convertCurrency(Number(tx.transferAmount), transCurr, originCurr, usdArsRate, tx.date);
+    }
     return Number(tx.transferAmount);
   }
   if (tx.amount !== undefined && tx.amount !== null && Number(tx.amount) > 0) {
+    const txCurr = (tx.currency || originCurr).toUpperCase();
+    if (txCurr !== originCurr) {
+      return convertCurrency(Number(tx.amount), txCurr, originCurr, usdArsRate, tx.date);
+    }
     return Number(tx.amount);
   }
   if (tx.receiveAmount !== undefined && tx.receiveAmount !== null && Number(tx.receiveAmount) > 0) {
     const recAmt = Number(tx.receiveAmount);
-    if (originCurr.includes('USD') && destCurr.includes('ARS') && usdArsRate > 0) {
-      return recAmt / usdArsRate;
-    } else if (originCurr.includes('ARS') && destCurr.includes('USD') && usdArsRate > 0) {
-      return recAmt * usdArsRate;
-    }
-    return recAmt;
+    const recCurr = (tx.receiveCurrency || destCurr).toUpperCase();
+    return convertCurrency(recAmt, recCurr, originCurr, usdArsRate, tx.date);
   }
   return 0;
 }
@@ -887,6 +892,7 @@ export function getTransferInflow(
     receiveCurrency?: string;
     account?: string;
     toAccount?: string;
+    date?: string;
   },
   usdArsRate: number = 1200,
   originCurrency?: string,
@@ -896,25 +902,22 @@ export function getTransferInflow(
   const destCurr = (destCurrency || tx.receiveCurrency || (tx.toAccount?.toLowerCase().includes('usd') ? 'USD' : 'ARS')).toUpperCase();
 
   if (tx.receiveAmount !== undefined && tx.receiveAmount !== null && Number(tx.receiveAmount) > 0) {
-    return Number(tx.receiveAmount);
+    const recAmt = Number(tx.receiveAmount);
+    const recCurr = (tx.receiveCurrency || destCurr).toUpperCase();
+    if (recCurr !== destCurr) {
+      return convertCurrency(recAmt, recCurr, destCurr, usdArsRate, tx.date);
+    }
+    return recAmt;
   }
   if (tx.transferAmount !== undefined && tx.transferAmount !== null && Number(tx.transferAmount) > 0) {
     const transAmt = Number(tx.transferAmount);
-    if (originCurr.includes('USD') && destCurr.includes('ARS') && usdArsRate > 0) {
-      return transAmt * usdArsRate;
-    } else if (originCurr.includes('ARS') && destCurr.includes('USD') && usdArsRate > 0) {
-      return transAmt / usdArsRate;
-    }
-    return transAmt;
+    const transCurr = (tx.transferCurrency || originCurr).toUpperCase();
+    return convertCurrency(transAmt, transCurr, destCurr, usdArsRate, tx.date);
   }
   if (tx.amount !== undefined && tx.amount !== null && Number(tx.amount) > 0) {
     const amt = Number(tx.amount);
-    if (originCurr.includes('USD') && destCurr.includes('ARS') && usdArsRate > 0) {
-      return amt * usdArsRate;
-    } else if (originCurr.includes('ARS') && destCurr.includes('USD') && usdArsRate > 0) {
-      return amt / usdArsRate;
-    }
-    return amt;
+    const txCurr = (tx.currency || originCurr).toUpperCase();
+    return convertCurrency(amt, txCurr, destCurr, usdArsRate, tx.date);
   }
   return 0;
 }
@@ -954,18 +957,22 @@ export function computeAccountBalances(
     const txDateStr = tx.date ? tx.date.substring(0, 10) : '';
     if (txDateStr && txDateStr > todayStr) return;
 
-    const amt = tx.amount || 0;
+    const rawAmt = tx.amount || 0;
+    const txCurr = (tx.currency || originCurr).toUpperCase();
+    const effectiveAmt = txCurr === originCurr 
+      ? rawAmt 
+      : convertCurrency(rawAmt, txCurr, originCurr, usdArsRate, tx.date, transactions);
 
     if (tx.type === 'INCOME') {
-      accountDeltas[acc].netDelta += amt;
+      accountDeltas[acc].netDelta += effectiveAmt;
     } else if (tx.type === 'EXPENSE') {
-      accountDeltas[acc].netDelta -= amt;
+      accountDeltas[acc].netDelta -= effectiveAmt;
     } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
       const destAcc = tx.toAccount;
       if (!destAcc && tx.type === 'CC_PAYMENT') {
         // If CC_PAYMENT was logged directly on the CC account without toAccount,
         // it represents a payment inflow reducing card debt
-        accountDeltas[acc].netDelta += amt;
+        accountDeltas[acc].netDelta += effectiveAmt;
       } else {
         const destCurr = destAcc ? getAccountCurrency(destAcc, tx.receiveCurrency) : originCurr;
 
@@ -2626,21 +2633,24 @@ export function recalculateAccountBalancesFromTransactions(
       const txDateStr = tx.date ? tx.date.substring(0, 10) : '';
       if (txDateStr && txDateStr > todayStr) return;
 
-      const amt = tx.amount || 0;
+      const rawAmt = tx.amount || 0;
+      const txCurr = (tx.currency || currency).toUpperCase();
+      const effectiveAmt = txCurr === currency
+        ? rawAmt
+        : convertCurrency(rawAmt, txCurr, currency, usdArsRate, tx.date, transactions);
+
       if (tx.account === accName) {
         if (tx.type === 'INCOME') {
-          netBalance += amt;
+          netBalance += effectiveAmt;
         } else if (tx.type === 'EXPENSE') {
-          netBalance -= amt;
+          netBalance -= effectiveAmt;
+        } else if (tx.type === 'CC_PAYMENT' && !tx.toAccount) {
+          netBalance += effectiveAmt;
         } else if (tx.type === 'TRANSFER' || tx.type === 'CC_PAYMENT') {
-          if (!tx.toAccount && tx.type === 'CC_PAYMENT') {
-            netBalance += amt;
-          } else {
-            const originCurr = currency;
-            const destCurr = tx.toAccount ? getAccCurrency(tx.toAccount) : originCurr;
-            const outflow = getTransferOutflow(tx, usdArsRate, originCurr, destCurr);
-            netBalance -= outflow;
-          }
+          const originCurr = currency;
+          const destCurr = tx.toAccount ? getAccCurrency(tx.toAccount) : originCurr;
+          const outflow = getTransferOutflow(tx, usdArsRate, originCurr, destCurr);
+          netBalance -= outflow;
         }
       }
 

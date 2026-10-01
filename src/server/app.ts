@@ -2,7 +2,7 @@ import express from "express";
 import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { parseStatementTextDeterministically } from "./deterministicStatementParser.ts";
+import { parseStatementTextDeterministically } from "./deterministicStatementParser";
 
 dotenv.config();
 
@@ -11,7 +11,7 @@ app.use(compression());
 app.use(express.json({ limit: '30mb' }));
 
 // Helper function to fetch with timeout
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = 8000): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = 4500): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -31,8 +31,8 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
 async function fetchWithRetryAndTimeout(
   url: string,
   options: RequestInit = {},
-  timeoutMs: number = 8000,
-  maxRetries: number = 1
+  timeoutMs: number = 4500,
+  maxRetries: number = 0
 ): Promise<Response> {
   let lastError: any;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -46,14 +46,14 @@ async function fetchWithRetryAndTimeout(
       clearTimeout(id);
       if (response.ok) return response;
       if (attempt < maxRetries && response.status >= 500 && response.status <= 504) {
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 300));
         continue;
       }
       return response;
     } catch (err) {
       lastError = err;
       if (attempt < maxRetries) {
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 300));
       }
     }
   }
@@ -166,33 +166,37 @@ app.get(["/api/fx-rates", "/fx-rates"], async (req, res) => {
     const [dolarRes, globalRes] = await Promise.allSettled([
       fetchWithTimeout("https://dolarapi.com/v1/dolares", {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-      }, 8000),
+      }, 4000),
       fetchWithTimeout("https://open.er-api.com/v6/latest/USD", {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-      }, 8000)
+      }, 4000)
     ]);
 
     const ratesMap: Record<string, { buy: number; sell: number; name: string; updated: string }> = {};
     if (dolarRes.status === 'fulfilled' && dolarRes.value.ok) {
-      const data = await dolarRes.value.json();
-      if (Array.isArray(data)) {
-        data.forEach((item: any) => {
-          ratesMap[item.casa] = {
-            buy: item.compra,
-            sell: item.venta,
-            name: item.nombre,
-            updated: item.fechaActualizacion,
-          };
-        });
-      }
+      try {
+        const data = await dolarRes.value.json();
+        if (Array.isArray(data)) {
+          data.forEach((item: any) => {
+            ratesMap[item.casa] = {
+              buy: item.compra,
+              sell: item.venta,
+              name: item.nombre,
+              updated: item.fechaActualizacion,
+            };
+          });
+        }
+      } catch {}
     }
 
     let globalRates: Record<string, number> = { ...FALLBACK_GLOBAL_RATES };
     if (globalRes.status === 'fulfilled' && globalRes.value.ok) {
-      const globalData = await globalRes.value.json();
-      if (globalData && globalData.rates) {
-        globalRates = { ...globalData.rates, USDT: 1.0 };
-      }
+      try {
+        const globalData = await globalRes.value.json();
+        if (globalData && globalData.rates) {
+          globalRates = { ...globalData.rates, USDT: 1.0 };
+        }
+      } catch {}
     }
 
     const mepRate = ratesMap['bolsa']?.sell || ratesMap['blue']?.sell || 1410;
@@ -209,10 +213,10 @@ app.get(["/api/fx-rates", "/fx-rates"], async (req, res) => {
     // Update cache
     cache.fxRates = { data: responseData, timestamp: Date.now() };
 
-    res.json(responseData);
+    return res.json(responseData);
   } catch (error: any) {
     console.warn("Using fallback FX rates due to upstream timeout/error:", error?.message || error);
-    res.json({
+    return res.json({
       rates: FALLBACK_FX_RATES,
       globalRates: FALLBACK_GLOBAL_RATES,
       fallback: true,
@@ -296,14 +300,14 @@ app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res)
       return res.json(cache.inflationHistory.data);
     }
 
-    // Attempt to fetch both inflation and FX history with automatic retry on 5xx errors
+    // Attempt to fetch both inflation and FX history with quick timeouts
     const [inflResSettled, fxResSettled] = await Promise.allSettled([
       fetchWithRetryAndTimeout("https://api.argentinadatos.com/v1/finanzas/indices/inflacion", {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-      }, 8000, 1),
+      }, 4000, 0),
       fetchWithRetryAndTimeout("https://api.argentinadatos.com/v1/cotizaciones/dolares/bolsa", {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-      }, 8000, 1)
+      }, 4000, 0)
     ]);
 
     const isInflOk = inflResSettled.status === 'fulfilled' && inflResSettled.value.ok;
@@ -340,12 +344,12 @@ app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res)
       }
     });
 
-    const startDate = (req.query.startDate as string) || '2024-01-01';
     const fallbackMap = new Map(FALLBACK_INFLATION_HISTORY.map(item => [item.month, item]));
+    const baselineStartDate = '2024-01-01';
 
-    // If live inflation data is available, compute history points from it
+    // If live inflation data is available, compute history points from it starting from baseline 2024
     if (Array.isArray(inflData) && inflData.length > 0) {
-      const recentInfl = inflData.filter(item => item.fecha >= startDate);
+      const recentInfl = inflData.filter(item => item.fecha >= baselineStartDate);
       let cumulativeIndex = 100;
       const historyPoints = recentInfl.map((item, idx) => {
         const month = item.fecha.substring(0, 7);
@@ -363,6 +367,15 @@ app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res)
         };
       });
 
+      // Ensure that all reference months from FALLBACK_INFLATION_HISTORY (2024, 2025, 2026) exist
+      const existingMonths = new Set(historyPoints.map(p => p.month));
+      FALLBACK_INFLATION_HISTORY.forEach(fb => {
+        if (!existingMonths.has(fb.month)) {
+          historyPoints.push({ ...fb });
+        }
+      });
+      historyPoints.sort((a, b) => a.month.localeCompare(b.month));
+
       const responseData = {
         points: historyPoints,
         source: isFxOk ? "ArgentinaDatos API (INDEC CPI & MEP FX Rate)" : "ArgentinaDatos API (INDEC CPI + Historical MEP)",
@@ -373,7 +386,7 @@ app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res)
       return res.json(responseData);
     }
 
-    // If inflation API was unavailable, provide complete fallback data cleanly
+    // If inflation API was unavailable, provide complete fallback data cleanly (all 2024, 2025, 2026)
     const responseData = {
       points: FALLBACK_INFLATION_HISTORY,
       fallback: true,
@@ -382,7 +395,8 @@ app.get(["/api/inflation-fx-history", "/inflation-fx-history"], async (req, res)
     };
     cache.inflationHistory = { data: responseData, timestamp: Date.now() - (CACHE_TTL - 120000) };
     return res.json(responseData);
-  } catch {
+  } catch (error) {
+    console.warn("Using fallback inflation history due to error:", error);
     const responseData = {
       points: FALLBACK_INFLATION_HISTORY,
       fallback: true,
@@ -424,7 +438,7 @@ ${langInstruction}`;
   <total_expenses>${summaryData?.totalExpenses ?? 0}</total_expenses>
   <savings_rate>${summaryData?.savingsRate ?? 0}%</savings_rate>
   <top_categories>${JSON.stringify(summaryData?.topCategories || [])}</top_categories>
-  <top_accounts>${JSON.stringify(summaryData?.topAccounts || [])}</top_accounts>
+  <top_merchants>${JSON.stringify(summaryData?.topMerchants || summaryData?.topAccounts || [])}</top_merchants>
   <market_context>Argentina bi-monetary (ARS / USD) with active inflation and dynamic FX rate tracking</market_context>
 </financial_context>`;
 

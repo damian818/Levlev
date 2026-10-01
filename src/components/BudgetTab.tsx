@@ -166,7 +166,9 @@ export function BudgetTab({
         const monthlyDraft = parseFloat(draftLimits[b.category]) || 0;
         return sum + (monthlyDraft * horizonInfo.multiplier);
       }
-      const monthlyConverted = convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+      const monthlyConverted = (b.currency === displayCurrency && b.monthlyLimit !== undefined)
+        ? b.monthlyLimit
+        : convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
       return sum + (monthlyConverted * horizonInfo.multiplier);
     }, 0);
   }, [budgetList, isEditing, draftLimits, displayCurrency, usdArsRate, horizonInfo.multiplier]);
@@ -202,7 +204,9 @@ export function BudgetTab({
   const handleStartEdit = () => {
     const drafts: Record<string, string> = {};
     budgetList.forEach(b => {
-      const limitConverted = convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+      const limitConverted = (b.currency === displayCurrency && b.monthlyLimit !== undefined)
+        ? b.monthlyLimit
+        : convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
       drafts[b.category] = String(Math.round(limitConverted));
     });
     setDraftLimits(drafts);
@@ -221,11 +225,13 @@ export function BudgetTab({
       const rawDraft = draftLimits[b.category];
       const numVal = rawDraft !== undefined 
         ? (parseFloat(rawDraft) || 0) 
-        : convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
+        : ((b.currency === displayCurrency && b.monthlyLimit !== undefined) ? b.monthlyLimit : convertCurrency(b.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate));
       const limitARS = convertCurrency(numVal, displayCurrency, 'ARS', usdArsRate);
       return {
         ...b,
         monthlyLimitARS: limitARS,
+        currency: displayCurrency,
+        monthlyLimit: numVal,
       };
     });
     setBudgetList(updatedList);
@@ -664,6 +670,8 @@ export function BudgetTab({
             const draftVal = draftLimits[budget.category];
             const monthlyBaseLimitDisplay = isEditing && draftVal !== undefined
               ? (parseFloat(draftVal) || 0)
+              : (budget.currency === displayCurrency && budget.monthlyLimit !== undefined)
+              ? budget.monthlyLimit
               : convertCurrency(budget.monthlyLimitARS, 'ARS', displayCurrency, usdArsRate);
 
             // Active limit scaled by time horizon multiplier

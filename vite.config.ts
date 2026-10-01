@@ -11,13 +11,13 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+        includeAssets: ['favicon.svg', 'pwa-icon.svg', 'manifest.json'],
         manifest: {
-          name: 'FinLev - Personal Finance',
-          short_name: 'FinLev',
-          description: 'Personal finance manager with offline support',
-          theme_color: '#0f172a',
-          background_color: '#0f172a',
+          name: 'LevLev | Personal Finance with Heart',
+          short_name: 'LevLev',
+          description: 'Personal finance with heart. Multi-currency and inflation intelligence tracker with global live exchange rates, custom reporting currency, and financial forecasting.',
+          theme_color: '#0a0b0d',
+          background_color: '#0a0b0d',
           display: 'standalone',
           share_target: {
             action: '/',
@@ -30,20 +30,16 @@ export default defineConfig(() => {
           },
           icons: [
             {
-              src: 'pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png'
+              src: '/pwa-icon.svg',
+              sizes: '512x512',
+              type: 'image/svg+xml',
+              purpose: 'maskable'
             },
             {
-              src: 'pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png'
-            },
-            {
-              src: 'pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any maskable'
+              src: '/pwa-icon.svg',
+              sizes: 'any',
+              type: 'image/svg+xml',
+              purpose: 'any'
             }
           ]
         },
