@@ -132,6 +132,9 @@ interface SettingsTabProps {
   debtExtraPayment?: number;
   periodStatusOverrides?: Record<string, 'PAID' | 'OPEN'>;
   closingDateOverrides?: Record<string, Record<string, string>>;
+  syncQueueCount?: number;
+  isSyncingQueue?: boolean;
+  onFlushSyncQueue?: () => void;
 }
 
 export function SettingsTab({
@@ -148,6 +151,9 @@ export function SettingsTab({
   onUpdateDisplayCurrency,
   enabledCurrencies = ['USD', 'ARS', 'EUR', 'BRL', 'USDT', 'CLP', 'UYU', 'GBP'],
   onUpdateEnabledCurrencies,
+  syncQueueCount = 0,
+  isSyncingQueue = false,
+  onFlushSyncQueue,
   userTimezone = 'America/Argentina/Buenos_Aires',
   onUpdateTimezone,
   privacyMode = false,
@@ -1414,6 +1420,27 @@ export function SettingsTab({
                 )}
               </div>
             </div>
+
+            {syncQueueCount > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-amber-400">
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingQueue ? 'animate-spin' : ''}`} />
+                  <span className="font-medium">
+                    {syncQueueCount} offline mutation{syncQueueCount > 1 ? 's' : ''} queued
+                  </span>
+                </div>
+                {onFlushSyncQueue && (
+                  <button
+                    type="button"
+                    onClick={onFlushSyncQueue}
+                    disabled={isSyncingQueue}
+                    className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold rounded-lg text-xs transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isSyncingQueue ? 'Syncing...' : 'Sync Now'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Privacy Mode Shield */}

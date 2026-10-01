@@ -25,7 +25,8 @@ import {
   Plus,
   Grid,
   Globe,
-  WifiOff
+  WifiOff,
+  RefreshCw,
 } from 'lucide-react';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from '../lib/supabase';
 import { LevLevLogo } from './LevLevLogo';
@@ -60,6 +61,9 @@ interface NavbarProps {
   onOpenDeleteModal: () => void;
   onLogout?: () => void;
   isOnline?: boolean;
+  syncQueueCount?: number;
+  isSyncingQueue?: boolean;
+  onFlushSyncQueue?: () => void;
   tabCustomization?: TabCustomizationItem[];
 }
 
@@ -80,6 +84,9 @@ export function Navbar({
   onOpenDeleteModal,
   onLogout,
   isOnline = true,
+  syncQueueCount = 0,
+  isSyncingQueue = false,
+  onFlushSyncQueue,
   tabCustomization,
 }: NavbarProps) {
   const { t, i18n } = useTranslation();
@@ -186,10 +193,33 @@ export function Navbar({
               </button>
 
               {!isOnline && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-[10px] font-black animate-pulse">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-[10px] font-black animate-pulse" title="Offline mode">
                   <WifiOff className="w-3 h-3" />
                   <span className="hidden sm:inline tracking-widest uppercase">OFFLINE</span>
+                  {syncQueueCount > 0 && (
+                    <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-300 rounded text-[9px] font-mono font-bold">
+                      {syncQueueCount}
+                    </span>
+                  )}
                 </div>
+              )}
+
+              {isOnline && syncQueueCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    if (onFlushSyncQueue) onFlushSyncQueue();
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-lg text-indigo-400 text-[10px] font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                  title={t('common.sync_pending_title', 'Click to sync pending changes to cloud')}
+                >
+                  <RefreshCw className={`w-3 h-3 ${isSyncingQueue ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline uppercase tracking-wider">{isSyncingQueue ? 'SYNCING...' : 'SYNC PENDING'}</span>
+                  <span className="px-1.5 py-0.5 bg-indigo-500/30 text-indigo-200 rounded text-[9px] font-mono font-bold">
+                    {syncQueueCount}
+                  </span>
+                </button>
               )}
             </div>
 

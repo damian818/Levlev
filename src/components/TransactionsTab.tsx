@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint, CategoryItem, AccountItem, AccountCustomBalance, InstallmentPlan } from '../types';
 import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKey, getTodayString, normalizeCleanTitle, isInstallmentTx, detectRecurringItems, isCreditCardAccount, computeAccountBalances } from '../utils/financeUtils';
 import { exportTransactionsToCSV } from '../utils/exportUtils';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
+import { TransactionSearchInput } from './TransactionSearchInput';
 import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2, Download, CreditCard, Landmark, Paperclip, FileText } from 'lucide-react';
 
 interface TransactionsTabProps {
@@ -62,6 +63,7 @@ export const TransactionsTab = React.memo(function TransactionsTab({
 }: TransactionsTabProps) {
   const { t, i18n } = useTranslation();
   const [searchTerm, setSearchTerm] = useState(activeFilter?.search || '');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [selectedType, setSelectedType] = useState<string>(activeFilter?.type || 'ALL');
   const [selectedCategory, setSelectedCategory] = useState<string>(activeFilter?.category || 'ALL');
   const [selectedAccount, setSelectedAccount] = useState<string>(activeFilter?.account || 'ALL');
@@ -290,12 +292,13 @@ export const TransactionsTab = React.memo(function TransactionsTab({
       const isShared = t.ownerId && currentUserId && t.ownerId !== currentUserId;
       if (isShared && !showSharedData) return false;
 
-      const matchSearch = !searchTerm || 
-                          (t.title && t.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                          (t.category && t.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                          (t.account && t.account.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                          (t.toAccount && t.toAccount.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                          (t.description && t.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      const searchClean = deferredSearchTerm.trim().toLowerCase();
+      const matchSearch = !searchClean || 
+                          (t.title && t.title.toLowerCase().includes(searchClean)) ||
+                          (t.category && t.category.toLowerCase().includes(searchClean)) ||
+                          (t.account && t.account.toLowerCase().includes(searchClean)) ||
+                          (t.toAccount && t.toAccount.toLowerCase().includes(searchClean)) ||
+                          (t.description && t.description.toLowerCase().includes(searchClean));
       const matchType = selectedType === 'ALL' || t.type === selectedType;
       const matchCat = selectedCategory === 'ALL' || t.category === selectedCategory;
       const matchAcc = selectedAccount === 'ALL' || t.account === selectedAccount || t.toAccount === selectedAccount;
@@ -344,12 +347,12 @@ export const TransactionsTab = React.memo(function TransactionsTab({
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [transactions, searchTerm, selectedType, selectedCategory, selectedAccount, selectedMonth, recurringFilter, recurringTxSet, sortField, sortOrder, displayCurrency, usdArsRate, historyData, showFutureTransactions, currentUserId, showSharedData]);
+  }, [transactions, deferredSearchTerm, selectedType, selectedCategory, selectedAccount, selectedMonth, recurringFilter, recurringTxSet, sortField, sortOrder, displayCurrency, usdArsRate, historyData, showFutureTransactions, currentUserId, showSharedData]);
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const isFiltered = searchTerm || selectedType !== 'ALL' || selectedCategory !== 'ALL' || selectedAccount !== 'ALL' || selectedMonth !== 'ALL' || recurringFilter !== 'ALL';
+  const isFiltered = deferredSearchTerm.trim() !== '' || selectedType !== 'ALL' || selectedCategory !== 'ALL' || selectedAccount !== 'ALL' || selectedMonth !== 'ALL' || recurringFilter !== 'ALL';
 
   const accountMovementsStats = useMemo(() => {
     if (selectedAccount === 'ALL') return null;
@@ -470,58 +473,18 @@ export const TransactionsTab = React.memo(function TransactionsTab({
 
   return (
     <div className="space-y-4">
-      {/* Active Filter Pill Bar */}
-      {isFiltered && (
-        <div className="bg-[#121620] px-4 py-2 rounded-lg border border-slate-800 flex items-center justify-between text-xs flex-wrap gap-2">
-          <div className="flex items-center space-x-2 text-slate-300 flex-wrap gap-y-1">
-            <Filter className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{t('common.filter')}:</span>
-            {recurringFilter !== 'ALL' && (
-              <span className="px-2 py-0.5 bg-purple-500/15 border border-purple-500/30 rounded font-semibold text-purple-300 flex items-center gap-1">
-                <Repeat className="w-3 h-3" />
-                {recurringFilter === 'RECURRING' ? 'Recurring / Fixed Costs' : 'One-time Transactions'}
-              </span>
-            )}
-            {selectedType !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.type')}: {selectedType}</span>}
-            {selectedCategory !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.category')}: {selectedCategory}</span>}
-            {selectedAccount !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.account')}: {selectedAccount}</span>}
-            {selectedMonth !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.month')}: {selectedMonth}</span>}
-            {searchTerm && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.search')}: "{searchTerm}"</span>}
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleExportVisibleCSV}
-              disabled={filtered.length === 0}
-              className="text-purple-400 hover:text-purple-300 flex items-center space-x-1 text-[11px] font-semibold cursor-pointer"
-              title={t('transactions.export_tooltip', { defaultValue: 'Export visible filtered transactions as CSV' })}
-            >
-              <Download className="w-3 h-3" />
-              <span>{t('transactions.export_visible', { count: filtered.length, defaultValue: `Export CSV (${filtered.length})` })}</span>
-            </button>
-            <button
-              onClick={handleResetFilters}
-              className="text-slate-400 hover:text-slate-200 flex items-center space-x-1 underline text-[11px] cursor-pointer"
-            >
-              <X className="w-3 h-3" />
-              <span>{t('transactions.reset_filters')}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Filters Toolbar */}
       <div className="bg-[#161b22] p-4 rounded-xl border border-slate-800 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder={t('transactions.search_placeholder')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-[#0f131a] border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-500 placeholder-slate-500"
-            />
-          </div>
+          <TransactionSearchInput
+            value={searchTerm}
+            onChange={(val) => {
+              setSearchTerm(val);
+              setCurrentPage(1);
+            }}
+            placeholder={t('transactions.search_placeholder')}
+            clearTitle={t('common.clear', 'Clear')}
+          />
 
           {/* Toggle buttons for All, One-time, Recurring */}
           <div className="flex items-center bg-[#0f131a] p-1 rounded-lg border border-slate-700 shrink-0">
@@ -694,6 +657,45 @@ export const TransactionsTab = React.memo(function TransactionsTab({
           )}
         </div>
       </div>
+
+      {/* Active Filter Pill Bar (Rendered below toolbar so typing in search never shifts layout) */}
+      {isFiltered && (
+        <div className="bg-[#121620] px-4 py-2 rounded-lg border border-slate-800 flex items-center justify-between text-xs flex-wrap gap-2 animate-in fade-in duration-150">
+          <div className="flex items-center space-x-2 text-slate-300 flex-wrap gap-y-1">
+            <Filter className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{t('common.filter')}:</span>
+            {recurringFilter !== 'ALL' && (
+              <span className="px-2 py-0.5 bg-purple-500/15 border border-purple-500/30 rounded font-semibold text-purple-300 flex items-center gap-1">
+                <Repeat className="w-3 h-3" />
+                {recurringFilter === 'RECURRING' ? 'Recurring / Fixed Costs' : 'One-time Transactions'}
+              </span>
+            )}
+            {selectedType !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.type')}: {selectedType}</span>}
+            {selectedCategory !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.category')}: {selectedCategory}</span>}
+            {selectedAccount !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.account')}: {selectedAccount}</span>}
+            {selectedMonth !== 'ALL' && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.month')}: {selectedMonth}</span>}
+            {searchTerm && <span className="px-2 py-0.5 bg-slate-800 rounded border border-slate-700 font-semibold text-emerald-400">{t('common.search')}: "{searchTerm}"</span>}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExportVisibleCSV}
+              disabled={filtered.length === 0}
+              className="text-purple-400 hover:text-purple-300 flex items-center space-x-1 text-[11px] font-semibold cursor-pointer"
+              title={t('transactions.export_tooltip', { defaultValue: 'Export visible filtered transactions as CSV' })}
+            >
+              <Download className="w-3 h-3" />
+              <span>{t('transactions.export_visible', { count: filtered.length, defaultValue: `Export CSV (${filtered.length})` })}</span>
+            </button>
+            <button
+              onClick={handleResetFilters}
+              className="text-slate-400 hover:text-slate-200 flex items-center space-x-1 underline text-[11px] cursor-pointer"
+            >
+              <X className="w-3 h-3" />
+              <span>{t('transactions.reset_filters')}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Bulk Action Toolbar - Shows when items are selected */}
       {isBulkMode && selectedIds.size > 0 && (

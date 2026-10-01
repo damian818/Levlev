@@ -15,7 +15,8 @@ import { useBrowserNotifications } from './hooks/useBrowserNotifications';
 import { initializeGlobalFxRates } from './utils/currencyUtils';
 import { persistAttachmentDataUrl, retrieveAttachmentDataUrl } from './utils/attachmentStorage';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
-import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase, getDeletedTxIds } from './services/supabaseSync';
+import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase, getDeletedTxIds, executeQueuedMutation } from './services/supabaseSync';
+import { initSyncQueueAutoFlush, flushSyncQueue, subscribeToSyncQueue } from './services/syncQueue';
 import { Navbar } from './components/Navbar';
 
 // Lazy load non-critical components
@@ -47,6 +48,8 @@ import { WifiOff } from 'lucide-react';
 
 export default function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [syncQueueCount, setSyncQueueCount] = useState<number>(0);
+  const [isSyncingQueue, setIsSyncingQueue] = useState<boolean>(false);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -57,6 +60,15 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+  }, []);
+
+  // Real-time subscription to offline mutation queue changes
+  useEffect(() => {
+    const unsubscribe = subscribeToSyncQueue((count, online) => {
+      setSyncQueueCount(count);
+      setIsOnline(online);
+    });
+    return unsubscribe;
   }, []);
 
   const [isWorkspaceShared, setIsWorkspaceShared] = useState<boolean>(() => {
@@ -1084,6 +1096,30 @@ export default function App() {
     };
   }, [syncFromSupabase]);
 
+  // Automated background sync queue flushing when authenticated
+  useEffect(() => {
+    if (!authUser) return;
+    const unsubscribe = initSyncQueueAutoFlush(async (mutation) => {
+      setIsSyncingQueue(true);
+      try {
+        return await executeQueuedMutation(mutation);
+      } finally {
+        setIsSyncingQueue(false);
+      }
+    });
+    return unsubscribe;
+  }, [authUser]);
+
+  const handleManualFlushSyncQueue = async () => {
+    if (isSyncingQueue) return;
+    setIsSyncingQueue(true);
+    try {
+      await flushSyncQueue(executeQueuedMutation);
+    } finally {
+      setIsSyncingQueue(false);
+    }
+  };
+
   // Auto-sync when switching tabs/apps or returning to mobile browser
   useEffect(() => {
     if (!authUser) return;
@@ -1816,6 +1852,9 @@ export default function App() {
         onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
         onLogout={handleLogout}
         isOnline={isOnline}
+        syncQueueCount={syncQueueCount}
+        isSyncingQueue={isSyncingQueue}
+        onFlushSyncQueue={handleManualFlushSyncQueue}
         tabCustomization={tabCustomization}
       />
 
@@ -1989,6 +2028,9 @@ export default function App() {
               onOpenImportModal={() => setIsImportModalOpen(true)}
               onRecalculateBalances={handleRecalculateAllBalances}
               onLogout={handleLogout}
+              syncQueueCount={syncQueueCount}
+              isSyncingQueue={isSyncingQueue}
+              onFlushSyncQueue={handleManualFlushSyncQueue}
               localCurrency={localCurrency}
               onUpdateLocalCurrency={setLocalCurrency}
               enabledCurrencies={enabledCurrencies}

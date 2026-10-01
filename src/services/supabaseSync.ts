@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '../lib/supabase';
 import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, TabCustomizationItem, InstallmentPlan, TransactionAttachment } from '../types';
+import { enqueueMutation, isNetworkOnline, QueuedMutation } from './syncQueue';
 
 const DELETED_TX_KEY = 'finance_app_deleted_tx_ids';
 
@@ -485,7 +486,18 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
   }
 }
 
-export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise<boolean> {
+export async function saveAllUserDataToSupabase(
+  data: SupabaseUserData,
+  options?: { skipEnqueue?: boolean }
+): Promise<boolean> {
+  if (!isNetworkOnline()) {
+    if (!options?.skipEnqueue) {
+      enqueueMutation('SAVE_ALL', data);
+      console.log('[SupabaseSync] Offline: Queued SAVE_ALL mutation.');
+    }
+    return true;
+  }
+
   const client = getSupabaseClient();
   if (!client) return false;
 
@@ -886,15 +898,30 @@ export async function saveAllUserDataToSupabase(data: SupabaseUserData): Promise
     return true;
   } catch (err) {
     console.error('Error syncing data to Supabase:', err);
+    if (!options?.skipEnqueue) {
+      enqueueMutation('SAVE_ALL', data);
+      console.log('[SupabaseSync] Network error: Queued SAVE_ALL mutation for retry.');
+    }
     return false;
   }
 }
 
-export async function deleteTransactionFromSupabase(txId: string | string[]): Promise<boolean> {
+export async function deleteTransactionFromSupabase(
+  txId: string | string[],
+  options?: { skipEnqueue?: boolean }
+): Promise<boolean> {
   const idsArr = Array.isArray(txId) ? txId : [txId];
   if (idsArr.length === 0) return true;
 
   addDeletedTxIds(idsArr);
+
+  if (!isNetworkOnline()) {
+    if (!options?.skipEnqueue) {
+      enqueueMutation('DELETE_TRANSACTION', idsArr);
+      console.log('[SupabaseSync] Offline: Queued DELETE_TRANSACTION mutation for', idsArr);
+    }
+    return true;
+  }
 
   const client = getSupabaseClient();
   if (!client) return true;
@@ -919,6 +946,9 @@ export async function deleteTransactionFromSupabase(txId: string | string[]): Pr
 
     if (error) {
       console.error('Error deleting transaction from Supabase:', error);
+      if (!options?.skipEnqueue) {
+        enqueueMutation('DELETE_TRANSACTION', idsArr);
+      }
       return false;
     }
 
@@ -935,6 +965,9 @@ export async function deleteTransactionFromSupabase(txId: string | string[]): Pr
     return true;
   } catch (e) {
     console.error('Exception deleting transaction from Supabase:', e);
+    if (!options?.skipEnqueue) {
+      enqueueMutation('DELETE_TRANSACTION', idsArr);
+    }
     return false;
   }
 }
@@ -947,8 +980,17 @@ export async function deleteTransactionFromSupabase(txId: string | string[]): Pr
 export async function saveTransactionAttachmentsToSupabase(
   txId: string,
   attachments: TransactionAttachment[],
-  deletedAttachmentId?: string
+  deletedAttachmentId?: string,
+  options?: { skipEnqueue?: boolean }
 ): Promise<boolean> {
+  if (!isNetworkOnline()) {
+    if (!options?.skipEnqueue) {
+      enqueueMutation('SAVE_ATTACHMENTS', { txId, attachments, deletedAttachmentId });
+      console.log('[SupabaseSync] Offline: Queued SAVE_ATTACHMENTS mutation for tx', txId);
+    }
+    return true;
+  }
+
   const client = getSupabaseClient();
   if (!client) return false;
 
@@ -1061,6 +1103,9 @@ export async function saveTransactionAttachmentsToSupabase(
     return true;
   } catch (err) {
     console.warn('saveTransactionAttachmentsToSupabase failed:', err);
+    if (!options?.skipEnqueue) {
+      enqueueMutation('SAVE_ATTACHMENTS', { txId, attachments, deletedAttachmentId });
+    }
     return false;
   }
 }
@@ -1071,12 +1116,31 @@ export async function saveTransactionAttachmentsToSupabase(
 export async function deleteTransactionAttachmentFromSupabase(
   txId: string,
   attachmentId: string,
-  remainingAttachments: TransactionAttachment[]
+  remainingAttachments: TransactionAttachment[],
+  options?: { skipEnqueue?: boolean }
 ): Promise<boolean> {
-  return saveTransactionAttachmentsToSupabase(txId, remainingAttachments, attachmentId);
+  if (!isNetworkOnline()) {
+    if (!options?.skipEnqueue) {
+      enqueueMutation('DELETE_ATTACHMENT', { txId, attachmentId, remainingAttachments });
+      console.log('[SupabaseSync] Offline: Queued DELETE_ATTACHMENT mutation.');
+    }
+    return true;
+  }
+  return saveTransactionAttachmentsToSupabase(txId, remainingAttachments, attachmentId, options);
 }
 
-export async function deleteCategoryFromSupabase(catName: string): Promise<boolean> {
+export async function deleteCategoryFromSupabase(
+  catName: string,
+  options?: { skipEnqueue?: boolean }
+): Promise<boolean> {
+  if (!isNetworkOnline()) {
+    if (!options?.skipEnqueue) {
+      enqueueMutation('DELETE_CATEGORY', catName);
+      console.log('[SupabaseSync] Offline: Queued DELETE_CATEGORY mutation for', catName);
+    }
+    return true;
+  }
+
   const client = getSupabaseClient();
   if (!client) return false;
 
@@ -1092,15 +1156,32 @@ export async function deleteCategoryFromSupabase(catName: string): Promise<boole
       .eq('name', cleanName);
     if (error) {
       console.error('Error deleting category from Supabase:', error);
+      if (!options?.skipEnqueue) {
+        enqueueMutation('DELETE_CATEGORY', catName);
+      }
       return false;
     }
     return true;
   } catch (e) {
+    if (!options?.skipEnqueue) {
+      enqueueMutation('DELETE_CATEGORY', catName);
+    }
     return false;
   }
 }
 
-export async function deleteAccountFromSupabase(accName: string): Promise<boolean> {
+export async function deleteAccountFromSupabase(
+  accName: string,
+  options?: { skipEnqueue?: boolean }
+): Promise<boolean> {
+  if (!isNetworkOnline()) {
+    if (!options?.skipEnqueue) {
+      enqueueMutation('DELETE_ACCOUNT', accName);
+      console.log('[SupabaseSync] Offline: Queued DELETE_ACCOUNT mutation for', accName);
+    }
+    return true;
+  }
+
   const client = getSupabaseClient();
   if (!client) return false;
 
@@ -1116,11 +1197,50 @@ export async function deleteAccountFromSupabase(accName: string): Promise<boolea
       .eq('name', cleanName);
     if (error) {
       console.error('Error deleting account from Supabase:', error);
+      if (!options?.skipEnqueue) {
+        enqueueMutation('DELETE_ACCOUNT', accName);
+      }
       return false;
     }
     return true;
   } catch (e) {
+    if (!options?.skipEnqueue) {
+      enqueueMutation('DELETE_ACCOUNT', accName);
+    }
     return false;
+  }
+}
+
+/**
+ * Universal executor for flushing queued offline mutations.
+ */
+export async function executeQueuedMutation(mutation: QueuedMutation): Promise<boolean> {
+  const options = { skipEnqueue: true };
+  switch (mutation.type) {
+    case 'SAVE_ALL':
+      return await saveAllUserDataToSupabase(mutation.payload, options);
+    case 'DELETE_TRANSACTION':
+      return await deleteTransactionFromSupabase(mutation.payload, options);
+    case 'SAVE_ATTACHMENTS':
+      return await saveTransactionAttachmentsToSupabase(
+        mutation.payload.txId,
+        mutation.payload.attachments,
+        mutation.payload.deletedAttachmentId,
+        options
+      );
+    case 'DELETE_ATTACHMENT':
+      return await deleteTransactionAttachmentFromSupabase(
+        mutation.payload.txId,
+        mutation.payload.attachmentId,
+        mutation.payload.remainingAttachments,
+        options
+      );
+    case 'DELETE_CATEGORY':
+      return await deleteCategoryFromSupabase(mutation.payload, options);
+    case 'DELETE_ACCOUNT':
+      return await deleteAccountFromSupabase(mutation.payload, options);
+    default:
+      return true;
   }
 }
 
