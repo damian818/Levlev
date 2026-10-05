@@ -821,11 +821,12 @@ Schema:
       });
     }
 
-    // Models to try with graceful fallback
+    // Models to try with graceful fallback (gemini-3.8-flash first for multimodal PDF document analysis)
     const candidateModels = [
-      'gemini-flash-latest',
-      'gemini-3.1-flash-lite',
       'gemini-3.8-flash',
+      'gemini-3.1-pro-preview',
+      'gemini-3.1-flash-lite',
+      'gemini-flash-latest',
     ];
 
     let aiResponseText: string | null = null;
@@ -844,12 +845,7 @@ Schema:
           console.log(`Calling Gemini with model ${model} for statement reconciliation...`);
           const response = await ai.models.generateContent({
             model,
-            contents: [
-              {
-                role: "user",
-                parts: contentsParts,
-              }
-            ],
+            contents: contentsParts,
             config: {
               systemInstruction,
               responseMimeType: "application/json",
@@ -860,12 +856,12 @@ Schema:
           const text = response.text?.trim();
           if (text && text.length > 20) {
             aiResponseText = text;
-            console.log(`Model ${model} succeeded!`);
+            console.log(`Model ${model} succeeded for statement parsing!`);
             break;
           }
         } catch (modelErr: any) {
           lastAiError = modelErr;
-          console.warn(`Model ${model} error:`, modelErr?.message || modelErr);
+          console.warn(`Model ${model} error during statement parsing:`, modelErr?.message || modelErr);
         }
       }
     }
@@ -891,7 +887,7 @@ Schema:
       }
     }
 
-    // Fallback: If text was provided, use deterministic parser
+    // Fallback 1: If text was provided, use deterministic parser
     if (trimmedText && trimmedText.length > 20) {
       const fallbackResult = parseStatementTextDeterministically(
         trimmedText,
@@ -901,6 +897,45 @@ Schema:
       );
       if (fallbackResult.items && fallbackResult.items.length > 0) {
         return res.json(fallbackResult);
+      }
+    }
+
+    // Fallback 2: If PDF base64 was provided, attempt local text extraction from PDF stream
+    if (pdfBase64) {
+      try {
+        const cleanBase64 = String(pdfBase64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+        const pdfBuf = Buffer.from(cleanBase64, 'base64');
+        const pdfString = pdfBuf.toString('latin1');
+        
+        const extractedLines: string[] = [];
+        const tjRegex = /\(([^)]{3,})\)\s*Tj/g;
+        let match;
+        while ((match = tjRegex.exec(pdfString)) !== null) {
+          extractedLines.push(match[1]);
+        }
+        const arrayRegex = /\[([^\]]+)\]\s*TJ/g;
+        while ((match = arrayRegex.exec(pdfString)) !== null) {
+          const innerMatches = match[1].match(/\(([^)]{2,})\)/g);
+          if (innerMatches) {
+            extractedLines.push(innerMatches.map(s => s.slice(1, -1)).join(' '));
+          }
+        }
+
+        if (extractedLines.length > 5) {
+          const extractedText = extractedLines.join('\n');
+          const pdfDeterministicResult = parseStatementTextDeterministically(
+            extractedText,
+            categories,
+            accounts,
+            cardHint
+          );
+          if (pdfDeterministicResult.items && pdfDeterministicResult.items.length > 0) {
+            console.log(`Fallback deterministic parser extracted ${pdfDeterministicResult.items.length} items from PDF text streams.`);
+            return res.json(pdfDeterministicResult);
+          }
+        }
+      } catch (pdfFallbackErr) {
+        console.warn("PDF stream fallback error:", pdfFallbackErr);
       }
     }
 

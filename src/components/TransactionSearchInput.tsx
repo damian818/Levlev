@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 
 interface TransactionSearchInputProps {
@@ -11,8 +11,8 @@ interface TransactionSearchInputProps {
 /**
  * Mobile-resilient search input for TransactionsTab.
  * Prevents mobile virtual keyboard IME cursor jumping and reversed typing
- * by isolating local keystrokes from heavy table re-renders, explicitly
- * tracking and restoring caret positions, and debouncing parent state updates.
+ * by isolating local keystrokes, avoiding programmatic selection tampering
+ * during typing, and cleanly debouncing updates to the parent component.
  */
 export function TransactionSearchInput({
   value,
@@ -22,54 +22,36 @@ export function TransactionSearchInput({
 }: TransactionSearchInputProps) {
   const [localValue, setLocalValue] = useState<string>(value || '');
   const inputRef = useRef<HTMLInputElement>(null);
-  const cursorRef = useRef<number | null>(null);
-  const isComposingRef = useRef<boolean>(false);
+  const lastEmittedValueRef = useRef<string>(value || '');
 
-  // Synchronize when the external value changes (e.g. from activeFilter, clear filters, etc.)
+  // Synchronize ONLY when parent changes value externally (e.g., reset filters, active tag clicked)
   useEffect(() => {
-    if (value !== localValue && !isComposingRef.current) {
+    // If the incoming value differs from what we last emitted to the parent, update local state
+    if (value !== lastEmittedValueRef.current) {
       setLocalValue(value || '');
-      cursorRef.current = (value || '').length;
+      lastEmittedValueRef.current = value || '';
     }
   }, [value]);
 
-  // Force caret preservation to prevent mobile keyboards from snapping selection to position 0
-  useLayoutEffect(() => {
-    if (
-      inputRef.current &&
-      document.activeElement === inputRef.current &&
-      cursorRef.current !== null &&
-      !isComposingRef.current
-    ) {
-      const pos = Math.min(cursorRef.current, localValue.length);
-      try {
-        inputRef.current.setSelectionRange(pos, pos);
-      } catch {
-        // Fallback for non-text input types
-      }
-    }
-  }, [localValue]);
-
-  // Debounce notification to parent to keep typing at 60fps on mobile without triggering heavy table re-renders
+  // Debounce notification to parent to keep typing at 60fps on mobile without heavy parent re-renders
   useEffect(() => {
-    if (localValue === value) return;
+    if (localValue === lastEmittedValueRef.current) return;
 
     const timer = setTimeout(() => {
+      lastEmittedValueRef.current = localValue;
       onChange(localValue);
-    }, 180);
+    }, 200);
 
     return () => clearTimeout(timer);
-  }, [localValue, onChange, value]);
+  }, [localValue, onChange]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nextVal = e.target.value;
-    cursorRef.current = e.target.selectionStart;
-    setLocalValue(nextVal);
+    setLocalValue(e.target.value);
   };
 
   const handleClear = () => {
     setLocalValue('');
-    cursorRef.current = 0;
+    lastEmittedValueRef.current = '';
     onChange('');
     if (inputRef.current) {
       inputRef.current.focus();
@@ -78,6 +60,7 @@ export function TransactionSearchInput({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      lastEmittedValueRef.current = localValue;
       onChange(localValue);
     }
   };
@@ -88,24 +71,14 @@ export function TransactionSearchInput({
       <input
         ref={inputRef}
         type="text"
-        inputMode="search"
-        dir="ltr"
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="none"
-        spellCheck={false}
         placeholder={placeholder}
         value={localValue}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        onCompositionStart={() => {
-          isComposingRef.current = true;
-        }}
-        onCompositionEnd={(e) => {
-          isComposingRef.current = false;
-          cursorRef.current = (e.target as HTMLInputElement).selectionStart;
-          setLocalValue((e.target as HTMLInputElement).value);
-        }}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="none"
+        spellCheck={false}
         className="w-full pl-9 pr-8 py-2 bg-[#0f131a] border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-500 placeholder-slate-500 text-left"
       />
       {localValue ? (
