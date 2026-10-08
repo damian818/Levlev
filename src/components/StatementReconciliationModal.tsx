@@ -37,6 +37,8 @@ import {
   reconcileStatementWithApp,
   getDemoStatementData
 } from '../utils/statementReconciliation';
+import { extractTextFromPdf } from '../utils/pdfExtractor';
+import { parseStatementTextDeterministically } from '../utils/deterministicStatementParser';
 
 interface StatementReconciliationModalProps {
   isOpen: boolean;
@@ -129,38 +131,65 @@ export function StatementReconciliationModal({
     setAnalyzingMessage(t('reconciliation.reading_pdf', { defaultValue: 'Reading PDF document...' }));
 
     try {
+      // 1. Extract text in browser using client-side PDF extractor
+      let clientExtractedText = '';
+      try {
+        const fileBuffer = await file.arrayBuffer();
+        clientExtractedText = await extractTextFromPdf(fileBuffer);
+      } catch (clientExtractErr) {
+        console.warn('Client-side PDF text extraction notice:', clientExtractErr);
+      }
+
+      // 2. Read base64 data for AI multimodal processing
       const reader = new FileReader();
       reader.onload = async () => {
         try {
           const base64Data = (reader.result as string) || '';
           setAnalyzingMessage(t('reconciliation.ai_analyzing', { defaultValue: 'Analyzing statement expenses, installments & dates...' }));
 
-          const response = await fetch('/api/parse-statement-pdf', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              pdfBase64: base64Data,
-              cardHint: selectedAccount,
-              accounts: accounts.map(a => a.name),
-              categories: categories.map(c => c.name),
-            }),
-          });
+          let statementData: StatementParsedData | null = null;
 
-          if (!response.ok) {
-            let errorMsg = `Server error (${response.status})`;
-            try {
-              const errData = await response.json();
-              if (errData?.error) errorMsg = errData.error;
-            } catch {
-              const text = await response.text().catch(() => '');
-              if (text && text.length < 300) errorMsg = text;
+          try {
+            const response = await fetch('/api/parse-statement-pdf', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                pdfBase64: base64Data,
+                statementText: clientExtractedText,
+                cardHint: selectedAccount,
+                accounts: accounts.map(a => a.name),
+                categories: categories.map(c => c.name),
+              }),
+            });
+
+            if (response.ok) {
+              const resJson = await response.json();
+              if (resJson && Array.isArray(resJson.items) && resJson.items.length > 0) {
+                statementData = resJson;
+              }
+            } else {
+              console.warn(`Server parse returned ${response.status}, trying local statement parser...`);
             }
-            throw new Error(errorMsg);
+          } catch (fetchErr) {
+            console.warn('API call to /api/parse-statement-pdf failed or offline:', fetchErr);
           }
 
-          const statementData: StatementParsedData = await response.json();
-          if (!statementData.items || statementData.items.length === 0) {
-            throw new Error('No expenses or transactions could be detected in this document. Please check the PDF or paste the statement text.');
+          // 3. Fallback: Parse deterministically from client-extracted text if server didn't return items
+          if (!statementData && clientExtractedText && clientExtractedText.trim().length > 10) {
+            const localParsed = parseStatementTextDeterministically(
+              clientExtractedText,
+              categories.map(c => c.name),
+              accounts.map(a => a.name),
+              selectedAccount
+            );
+            if (localParsed.items && localParsed.items.length > 0) {
+              console.log(`Successfully extracted ${localParsed.items.length} items using client statement parser.`);
+              statementData = localParsed;
+            }
+          }
+
+          if (!statementData || !statementData.items || statementData.items.length === 0) {
+            throw new Error('No expenses or transactions could be detected in this document. Please check the PDF or paste the statement text directly.');
           }
 
           setAnalyzingMessage(t('reconciliation.matching_expenses', { defaultValue: 'Comparing against recorded app expenses...' }));
@@ -202,33 +231,50 @@ export function StatementReconciliationModal({
 
     setIsAnalyzing(true);
     setAnalysisError(null);
-    setAnalyzingMessage('Analyzing statement text with AI...');
+    setAnalyzingMessage('Analyzing statement text...');
 
     try {
-      const response = await fetch('/api/parse-statement-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          statementText: pastedText,
-          cardHint: selectedAccount,
-          accounts: accounts.map(a => a.name),
-          categories: categories.map(c => c.name),
-        }),
-      });
+      let statementData: StatementParsedData | null = null;
 
-      if (!response.ok) {
-        let errorMsg = `Server error (${response.status})`;
-        try {
-          const errData = await response.json();
-          if (errData?.error) errorMsg = errData.error;
-        } catch {
-          const text = await response.text().catch(() => '');
-          if (text && text.length < 300) errorMsg = text;
+      try {
+        const response = await fetch('/api/parse-statement-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            statementText: pastedText,
+            cardHint: selectedAccount,
+            accounts: accounts.map(a => a.name),
+            categories: categories.map(c => c.name),
+          }),
+        });
+
+        if (response.ok) {
+          const resJson = await response.json();
+          if (resJson && Array.isArray(resJson.items) && resJson.items.length > 0) {
+            statementData = resJson;
+          }
         }
-        throw new Error(errorMsg);
+      } catch (fetchErr) {
+        console.warn('Server parse error, using client parser:', fetchErr);
       }
 
-      const statementData: StatementParsedData = await response.json();
+      // Fallback: Parse deterministically from pasted text
+      if (!statementData) {
+        const localParsed = parseStatementTextDeterministically(
+          pastedText,
+          categories.map(c => c.name),
+          accounts.map(a => a.name),
+          selectedAccount
+        );
+        if (localParsed.items && localParsed.items.length > 0) {
+          statementData = localParsed;
+        }
+      }
+
+      if (!statementData || !statementData.items || statementData.items.length === 0) {
+        throw new Error('No transactions could be detected in the pasted text. Please verify the format.');
+      }
+
       const { reconciliationItems: recItems } = reconcileStatementWithApp(
         statementData,
         transactions,

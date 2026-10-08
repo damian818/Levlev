@@ -3,8 +3,17 @@ import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { parseStatementTextDeterministically } from "./deterministicStatementParser";
+import { extractTextFromPdf } from "../utils/pdfExtractor";
 
 dotenv.config();
+
+const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
+const GEMINI_STATEMENT_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-2.5-pro",
+];
 
 const app = express();
 app.use(compression());
@@ -449,7 +458,7 @@ ${langInstruction}`;
     const fullPrompt = `${contextXml}\n\n${taskText}`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: GEMINI_DEFAULT_MODEL,
       contents: fullPrompt,
       config: {
         systemInstruction,
@@ -533,7 +542,7 @@ Respond ONLY with valid JSON in this exact structure:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: GEMINI_DEFAULT_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -603,7 +612,7 @@ Return ONLY a JSON object with the following fields:
 Do NOT include markdown formatting or backticks in the response. Return raw JSON.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: GEMINI_DEFAULT_MODEL,
       contents: [
         { role: "user", parts: [{ text: text }] }
       ],
@@ -687,7 +696,7 @@ Recent Transactions: ${JSON.stringify(financialContext?.recentTransactions || []
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: GEMINI_DEFAULT_MODEL,
       contents,
       config: {
         systemInstruction,
@@ -821,13 +830,8 @@ Schema:
       });
     }
 
-    // Models to try with graceful fallback (gemini-3.8-flash first for multimodal PDF document analysis)
-    const candidateModels = [
-      'gemini-3.8-flash',
-      'gemini-3.1-pro-preview',
-      'gemini-3.1-flash-lite',
-      'gemini-flash-latest',
-    ];
+    // Models to try with graceful fallback (using multimodal Gemini models)
+    const candidateModels = GEMINI_STATEMENT_MODELS;
 
     let aiResponseText: string | null = null;
     let lastAiError: any = null;
@@ -845,7 +849,12 @@ Schema:
           console.log(`Calling Gemini with model ${model} for statement reconciliation...`);
           const response = await ai.models.generateContent({
             model,
-            contents: contentsParts,
+            contents: [
+              {
+                role: 'user',
+                parts: contentsParts,
+              },
+            ],
             config: {
               systemInstruction,
               responseMimeType: "application/json",
@@ -900,29 +909,14 @@ Schema:
       }
     }
 
-    // Fallback 2: If PDF base64 was provided, attempt local text extraction from PDF stream
+    // Fallback 2: If PDF base64 was provided, decompress streams and extract text
     if (pdfBase64) {
       try {
         const cleanBase64 = String(pdfBase64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
         const pdfBuf = Buffer.from(cleanBase64, 'base64');
-        const pdfString = pdfBuf.toString('latin1');
-        
-        const extractedLines: string[] = [];
-        const tjRegex = /\(([^)]{3,})\)\s*Tj/g;
-        let match;
-        while ((match = tjRegex.exec(pdfString)) !== null) {
-          extractedLines.push(match[1]);
-        }
-        const arrayRegex = /\[([^\]]+)\]\s*TJ/g;
-        while ((match = arrayRegex.exec(pdfString)) !== null) {
-          const innerMatches = match[1].match(/\(([^)]{2,})\)/g);
-          if (innerMatches) {
-            extractedLines.push(innerMatches.map(s => s.slice(1, -1)).join(' '));
-          }
-        }
+        const extractedText = await extractTextFromPdf(pdfBuf);
 
-        if (extractedLines.length > 5) {
-          const extractedText = extractedLines.join('\n');
+        if (extractedText && extractedText.trim().length > 20) {
           const pdfDeterministicResult = parseStatementTextDeterministically(
             extractedText,
             categories,
@@ -930,7 +924,7 @@ Schema:
             cardHint
           );
           if (pdfDeterministicResult.items && pdfDeterministicResult.items.length > 0) {
-            console.log(`Fallback deterministic parser extracted ${pdfDeterministicResult.items.length} items from PDF text streams.`);
+            console.log(`Deterministic parser extracted ${pdfDeterministicResult.items.length} items from decompressed PDF text streams.`);
             return res.json(pdfDeterministicResult);
           }
         }
