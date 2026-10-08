@@ -10,10 +10,9 @@ interface TransactionSearchInputProps {
 }
 
 /**
- * Mobile-resilient search input for TransactionsTab.
- * Uses an uncontrolled input with a ref and debounce so that the browser's
- * native keyboard/IME manages text composition without React interrupting
- * or resetting the caret position on mobile devices.
+ * Responsive search input for TransactionsTab.
+ * Uses controlled state synchronized with external prop updates to ensure
+ * smooth native typing without caret jumps or character reversals.
  */
 export function TransactionSearchInput({
   value,
@@ -22,50 +21,37 @@ export function TransactionSearchInput({
   clearTitle = 'Clear',
   className = 'w-full sm:w-64 md:w-72',
 }: TransactionSearchInputProps) {
+  const [internalValue, setInternalValue] = useState<string>(value || '');
+  const lastPropValueRef = useRef<string>(value || '');
   const inputRef = useRef<HTMLInputElement>(null);
-  const [hasText, setHasText] = useState<boolean>(Boolean(value));
-  const debounceTimerRef = useRef<any>(null);
 
-  // Sync when parent resets or updates value externally (e.g., reset filters)
+  // Sync from props only when the value prop changes from an outside event (e.g. filter reset)
   useEffect(() => {
-    if (inputRef.current && inputRef.current.value !== (value || '')) {
-      inputRef.current.value = value || '';
-      setHasText(Boolean(value));
+    if (value !== lastPropValueRef.current) {
+      lastPropValueRef.current = value || '';
+      setInternalValue(value || '');
     }
   }, [value]);
 
-  const handleInput = (e: React.FormEvent<HTMLInputElement>) => {
-    const nextVal = (e.target as HTMLInputElement).value;
-    setHasText(Boolean(nextVal));
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    debounceTimerRef.current = setTimeout(() => {
-      onChange(nextVal);
-    }, 200);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextVal = e.target.value;
+    setInternalValue(nextVal);
+    lastPropValueRef.current = nextVal;
+    onChange(nextVal);
   };
 
   const handleClear = () => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
+    setInternalValue('');
+    lastPropValueRef.current = '';
+    onChange('');
     if (inputRef.current) {
-      inputRef.current.value = '';
       inputRef.current.focus();
     }
-    setHasText(false);
-    onChange('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      if (inputRef.current) {
-        onChange(inputRef.current.value);
-      }
+    if (e.key === 'Escape') {
+      handleClear();
     }
   };
 
@@ -76,8 +62,8 @@ export function TransactionSearchInput({
         ref={inputRef}
         type="text"
         dir="ltr"
-        defaultValue={value || ''}
-        onInput={handleInput}
+        value={internalValue}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         autoComplete="off"
@@ -86,7 +72,7 @@ export function TransactionSearchInput({
         spellCheck={false}
         className="w-full pl-9 pr-8 py-2 bg-[#0f131a] border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-500 placeholder-slate-500 text-left"
       />
-      {hasText ? (
+      {internalValue ? (
         <button
           type="button"
           onClick={handleClear}
@@ -99,3 +85,4 @@ export function TransactionSearchInput({
     </div>
   );
 }
+
