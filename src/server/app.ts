@@ -3,7 +3,7 @@ import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { parseStatementTextDeterministically } from "./deterministicStatementParser";
-import { extractTextFromPdf } from "../utils/pdfExtractor";
+import { extractStructuredTextFromPdfBuffer } from "./serverPdfParser";
 
 dotenv.config();
 
@@ -715,9 +715,26 @@ Recent Transactions: ${JSON.stringify(financialContext?.recentTransactions || []
   }
 });
 
-app.post(["/api/parse-statement-pdf", "/parse-statement-pdf"], checkAiRateLimit, async (req, res) => {
+// Dedicated endpoint to extract structured text directly from PDF without AI
+app.post(["/api/extract-pdf-text", "/extract-pdf-text"], async (req, res) => {
   try {
-    const { pdfBase64, statementText, accounts = [], categories = [], cardHint = '' } = req.body;
+    const { pdfBase64 } = req.body;
+    if (!pdfBase64) {
+      return res.status(400).json({ error: "Missing pdfBase64 payload" });
+    }
+    const cleanBase64 = String(pdfBase64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+    const pdfBuf = Buffer.from(cleanBase64, 'base64');
+    const result = await extractStructuredTextFromPdfBuffer(pdfBuf);
+    res.json(result);
+  } catch (err: any) {
+    console.error("Extract PDF text error:", err);
+    res.status(500).json({ error: err.message || "Failed to extract text from PDF" });
+  }
+});
+
+app.post(["/api/parse-statement-pdf", "/parse-statement-pdf"], async (req, res) => {
+  try {
+    const { pdfBase64, statementText, accounts = [], categories = [], cardHint = '', allowAiFallback = true } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!pdfBase64 && !statementText) {
@@ -729,17 +746,51 @@ app.post(["/api/parse-statement-pdf", "/parse-statement-pdf"], checkAiRateLimit,
       : 'Food, Groceries, Services, Shopping, Transport, Entertainment, Healthcare, Utilities, Education, Travel, Housing, Subscriptions';
     const accountsList = Array.isArray(accounts) && accounts.length > 0 ? accounts.join(', ') : 'Credit Card';
 
-    // If pure text is provided, try deterministic extraction first if text has high confidence
-    const trimmedText = (statementText || '').trim();
-    if (trimmedText && trimmedText.length > 20) {
-      const fastParsed = parseStatementTextDeterministically(trimmedText, categories, accounts, cardHint);
-      if (fastParsed.items && fastParsed.items.length >= 3) {
-        console.log(`Deterministic parser extracted ${fastParsed.items.length} items instantly from text.`);
-        return res.json(fastParsed);
+    let localExtractedText = (statementText || '').trim();
+    let localEngineUsed = 'text';
+
+    // 1. PRIMARY ENGINE: Local non-AI PDF parsing via pdf2json & pdfjs-dist
+    if (pdfBase64) {
+      try {
+        const cleanBase64 = String(pdfBase64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+        const pdfBuf = Buffer.from(cleanBase64, 'base64');
+        const extracted = await extractStructuredTextFromPdfBuffer(pdfBuf);
+        if (extracted && extracted.text && extracted.text.length > 20) {
+          localExtractedText = extracted.text;
+          localEngineUsed = extracted.engine;
+          console.log(`Local non-AI PDF engine (${extracted.engine}) extracted ${localExtractedText.split('\n').length} lines.`);
+        }
+      } catch (pdfLocalErr) {
+        console.warn("Local PDF extraction error:", pdfLocalErr);
       }
     }
 
-    const systemInstruction = `You are an expert financial auditor and automated statement reconciliation engine.
+    // 2. PRIMARY PARSER: High-precision deterministic statement parser
+    if (localExtractedText && localExtractedText.length > 20) {
+      const deterministicResult = parseStatementTextDeterministically(
+        localExtractedText,
+        categories,
+        accounts,
+        cardHint
+      );
+
+      if (deterministicResult.items && deterministicResult.items.length > 0) {
+        console.log(`Successfully parsed ${deterministicResult.items.length} items deterministically using local non-AI engine (${localEngineUsed}).`);
+        return res.json({
+          ...deterministicResult,
+          parserEngine: 'local-non-ai',
+          parserMethod: localEngineUsed,
+        });
+      }
+    }
+
+    // 3. SECONDARY FALLBACK: Gemini Multimodal AI (only if local parser couldn't detect structured lines)
+    let aiResponseText: string | null = null;
+    let lastAiError: any = null;
+
+    if (allowAiFallback && apiKey) {
+      console.log("Local non-AI parser found 0 items; attempting AI fallback...");
+      const systemInstruction = `You are an expert financial auditor and automated statement reconciliation engine.
 Your task is to analyze the provided credit card statement document or text (e.g. Visa, Mastercard, American Express, Santander, BBVA, Galicia, Macro, etc.) and extract all transactional data.
 
 User's App Context:
@@ -812,31 +863,24 @@ Schema:
   ]
 }`;
 
-    const contentsParts: any[] = [];
-    if (pdfBase64) {
-      const cleanBase64 = String(pdfBase64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
-      contentsParts.push({
-        inlineData: {
-          mimeType: "application/pdf",
-          data: cleanBase64,
-        }
-      });
-      contentsParts.push({
-        text: "Please extract all expense transactions, installments, payments, and period dates from this credit card statement PDF as specified."
-      });
-    } else {
-      contentsParts.push({
-        text: `Statement Content:\n\n${statementText}\n\nPlease extract all expense transactions, installments, payments, and period dates from this statement as specified.`
-      });
-    }
+      const contentsParts: any[] = [];
+      if (pdfBase64) {
+        const cleanBase64 = String(pdfBase64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+        contentsParts.push({
+          inlineData: {
+            mimeType: "application/pdf",
+            data: cleanBase64,
+          }
+        });
+        contentsParts.push({
+          text: "Please extract all expense transactions, installments, payments, and period dates from this credit card statement PDF as specified."
+        });
+      } else {
+        contentsParts.push({
+          text: `Statement Content:\n\n${localExtractedText}\n\nPlease extract all expense transactions, installments, payments, and period dates from this statement as specified.`
+        });
+      }
 
-    // Models to try with graceful fallback (using multimodal Gemini models)
-    const candidateModels = GEMINI_STATEMENT_MODELS;
-
-    let aiResponseText: string | null = null;
-    let lastAiError: any = null;
-
-    if (apiKey) {
       const ai = new GoogleGenAI({
         apiKey,
         httpOptions: {
@@ -844,17 +888,12 @@ Schema:
         },
       });
 
-      for (const model of candidateModels) {
+      for (const model of GEMINI_STATEMENT_MODELS) {
         try {
-          console.log(`Calling Gemini with model ${model} for statement reconciliation...`);
+          console.log(`Calling Gemini with model ${model} for statement fallback...`);
           const response = await ai.models.generateContent({
             model,
-            contents: [
-              {
-                role: 'user',
-                parts: contentsParts,
-              },
-            ],
+            contents: [{ role: 'user', parts: contentsParts }],
             config: {
               systemInstruction,
               responseMimeType: "application/json",
@@ -865,87 +904,50 @@ Schema:
           const text = response.text?.trim();
           if (text && text.length > 20) {
             aiResponseText = text;
-            console.log(`Model ${model} succeeded for statement parsing!`);
             break;
           }
         } catch (modelErr: any) {
           lastAiError = modelErr;
-          console.warn(`Model ${model} error during statement parsing:`, modelErr?.message || modelErr);
+          console.warn(`Model ${model} error during fallback:`, modelErr?.message || modelErr);
+        }
+      }
+
+      if (aiResponseText) {
+        const cleanedText = aiResponseText
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/```$/i, '')
+          .trim();
+
+        try {
+          const parsedData = JSON.parse(cleanedText);
+          if (!Array.isArray(parsedData.items)) parsedData.items = [];
+          if (!Array.isArray(parsedData.payments)) parsedData.payments = [];
+          parsedData.parserEngine = 'ai-gemini';
+          return res.json(parsedData);
+        } catch (parseErr) {
+          console.warn("AI JSON parse error:", parseErr);
         }
       }
     }
 
-    if (aiResponseText) {
-      const cleanedText = aiResponseText
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```$/i, '')
-        .trim();
-
-      try {
-        const parsedData = JSON.parse(cleanedText);
-        if (!Array.isArray(parsedData.items)) {
-          parsedData.items = [];
-        }
-        if (!Array.isArray(parsedData.payments)) {
-          parsedData.payments = [];
-        }
-        return res.json(parsedData);
-      } catch (parseErr) {
-        console.warn("AI JSON parse error:", parseErr);
-      }
-    }
-
-    // Fallback 1: If text was provided, use deterministic parser
-    if (trimmedText && trimmedText.length > 20) {
-      const fallbackResult = parseStatementTextDeterministically(
-        trimmedText,
+    // If both failed or document was empty
+    if (localExtractedText && localExtractedText.length > 0) {
+      // Return whatever metadata we could infer even if 0 transactions
+      const minimalResult = parseStatementTextDeterministically(
+        localExtractedText,
         categories,
         accounts,
         cardHint
       );
-      if (fallbackResult.items && fallbackResult.items.length > 0) {
-        return res.json(fallbackResult);
-      }
-    }
-
-    // Fallback 2: If PDF base64 was provided, decompress streams and extract text
-    if (pdfBase64) {
-      try {
-        const cleanBase64 = String(pdfBase64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
-        const pdfBuf = Buffer.from(cleanBase64, 'base64');
-        const extractedText = await extractTextFromPdf(pdfBuf);
-
-        if (extractedText && extractedText.trim().length > 20) {
-          const pdfDeterministicResult = parseStatementTextDeterministically(
-            extractedText,
-            categories,
-            accounts,
-            cardHint
-          );
-          if (pdfDeterministicResult.items && pdfDeterministicResult.items.length > 0) {
-            console.log(`Deterministic parser extracted ${pdfDeterministicResult.items.length} items from decompressed PDF text streams.`);
-            return res.json(pdfDeterministicResult);
-          }
-        }
-      } catch (pdfFallbackErr) {
-        console.warn("PDF stream fallback error:", pdfFallbackErr);
-      }
-    }
-
-    const isQuotaOrDemand = lastAiError?.message?.includes('503') ||
-      lastAiError?.message?.includes('resource_exhausted') ||
-      lastAiError?.message?.includes('high demand') ||
-      lastAiError?.status === 429;
-
-    if (isQuotaOrDemand) {
-      return res.status(503).json({
-        error: "The AI service is currently experiencing temporary high demand or quota limits. You can paste your statement text directly into the 'Paste Text' tab, or test with the Demo Statement.",
-        isOverloaded: true
+      return res.json({
+        ...minimalResult,
+        parserEngine: 'local-non-ai',
+        parserMethod: localEngineUsed,
       });
     }
 
-    throw lastAiError || new Error("Unable to parse transactions from this statement. Please check the document or paste the text.");
+    throw lastAiError || new Error("Unable to parse transactions from this document. Please check the PDF format or paste the text directly into the 'Paste Text' tab.");
   } catch (err: any) {
     console.error("Parse statement PDF error:", err);
     res.status(500).json({

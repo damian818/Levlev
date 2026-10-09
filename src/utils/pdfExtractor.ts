@@ -31,29 +31,10 @@ function decodePdfHexString(hex: string): string {
 }
 
 /**
- * Decompresses a raw byte stream using Node zlib (if available) or Web DecompressionStream
+ * Decompresses a raw byte stream using Web DecompressionStream
  */
 async function decompressStreamBytes(rawBytes: Uint8Array): Promise<string> {
-  // 1. Try Node.js zlib if in Node environment
-  if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-    try {
-      const zlib = await import('zlib');
-      const buf = Buffer.from(rawBytes);
-      try {
-        return zlib.inflateSync(buf).toString('latin1');
-      } catch {
-        try {
-          return zlib.inflateRawSync(buf).toString('latin1');
-        } catch {
-          return buf.toString('latin1');
-        }
-      }
-    } catch {
-      // Continue to Web API fallback
-    }
-  }
-
-  // 2. Try Web DecompressionStream (supported in modern browsers)
+  // 1. Try Web DecompressionStream (supported in modern browsers)
   if (typeof DecompressionStream !== 'undefined') {
     // Try standard zlib wrapper first ('deflate')
     try {
@@ -175,6 +156,36 @@ const ENDSTREAM_BYTES = new Uint8Array([101, 110, 100, 115, 116, 114, 101, 97, 1
  */
 export async function extractTextFromPdf(pdfBytes: Uint8Array | ArrayBuffer): Promise<string> {
   const bytes = pdfBytes instanceof Uint8Array ? pdfBytes : new Uint8Array(pdfBytes);
+
+  // 1. If running in a browser environment, use the local backend's high-precision PDF engine
+  if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+    try {
+      // Convert bytes to base64 safely
+      let binary = '';
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = window.btoa(binary);
+
+      const resp = await fetch('/api/extract-pdf-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdfBase64: base64 }),
+      });
+
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json && typeof json.text === 'string' && json.text.trim().length > 0) {
+          return json.text.trim();
+        }
+      }
+    } catch (apiErr) {
+      console.warn('API PDF extraction call failed, falling back to local decompression:', apiErr);
+    }
+  }
+
+  // 2. Fallback byte stream extractor
   const allLines: string[] = [];
 
   let pos = 0;

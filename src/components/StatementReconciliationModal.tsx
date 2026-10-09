@@ -145,7 +145,7 @@ export function StatementReconciliationModal({
       reader.onload = async () => {
         try {
           const base64Data = (reader.result as string) || '';
-          setAnalyzingMessage(t('reconciliation.ai_analyzing', { defaultValue: 'Analyzing statement expenses, installments & dates...' }));
+          setAnalyzingMessage(t('reconciliation.local_analyzing', { defaultValue: 'Parsing statement tables, installments & amounts with local engine (pdf2json)...' }));
 
           let statementData: StatementParsedData | null = null;
 
@@ -459,8 +459,9 @@ export function StatementReconciliationModal({
                 <h3 className="text-base font-bold text-slate-100">
                   {t('reconciliation.modal_title', { defaultValue: 'Credit Card Statement Reconciliation' })}
                 </h3>
-                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
-                  PDF · Gemini AI
+                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  PDF · Local Engine (pdf2json)
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -562,7 +563,7 @@ export function StatementReconciliationModal({
                         {t('reconciliation.upload_drag_title', { defaultValue: 'Drag and drop your Credit Card Statement PDF' })}
                       </h4>
                       <p className="text-xs text-slate-400 mt-1">
-                        Supports PDF statements from Visa, Mastercard, AMEX, Santander, BBVA, Galicia, Macro, Chase, etc.
+                        Supports PDF statements from Visa, Mastercard, AMEX, Santander, BBVA, Galicia, Macro, etc. Processed 100% locally with high-precision non-AI table parser.
                       </p>
                     </div>
 
@@ -681,6 +682,10 @@ export function StatementReconciliationModal({
                         {parsedStatement?.cardLast4 && (
                           <span className="text-xs text-slate-400 font-mono">···· {parsedStatement.cardLast4}</span>
                         )}
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                          {parsedStatement?.parserEngine === 'ai-gemini' ? 'AI Gemini' : `Local Engine (${parsedStatement?.parserMethod || 'pdf2json'})`}
+                        </span>
                       </h4>
                       <span className="text-xs text-slate-500 font-mono">
                         {parsedStatement?.periodStart} → {parsedStatement?.periodEnd || parsedStatement?.closeDate}

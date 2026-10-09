@@ -228,40 +228,122 @@ export function parseStatementTextDeterministically(
   const items: ParsedItem[] = [];
   const payments: { date: string; description: string; amount: number; currency: string }[] = [];
 
-  // Match typical transaction lines:
-  // Examples:
-  // 02/08/2026 554123 SUPERMERCADO COTO 01/03 $ 45.120,50
-  // 02/08 COTO SUC 14 01/03 45.120,50
-  // 02-AGO-26 COTO SUC 14 45.120,50
-  // 15/08 MERCADOLIBRE CUOTA 02/06 $ 35.000,00
-  // 18/08 SU PAGO EN PESOS - $ 150.000,00
-  const txLineRegex = /^(\d{1,2}[/\-.]\d{1,2}(?:[/\-.]\d{2,4})?|\d{1,2}[/\-.][a-zA-Z]{3}(?:[/\-.]\d{2,4})?)\s+(.*?)(?:(?:c(?:uota)?\.?|\(cuota\)?)\s*(\d{1,2})\s*[/deDE\s]+\s*(\d{1,2})|(\d{1,2})\s*[/]\s*(\d{1,2})|\((\d{1,2})\/(\d{1,2})\))?\s+([-\(\$US\s]*[\d.,]+[\s\-\)]*)$/i;
-
+  // Match statement transaction lines with flexible column formats:
+  // e.g.:
+  // 02/03/26 001245 SUPERMERCADO COTO 01/01 45.200,50 0,00
+  // 05/03/26 003412 FARMACITY 44 01/03 12.300,00 0,00
+  // 12/03/26 009871 NETFLIX.COM 0,00 15,99
+  // 15/03/26 MERCADOLIBRE *COMPRA 02/06 38.450,00
+  // 20/03/26 000000 SU PAGO EN PESOS -95.950,50 0,00
+  // 18/03/2026 FARMACITY 44 $ 12.500,00
   for (const line of lines) {
-    // Skip obvious header or footer lines
-    if (line.match(/^(fecha|date|comprobante|detalle|resumen|total a pagar|saldo anterior|página|page|banco|tarjeta|titular|periodo|cierre|vencimiento)/i)) {
+    // Skip obvious header, divider or summary lines
+    if (line.match(/^(fecha|date|comprobante|detalle|resumen|total a pagar|total del mes|saldo anterior|página|page|banco|tarjeta|titular|periodo|cierre|vencimiento|---|===|\*\*\*|___)/i)) {
       continue;
     }
 
-    const match = line.match(txLineRegex);
-    if (match) {
-      const dateRaw = match[1];
-      let desc = match[2].trim();
-      const instCurr = match[3] || match[5] || match[7];
-      const instTot = match[4] || match[6] || match[8];
-      const amtRaw = match[9];
+    // Match lines starting with a date: DD/MM/YY, DD/MM/YYYY, DD-MMM-YY, etc.
+    const dateMatch = line.match(/^(\d{1,2}[/\-.](?:\d{1,2}|[a-zA-Z]{3,4})(?:[/\-.]\d{2,4})?)\s+(.*)$/);
+    if (!dateMatch) {
+      continue;
+    }
 
-      let amt = Math.abs(parseAmount(amtRaw));
+    const dateRaw = dateMatch[1];
+    let rest = dateMatch[2].trim();
+
+    // Extract trailing amounts (one or two, for Pesos and USD columns)
+    const amounts: string[] = [];
+    while (true) {
+      const amtMatch = rest.match(/([+\-]?(?:\$|U\$S|USD|US\$)?\s*[\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|-?\b\d+,\d{2}\b|-?\b\d+\.\d{2}\b)(?:\s*[-+])?\s*$/i);
+      if (!amtMatch) break;
+      amounts.unshift(amtMatch[1].trim());
+      rest = rest.slice(0, amtMatch.index).trim();
+      if (amounts.length >= 2) break; // Maximum 2 trailing columns (Pesos, USD)
+    }
+
+    if (amounts.length === 0) continue;
+
+    // Check for installment pattern at the end of remaining text:
+    // e.g. "01/03", "C.01/03", "(01/03)", "01 de 03", "1/3", "CUOTA 02/06"
+    let instCurr: number | null = null;
+    let instTot: number | null = null;
+    const instMatch = rest.match(/(?:c(?:uota)?\.?|\(cuota\)?|\bcuota\b)?\s*(\d{1,2})\s*[/deDE\s]+\s*(\d{1,2})\s*$/i);
+    if (instMatch) {
+      instCurr = parseInt(instMatch[1], 10);
+      instTot = parseInt(instMatch[2], 10);
+      rest = rest.slice(0, instMatch.index).trim();
+    }
+
+    // Strip leading voucher / ticket / coupon / operation number if present:
+    // e.g. "001245 SUPERMERCADO COTO", "OP 123445 FARMACIA"
+    rest = rest.replace(/^(\d{4,10}\s+)+/, '').trim();
+    rest = rest.replace(/^(OP\s*\d+|CUPON\s*\d+|COMP\s*\d+)\s+/i, '').trim();
+
+    if (!rest || rest.length < 2) continue;
+
+    const txDate = normalizeDate(dateRaw, defaultYear);
+    const isPayment =
+      rest.toLowerCase().includes('pago') ||
+      rest.toLowerCase().includes('payment') ||
+      rest.toLowerCase().includes('credito a su favor') ||
+      rest.toLowerCase().includes('su abono') ||
+      line.toLowerCase().includes('su pago') ||
+      amounts.some(a => a.includes('-') || a.endsWith('-'));
+
+    if (amounts.length === 2) {
+      // Dual column: Pesos and USD
+      const amtArs = parseAmount(amounts[0]);
+      const amtUsd = parseAmount(amounts[1]);
+
+      if (isPayment) {
+        if (amtArs !== 0) {
+          payments.push({
+            date: txDate,
+            description: cleanMerchantTitle(rest),
+            amount: Math.abs(amtArs),
+            currency: 'ARS',
+          });
+        }
+        if (amtUsd !== 0) {
+          payments.push({
+            date: txDate,
+            description: cleanMerchantTitle(rest),
+            amount: Math.abs(amtUsd),
+            currency: 'USD',
+          });
+        }
+      } else {
+        if (amtArs > 0) {
+          items.push({
+            date: txDate,
+            rawDescription: rest,
+            cleanTitle: cleanMerchantTitle(rest),
+            amount: amtArs,
+            currency: 'ARS',
+            category: matchCategory(rest, categories),
+            installmentCurrent: instCurr,
+            installmentTotal: instTot,
+            cardholder: null,
+          });
+        }
+        if (amtUsd > 0) {
+          items.push({
+            date: txDate,
+            rawDescription: rest,
+            cleanTitle: cleanMerchantTitle(rest),
+            amount: amtUsd,
+            currency: 'USD',
+            category: matchCategory(rest, categories),
+            installmentCurrent: instCurr,
+            installmentTotal: instTot,
+            cardholder: null,
+          });
+        }
+      }
+    } else {
+      // Single amount column
+      const amt = Math.abs(parseAmount(amounts[0]));
       if (amt <= 0) continue;
-
-      const txDate = normalizeDate(dateRaw, defaultYear);
-      const isPayment =
-        desc.toLowerCase().includes('pago') ||
-        desc.toLowerCase().includes('payment') ||
-        desc.toLowerCase().includes('credito a su favor') ||
-        desc.toLowerCase().includes('su abono') ||
-        amtRaw.includes('-') ||
-        line.toLowerCase().includes('su pago');
 
       let itemCurrency = 'ARS';
       if (
@@ -275,23 +357,20 @@ export function parseStatementTextDeterministically(
       if (isPayment) {
         payments.push({
           date: txDate,
-          description: desc,
+          description: cleanMerchantTitle(rest),
           amount: amt,
           currency: itemCurrency,
         });
       } else {
-        const cleanTitle = cleanMerchantTitle(desc);
-        const category = matchCategory(desc, categories);
-
         items.push({
           date: txDate,
-          rawDescription: desc,
-          cleanTitle,
+          rawDescription: rest,
+          cleanTitle: cleanMerchantTitle(rest),
           amount: amt,
           currency: itemCurrency,
-          category,
-          installmentCurrent: instCurr ? parseInt(instCurr, 10) : null,
-          installmentTotal: instTot ? parseInt(instTot, 10) : null,
+          category: matchCategory(rest, categories),
+          installmentCurrent: instCurr,
+          installmentTotal: instTot,
           cardholder: null,
         });
       }
@@ -303,7 +382,7 @@ export function parseStatementTextDeterministically(
   const seenKey = new Set<string>();
 
   for (const it of items) {
-    const key = `${it.date}_${it.cleanTitle}_${it.amount}_${it.installmentCurrent || 0}`;
+    const key = `${it.date}_${it.cleanTitle}_${it.amount}_${it.currency}_${it.installmentCurrent || 0}`;
     if (!seenKey.has(key)) {
       seenKey.add(key);
       dedupedItems.push(it);

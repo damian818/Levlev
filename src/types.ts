@@ -404,6 +404,8 @@ export interface StatementParsedData {
     amount: number;
     currency: string;
   }[];
+  parserEngine?: string;
+  parserMethod?: string;
 }
 
 export interface StatementItemDiff {
