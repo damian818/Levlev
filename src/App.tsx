@@ -601,6 +601,16 @@ export default function App() {
     return ['USD', 'ARS', 'EUR', 'BRL', 'USDT', 'CLP', 'UYU', 'GBP'];
   });
 
+  // Handle user-directed display currency changes to guarantee persistence
+  const handleDisplayCurrencyChange = (newCurrency: DisplayCurrency) => {
+    setDisplayCurrency(newCurrency);
+    try {
+      localStorage.setItem('finance_app_display_currency', newCurrency);
+    } catch (e) {
+      console.warn('Failed to save display currency to localStorage');
+    }
+  };
+
   // Sync display currency to localStorage
   useEffect(() => {
     try {
@@ -936,7 +946,13 @@ export default function App() {
             setLocalCurrency(data.settings.localCurrency as DisplayCurrency);
           }
           if (data.settings.displayCurrency) {
-            setDisplayCurrency(data.settings.displayCurrency as DisplayCurrency);
+            const localSaved = localStorage.getItem('finance_app_display_currency');
+            if (!localSaved) {
+              setDisplayCurrency(data.settings.displayCurrency as DisplayCurrency);
+              try {
+                localStorage.setItem('finance_app_display_currency', data.settings.displayCurrency);
+              } catch (e) {}
+            }
           }
           if (Array.isArray(data.settings.enabledCurrencies) && data.settings.enabledCurrencies.length > 0) {
             setEnabledCurrencies(data.settings.enabledCurrencies);
@@ -1839,7 +1855,7 @@ export default function App() {
           if (tab !== 'transactions') setActiveFilter(undefined);
         }}
         displayCurrency={displayCurrency}
-        setDisplayCurrency={setDisplayCurrency}
+        setDisplayCurrency={handleDisplayCurrencyChange}
         usdArsRate={usdArsRate}
         setUsdArsRate={setUsdArsRate}
         privacyMode={privacyMode}
@@ -2006,7 +2022,7 @@ export default function App() {
               budgets={budgets}
               usdArsRate={usdArsRate}
               displayCurrency={displayCurrency}
-              onUpdateDisplayCurrency={setDisplayCurrency}
+              onUpdateDisplayCurrency={handleDisplayCurrencyChange}
               userTimezone={userTimezone}
               onUpdateTimezone={setUserTimezone}
               privacyMode={privacyMode}

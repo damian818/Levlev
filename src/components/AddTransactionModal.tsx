@@ -530,16 +530,51 @@ export function AddTransactionModal({
       }
       setNumInstallments(instCount);
 
+      let recAmtStr = '';
       if (editingTx.receiveAmount !== undefined && editingTx.receiveAmount !== null) {
-        setReceiveAmount(String(editingTx.receiveAmount));
-      } else if (editingTx.transferAmount !== undefined && editingTx.transferAmount !== null) {
-        setReceiveAmount(String(editingTx.transferAmount));
-      } else {
-        setReceiveAmount('');
+        recAmtStr = String(editingTx.receiveAmount);
+      } else if (editingTx.transferAmount !== undefined && editingTx.transferAmount !== null && txType === 'TRANSFER') {
+        recAmtStr = String(editingTx.transferAmount);
+      }
+      setReceiveAmount(recAmtStr);
+
+      let rateStr = '';
+      if (editingTx.exchangeRate !== undefined && editingTx.exchangeRate !== null) {
+        rateStr = String(editingTx.exchangeRate);
       }
 
-      setCustomFxRate('');
-      setFxEditMode('AUTO');
+      // If editing transfer between different currencies: auto-calculate the missing variable
+      const pSent = typeof rawAmount === 'number' ? rawAmount : parseFloat(rawAmount) || 0;
+      const pRec = parseFloat(recAmtStr);
+      const srcCur = lookupAccountCurrency(acc);
+      const dstCur = lookupAccountCurrency(toAcc);
+
+      if (!rateStr && pRec > 0 && pSent > 0 && srcCur !== dstCur) {
+        if (srcCur === 'ARS' && dstCur === 'USD') {
+          rateStr = (pSent / pRec).toFixed(2);
+        } else if (srcCur === 'USD' && dstCur === 'ARS') {
+          rateStr = (pRec / pSent).toFixed(2);
+        } else {
+          rateStr = (pRec / pSent).toFixed(4);
+        }
+      } else if (!recAmtStr && rateStr && pSent > 0 && srcCur !== dstCur) {
+        const pRate = parseFloat(rateStr);
+        if (pRate > 0) {
+          if (srcCur === 'ARS' && dstCur === 'USD') {
+            recAmtStr = (pSent / pRate).toFixed(2);
+          } else {
+            recAmtStr = (pSent * pRate).toFixed(2);
+          }
+          setReceiveAmount(recAmtStr);
+        }
+      }
+
+      setCustomFxRate(rateStr);
+      if (recAmtStr || rateStr) {
+        setFxEditMode(rateStr && !editingTx.receiveAmount ? 'CUSTOM_RATE' : 'CUSTOM_REC_AMT');
+      } else {
+        setFxEditMode('AUTO');
+      }
     } else {
       // Reset form for creating a new transaction
       setType('EXPENSE');
@@ -706,6 +741,41 @@ export function AddTransactionModal({
   const sourceCurrency = useMemo(() => lookupAccountCurrency(account), [account, accountItems]);
   const destCurrency = useMemo(() => lookupAccountCurrency(toAccount), [toAccount, accountItems]);
 
+  // Transfer FX calculation helpers - bidirectional auto-calculation
+  const handleReceiveAmountChange = (val: string) => {
+    setReceiveAmount(val);
+    setFxEditMode('CUSTOM_REC_AMT');
+    const evalRes = evaluateMathExpression(amount);
+    const parsedSent = evalRes.isValid && evalRes.result !== null ? evalRes.result : parseFloat(amount);
+    const rec = parseFloat(val);
+    if (!isNaN(parsedSent) && parsedSent > 0 && !isNaN(rec) && rec > 0) {
+      if (sourceCurrency === 'ARS' && destCurrency === 'USD') {
+        setCustomFxRate((parsedSent / rec).toFixed(2));
+      } else if (sourceCurrency === 'USD' && destCurrency === 'ARS') {
+        setCustomFxRate((rec / parsedSent).toFixed(2));
+      } else {
+        setCustomFxRate((rec / parsedSent).toFixed(4));
+      }
+    }
+  };
+
+  const handleCustomFxRateChange = (val: string) => {
+    setCustomFxRate(val);
+    setFxEditMode('CUSTOM_RATE');
+    const evalRes = evaluateMathExpression(amount);
+    const parsedSent = evalRes.isValid && evalRes.result !== null ? evalRes.result : parseFloat(amount);
+    const rate = parseFloat(val);
+    if (!isNaN(parsedSent) && parsedSent > 0 && !isNaN(rate) && rate > 0) {
+      if (sourceCurrency === 'ARS' && destCurrency === 'USD') {
+        setReceiveAmount((parsedSent / rate).toFixed(2));
+      } else if (sourceCurrency === 'USD' && destCurrency === 'ARS') {
+        setReceiveAmount((parsedSent * rate).toFixed(2));
+      } else {
+        setReceiveAmount((parsedSent * rate).toFixed(2));
+      }
+    }
+  };
+
   useEffect(() => {
     if (type !== 'TRANSFER') return;
     const evalRes = evaluateMathExpression(amount);
@@ -754,7 +824,7 @@ export function AddTransactionModal({
         }
       }
     }
-  }, [type, amount, sourceCurrency, destCurrency, usdArsRate, fxEditMode, customFxRate, receiveAmount]);
+  }, [type, amount, sourceCurrency, destCurrency, usdArsRate, fxEditMode]);
 
   // Installment breakdown calculation
   const installmentSchedule = useMemo(() => {
@@ -844,6 +914,16 @@ export function AddTransactionModal({
         });
       } else if (type === 'TRANSFER') {
         const parsedReceiveAmt = parseFloat(receiveAmount) || parsedAmount;
+        let effectiveRate = parseFloat(customFxRate);
+        if ((isNaN(effectiveRate) || effectiveRate <= 0) && parsedReceiveAmt > 0 && parsedAmount > 0) {
+          if (sourceCurrency === 'ARS' && destCurrency === 'USD') {
+            effectiveRate = Number((parsedAmount / parsedReceiveAmt).toFixed(2));
+          } else if (sourceCurrency === 'USD' && destCurrency === 'ARS') {
+            effectiveRate = Number((parsedReceiveAmt / parsedAmount).toFixed(2));
+          } else {
+            effectiveRate = Number((parsedReceiveAmt / parsedAmount).toFixed(4));
+          }
+        }
         const now = new Date();
         const transferDesc = getTransferDescription(account, toAccount);
         onUpdateTransaction(editingTx.id, {
@@ -854,8 +934,12 @@ export function AddTransactionModal({
           account: account,
           toAccount: toAccount,
           amount: parsedAmount,
+          currency: sourceCurrency,
           transferAmount: parsedAmount,
+          transferCurrency: sourceCurrency,
           receiveAmount: parsedReceiveAmt,
+          receiveCurrency: destCurrency,
+          exchangeRate: !isNaN(effectiveRate) && effectiveRate > 0 ? effectiveRate : undefined,
           type: 'TRANSFER',
           description: description || transferDesc,
         });
@@ -912,6 +996,16 @@ export function AddTransactionModal({
       onAddTransaction(paymentTx);
     } else if (type === 'TRANSFER') {
       const parsedReceiveAmt = parseFloat(receiveAmount) || parsedAmount;
+      let effectiveRate = parseFloat(customFxRate);
+      if ((isNaN(effectiveRate) || effectiveRate <= 0) && parsedReceiveAmt > 0 && parsedAmount > 0) {
+        if (sourceCurrency === 'ARS' && destCurrency === 'USD') {
+          effectiveRate = Number((parsedAmount / parsedReceiveAmt).toFixed(2));
+        } else if (sourceCurrency === 'USD' && destCurrency === 'ARS') {
+          effectiveRate = Number((parsedReceiveAmt / parsedAmount).toFixed(2));
+        } else {
+          effectiveRate = Number((parsedReceiveAmt / parsedAmount).toFixed(4));
+        }
+      }
       const now = new Date();
       const transferDesc = getTransferDescription(account, toAccount);
       const transferTx: Transaction = {
@@ -928,6 +1022,7 @@ export function AddTransactionModal({
         transferCurrency: sourceCurrency,
         receiveAmount: parsedReceiveAmt,
         receiveCurrency: destCurrency,
+        exchangeRate: !isNaN(effectiveRate) && effectiveRate > 0 ? effectiveRate : undefined,
         type: 'TRANSFER',
         description: description || transferDesc,
         attachments: attachments.length > 0 ? attachments : undefined,
@@ -1452,10 +1547,7 @@ export function AddTransactionModal({
                       step="any"
                       placeholder="0.00"
                       value={receiveAmount}
-                      onChange={(e) => {
-                        setReceiveAmount(e.target.value);
-                        setFxEditMode('CUSTOM_REC_AMT');
-                      }}
+                      onChange={(e) => handleReceiveAmountChange(e.target.value)}
                       className="w-full px-3 py-1.5 bg-[#11141c] border border-slate-700 text-slate-100 font-mono font-bold rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 text-xs"
                     />
                   </div>
@@ -1468,6 +1560,15 @@ export function AddTransactionModal({
                         onClick={() => {
                           setFxEditMode('AUTO');
                           setCustomFxRate(usdArsRate.toString());
+                          const evalRes = evaluateMathExpression(amount);
+                          const parsedSent = evalRes.isValid && evalRes.result !== null ? evalRes.result : parseFloat(amount);
+                          if (!isNaN(parsedSent) && parsedSent > 0) {
+                            if (sourceCurrency === 'ARS' && destCurrency === 'USD') {
+                              setReceiveAmount((parsedSent / usdArsRate).toFixed(2));
+                            } else if (sourceCurrency === 'USD' && destCurrency === 'ARS') {
+                              setReceiveAmount((parsedSent * usdArsRate).toFixed(2));
+                            }
+                          }
                         }}
                         className="text-[9px] text-amber-400 hover:text-amber-300 underline font-semibold flex items-center gap-0.5"
                       >
@@ -1479,10 +1580,7 @@ export function AddTransactionModal({
                       step="any"
                       placeholder={`e.g. ${usdArsRate}`}
                       value={customFxRate}
-                      onChange={(e) => {
-                        setCustomFxRate(e.target.value);
-                        setFxEditMode('CUSTOM_RATE');
-                      }}
+                      onChange={(e) => handleCustomFxRateChange(e.target.value)}
                       disabled={sourceCurrency === destCurrency}
                       className="w-full px-3 py-1.5 bg-[#11141c] border border-slate-700 text-amber-300 font-mono font-bold rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 text-xs disabled:opacity-50"
                     />

@@ -44,6 +44,7 @@ export interface Transaction {
   toAccount?: string;
   receiveAmount?: number;
   receiveCurrency?: string;
+  exchangeRate?: number;
   description?: string;
   notes?: string;
   dueDate?: string;

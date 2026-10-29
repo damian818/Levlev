@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, TransactionFilter, CreditCardClosingRule, ClosingRuleType } from '../types';
 import { getCreditCardStatements, getCurrentStatementIndex, getNextCloseDate, formatCurrency, getStatementCloseDateForTx, getStatementCloseDateForPayment, getClosingRuleLabel, getCloseDateForMonthAndYear, getNextDayStr, getPreviousDayStr } from '../utils/financeUtils';
@@ -45,7 +45,9 @@ export function CreditCardDetailModal({
   onOpenReconciliationModal,
 }: CreditCardDetailModalProps) {
   const { t } = useTranslation();
-  const [selectedStatementIdx, setSelectedStatementIdx] = useState<number>(0);
+  const [selectedCloseDate, setSelectedCloseDate] = useState<string | null>(initialCloseDate || null);
+  const prevIsOpenRef = useRef(false);
+  const prevAccountRef = useRef(accountName);
   const [showPaymentForm, setShowPaymentForm] = useState<boolean>(false);
   const [isEditingRule, setIsEditingRule] = useState<boolean>(false);
   const [isAdjustingCloseDate, setIsAdjustingCloseDate] = useState<boolean>(false);
@@ -136,21 +138,33 @@ export function CreditCardDetailModal({
   }, [statements, currentRule, effectiveClosingDateOverrides]);
 
   useEffect(() => {
+    const justOpened = isOpen && !prevIsOpenRef.current;
+    const accountChanged = accountName !== prevAccountRef.current;
+    prevIsOpenRef.current = isOpen;
+    prevAccountRef.current = accountName;
+
     if (isOpen) {
-      if (initialCloseDate) {
-        const targetIdx = statements.findIndex(s => s.closeDate === initialCloseDate);
-        if (targetIdx !== -1) {
-          setSelectedStatementIdx(targetIdx);
-          return;
+      if (justOpened || accountChanged) {
+        if (initialCloseDate) {
+          setSelectedCloseDate(initialCloseDate);
+        } else {
+          const defaultDate = statements[currentIdx]?.closeDate || statements[0]?.closeDate || null;
+          setSelectedCloseDate(defaultDate);
         }
+      } else if (initialCloseDate && initialCloseDate !== selectedCloseDate) {
+        setSelectedCloseDate(initialCloseDate);
       }
-      setSelectedStatementIdx(currentIdx);
     }
   }, [isOpen, accountName, initialCloseDate, currentIdx, statements]);
 
-  const activeStatement = (selectedStatementIdx >= 0 && selectedStatementIdx < statements.length)
-    ? statements[selectedStatementIdx]
-    : (statements[currentIdx] || statements[0]);
+  const activeStatement = useMemo(() => {
+    if (!statements || statements.length === 0) return null;
+    if (selectedCloseDate) {
+      const match = statements.find(s => s.closeDate === selectedCloseDate);
+      if (match) return match;
+    }
+    return statements[currentIdx] || statements[0];
+  }, [statements, selectedCloseDate, currentIdx]);
 
   useEffect(() => {
     if (activeStatement) {
@@ -200,6 +214,7 @@ export function CreditCardDetailModal({
     const trimmed = (customCloseDateInput || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return;
     onUpdatePeriodClosingDate(accountName, activeStatement.closeDate, trimmed);
+    setSelectedCloseDate(trimmed);
     setIsAdjustingCloseDate(false);
   };
 
@@ -208,6 +223,9 @@ export function CreditCardDetailModal({
     const target = closeDateToReset || activeStatement?.closeDate;
     if (!target) return;
     onUpdatePeriodClosingDate(accountName, target, undefined);
+    if (activeStatement?.defaultCloseDate) {
+      setSelectedCloseDate(activeStatement.defaultCloseDate);
+    }
     setIsAdjustingCloseDate(false);
   };
 
@@ -499,14 +517,14 @@ export function CreditCardDetailModal({
             <Calendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
             <span className="text-xs font-semibold text-slate-300">{t('cc_modal.statement_period')}:</span>
             <select
-              value={selectedStatementIdx}
+              value={activeStatement?.closeDate || ''}
               onChange={(e) => {
-                setSelectedStatementIdx(Number(e.target.value));
+                setSelectedCloseDate(e.target.value);
                 setIsAdjustingCloseDate(false);
               }}
               className="px-3 py-1.5 bg-[#161b22] border border-slate-700 text-slate-100 font-semibold rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 flex-1 sm:flex-none"
             >
-              {statements.map((stmt, idx) => {
+              {statements.map((stmt) => {
                 const isPast = stmt.closeDate < currentCloseDate;
                 const isFuture = stmt.closeDate > currentCloseDate;
                 let tag = t('cc_modal.current', { defaultValue: 'Current' });
@@ -521,7 +539,7 @@ export function CreditCardDetailModal({
                 }
                 const adjustPrefix = stmt.isManualCloseDate ? `[${t('cc_modal.adjusted_badge', { defaultValue: 'Adjusted' })}] ` : '';
                 return (
-                  <option key={stmt.closeDate} value={idx}>
+                  <option key={stmt.closeDate} value={stmt.closeDate}>
                     {adjustPrefix}{t('cc_modal.closing_date')} {stmt.closeDate} — {formatCurrency(stmt.totalExpenses, stmt.currency as DisplayCurrency)} [{tag}]
                   </option>
                 );
