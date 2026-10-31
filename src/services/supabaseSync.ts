@@ -26,8 +26,30 @@ export function addDeletedTxIds(ids: string[]) {
         current.add(cleanId);
       }
     });
-    localStorage.setItem(DELETED_TX_KEY, JSON.stringify(Array.from(current)));
+    // Keep bounded to last 2000 tombstones to prevent storage bloat
+    const arr = Array.from(current).slice(-2000);
+    localStorage.setItem(DELETED_TX_KEY, JSON.stringify(arr));
   } catch (e) {}
+}
+
+export function mergeDeletedTxIds(remoteIds?: string[]): Set<string> {
+  try {
+    const current = getDeletedTxIds();
+    if (Array.isArray(remoteIds)) {
+      remoteIds.forEach(id => {
+        if (id) {
+          current.add(id);
+          const cleanId = id.includes('_') ? id.split('_').slice(1).join('_') : id;
+          current.add(cleanId);
+        }
+      });
+    }
+    const arr = Array.from(current).slice(-2000);
+    localStorage.setItem(DELETED_TX_KEY, JSON.stringify(arr));
+    return new Set(arr);
+  } catch (e) {
+    return getDeletedTxIds();
+  }
 }
 
 export function removeDeletedTxIds(ids: string[]) {
@@ -82,6 +104,7 @@ export interface SupabaseUserData {
     dismissedRecurring?: string[];
     tabSettings?: TabCustomizationItem[];
     reportSettings?: string[];
+    deletedTxIds?: string[];
   };
 }
 
@@ -244,7 +267,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
 
     const rawTxRows: any[] = Array.from(rawTxRowsMap.values());
 
-    const deletedIds = getDeletedTxIds();
+    const deletedIds = mergeDeletedTxIds(userSettings?.deletedTxIds);
     const transactions: Transaction[] = rawTxRows
       .filter((row: any) => {
         const rowId = row.id || '';
@@ -479,7 +502,19 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
     const nonRecurringKeys: string[] = Array.isArray(userSettings?.nonRecurringKeys) ? userSettings.nonRecurringKeys : [];
     const installmentPlans: InstallmentPlan[] = Array.isArray(userSettings?.installmentPlans) ? userSettings.installmentPlans : [];
 
-    return { transactions, categories, accounts, budgets, recurringRules, nonRecurringKeys, installmentPlans, settings: userSettings };
+    return {
+      transactions,
+      categories,
+      accounts,
+      budgets,
+      recurringRules,
+      nonRecurringKeys,
+      installmentPlans,
+      settings: {
+        ...(userSettings || {}),
+        deletedTxIds: Array.from(deletedIds),
+      },
+    };
   } catch (err) {
     console.error('Error fetching data from Supabase:', err);
     return null;
@@ -539,8 +574,17 @@ export async function saveAllUserDataToSupabase(
     });
 
     // 1. Transactions upsert or clear in batches of 500
-    if (data.transactions && data.transactions.length > 0) {
-      const txRows = data.transactions.map(t => {
+    const currentDeletedIds = getDeletedTxIds();
+    const activeTransactions = (data.transactions || []).filter(t => {
+      if (!t.id) return false;
+      if (currentDeletedIds.has(t.id)) return false;
+      const clean = t.id.includes('_') ? t.id.split('_').slice(1).join('_') : t.id;
+      if (currentDeletedIds.has(clean)) return false;
+      return true;
+    });
+
+    if (activeTransactions.length > 0) {
+      const txRows = activeTransactions.map(t => {
         const ownerHint = (t.account ? accountOwnerMap[t.account] : undefined) || firstForeignOwner;
         const { id: rowId, userId: targetUserId } = resolveSyncId(t.id, userId, ownerHint);
         
@@ -863,6 +907,10 @@ export async function saveAllUserDataToSupabase(
         });
         return Object.keys(attMap).length > 0 ? attMap : undefined;
       })(),
+      deletedTxIds: Array.from(new Set([
+        ...(Array.isArray(data.settings?.deletedTxIds) ? data.settings.deletedTxIds : []),
+        ...Array.from(getDeletedTxIds())
+      ])).slice(-1000),
     };
 
     try {
@@ -886,13 +934,15 @@ export async function saveAllUserDataToSupabase(
       const pendingIds = Array.from(pendingDeleted);
       const queryIds: string[] = [];
       pendingIds.forEach(id => {
+        if (!id) return;
         queryIds.push(id);
+        const clean = id.includes('_') ? id.split('_').slice(1).join('_') : id;
+        queryIds.push(clean);
         if (!id.startsWith(userId)) queryIds.push(`${userId}_${id}`);
+        if (!clean.startsWith(userId)) queryIds.push(`${userId}_${clean}`);
       });
-      const { error: delErr } = await client.from('transactions').delete().in('id', queryIds);
-      if (!delErr) {
-        removeDeletedTxIds(pendingIds);
-      }
+      const uniqueQueryIds = Array.from(new Set(queryIds));
+      await client.from('transactions').delete().in('id', uniqueQueryIds);
     }
 
     return true;
@@ -933,16 +983,23 @@ export async function deleteTransactionFromSupabase(
     const userId = session.user.id;
     const queryIds: string[] = [];
     idsArr.forEach(id => {
+      if (!id) return;
       queryIds.push(id);
+      const cleanId = id.includes('_') ? id.split('_').slice(1).join('_') : id;
+      queryIds.push(cleanId);
       if (!id.startsWith(userId)) {
         queryIds.push(`${userId}_${id}`);
       }
+      if (!cleanId.startsWith(userId)) {
+        queryIds.push(`${userId}_${cleanId}`);
+      }
     });
+    const uniqueQueryIds = Array.from(new Set(queryIds));
 
     const { error } = await client
       .from('transactions')
       .delete()
-      .in('id', queryIds);
+      .in('id', uniqueQueryIds);
 
     if (error) {
       console.error('Error deleting transaction from Supabase:', error);
@@ -956,12 +1013,38 @@ export async function deleteTransactionFromSupabase(
       await client
         .from('transaction_attachments')
         .delete()
-        .in('transaction_id', queryIds);
+        .in('transaction_id', uniqueQueryIds);
     } catch (e) {
       // Ignored if table does not exist
     }
 
-    removeDeletedTxIds(idsArr);
+    // Immediately persist cloud tombstones in user_settings so any other device immediately gets them
+    try {
+      const currentLocalTombstones = Array.from(getDeletedTxIds()).slice(-1000);
+      const setRes = await client.from('user_settings').select('settings').eq('user_id', userId).maybeSingle();
+      let existingSettings: Record<string, any> = {};
+      if (setRes?.data?.settings) {
+        existingSettings = typeof setRes.data.settings === 'string'
+          ? JSON.parse(setRes.data.settings)
+          : setRes.data.settings;
+      }
+      const remoteTombstones = Array.isArray(existingSettings.deletedTxIds) ? existingSettings.deletedTxIds : [];
+      const mergedTombstones = Array.from(new Set([...remoteTombstones, ...currentLocalTombstones, ...uniqueQueryIds])).slice(-1000);
+      
+      await client.from('user_settings').upsert({
+        id: `${userId}_settings`,
+        user_id: userId,
+        settings: {
+          ...existingSettings,
+          deletedTxIds: mergedTombstones,
+        },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+    } catch (settErr) {
+      console.warn('Failed to update cloud tombstones in deleteTransactionFromSupabase:', settErr);
+    }
+
+    // Do NOT removeDeletedTxIds(idsArr) - keep tombstones permanently in cache
     return true;
   } catch (e) {
     console.error('Exception deleting transaction from Supabase:', e);

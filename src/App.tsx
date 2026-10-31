@@ -15,8 +15,8 @@ import { useBrowserNotifications } from './hooks/useBrowserNotifications';
 import { initializeGlobalFxRates } from './utils/currencyUtils';
 import { persistAttachmentDataUrl, retrieveAttachmentDataUrl } from './utils/attachmentStorage';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
-import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase, getDeletedTxIds, executeQueuedMutation } from './services/supabaseSync';
-import { initSyncQueueAutoFlush, flushSyncQueue, subscribeToSyncQueue } from './services/syncQueue';
+import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase, getDeletedTxIds, mergeDeletedTxIds, addDeletedTxIds, executeQueuedMutation } from './services/supabaseSync';
+import { initSyncQueueAutoFlush, flushSyncQueue, subscribeToSyncQueue, getSyncQueue } from './services/syncQueue';
 import { Navbar } from './components/Navbar';
 
 // Lazy load non-critical components
@@ -701,6 +701,7 @@ export default function App() {
   const [historyData, setHistoryData] = useState<InflationPoint[]>(historicalInflationAndFX);
   const hasHandledShareRef = useRef(false);
   const lastAddedTxRef = useRef<{ txHash: string; time: number } | null>(null);
+  const locallyCreatedTxIdsRef = useRef<Set<string>>(new Set());
 
   // Parse incoming data from Web Share Target API
   useEffect(() => {
@@ -880,24 +881,53 @@ export default function App() {
       const data = await fetchUserDataFromSupabase();
       if (data) {
         setTransactions(prev => {
-          const deletedIds = getDeletedTxIds();
-          const remoteTxs = (data.transactions || []).filter(t => !deletedIds.has(t.id));
+          // Cloud tombstones merged into local storage
+          const deletedIds = mergeDeletedTxIds(data.settings?.deletedTxIds);
+          const remoteTxs = (data.transactions || []).filter(t => {
+            if (!t.id) return false;
+            if (deletedIds.has(t.id)) return false;
+            const clean = t.id.includes('_') ? t.id.split('_').slice(1).join('_') : t.id;
+            return !deletedIds.has(clean);
+          });
           
           const remoteIdMap = new Map<string, Transaction>();
           remoteTxs.forEach(t => {
             remoteIdMap.set(t.id, t);
+            locallyCreatedTxIdsRef.current.delete(t.id);
             if (t.id.includes('_')) {
               const clean = t.id.split('_').slice(1).join('_');
               remoteIdMap.set(clean, t);
+              locallyCreatedTxIdsRef.current.delete(clean);
             }
           });
 
-          // Keep local transactions that were added recently or not yet in remote, as long as not deleted
+          // Offline sync queue ids
+          const queuedMutations = getSyncQueue();
+          const queuedNewTxIds = new Set<string>();
+          queuedMutations.forEach(m => {
+            if (m.type === 'SAVE_ALL' && m.payload?.transactions) {
+              (m.payload.transactions as Transaction[]).forEach(tx => {
+                if (tx.id) {
+                  queuedNewTxIds.add(tx.id);
+                  if (tx.id.includes('_')) queuedNewTxIds.add(tx.id.split('_').slice(1).join('_'));
+                }
+              });
+            }
+          });
+
+          // STRICT PENDING LOCAL: Only retain transactions created during the current session
+          // or pending in the offline mutation queue, AND never if tombstoned.
+          // Stale entries from localStorage that are missing from cloud are discarded!
           const pendingLocal = prev.filter(t => {
+            if (!t.id) return false;
             if (deletedIds.has(t.id)) return false;
             const clean = t.id.includes('_') ? t.id.split('_').slice(1).join('_') : t.id;
             if (deletedIds.has(clean)) return false;
-            return !remoteIdMap.has(t.id) && !remoteIdMap.has(clean);
+            if (remoteIdMap.has(t.id) || remoteIdMap.has(clean)) return false;
+
+            const isLocallyCreated = locallyCreatedTxIdsRef.current.has(t.id) || locallyCreatedTxIdsRef.current.has(clean);
+            const isQueued = queuedNewTxIds.has(t.id) || queuedNewTxIds.has(clean);
+            return isLocallyCreated || isQueued;
           });
 
           const merged = [...pendingLocal, ...remoteTxs];
@@ -1543,6 +1573,7 @@ export default function App() {
           dismissedRecurring,
           tabSettings: tabCustomization,
           reportSettings,
+          deletedTxIds: Array.from(getDeletedTxIds()).slice(-1000),
         },
       });
     }, 1000);
@@ -1614,6 +1645,8 @@ export default function App() {
             ? `Ajuste de saldo (${prevBal.toFixed(2)} → ${currentBalance.toFixed(2)})`
             : `Balance adjust (${prevBal.toFixed(2)} → ${currentBalance.toFixed(2)})`,
         };
+
+        locallyCreatedTxIdsRef.current.add(adjustTx.id);
 
         setTransactions(prev => {
           const updatedTxs = [adjustTx, ...prev];
@@ -1720,10 +1753,15 @@ export default function App() {
     const idsToDelete = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
     if (idsToDelete.length === 0) return;
 
+    addDeletedTxIds(idsToDelete);
+
     const idSet = new Set(idsToDelete);
     idsToDelete.forEach(id => {
+      locallyCreatedTxIdsRef.current.delete(id);
       if (id && id.includes('_')) {
-        idSet.add(id.split('_').slice(1).join('_'));
+        const clean = id.split('_').slice(1).join('_');
+        idSet.add(clean);
+        locallyCreatedTxIdsRef.current.delete(clean);
       }
     });
 
@@ -1744,6 +1782,15 @@ export default function App() {
   const handleAddTransaction = (newTx: Transaction | Transaction[]) => {
     const txArray = Array.isArray(newTx) ? newTx : [newTx];
     if (txArray.length === 0) return;
+
+    txArray.forEach(t => {
+      if (t.id) {
+        locallyCreatedTxIdsRef.current.add(t.id);
+        if (t.id.includes('_')) {
+          locallyCreatedTxIdsRef.current.add(t.id.split('_').slice(1).join('_'));
+        }
+      }
+    });
 
     const now = Date.now();
     // Guard against rapid duplicate submission of identical transactions

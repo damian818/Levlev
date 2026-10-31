@@ -1,90 +1,92 @@
-# Implementation Plan - Stability & State Persistence Fixes
+# Multi-Device Deletion & Tombstone Synchronization
 
-Resolve three critical state persistence and navigation stability issues across currency transfers, system display currency, and credit card period management.
+Resolve the issue where deleting a transaction on one device causes it to reappear when opening the app from another computer, mobile device, or instance.
 
----
+## User Review & Critical Decisions
 
-## Root Cause Analysis & Solution Design
+> [!IMPORTANT]
+> The following decisions were confirmed by the user during the clarification phase:
 
-### 1. Multi-Currency Transfer Value & Rate Persistence
-* **Problem**: When loading or submitting a cross-currency transfer, the custom amount or custom exchange rate entered by the user gets overwritten by live rate fetches or is omitted during save/edit initialization.
-* **Fix**:
-  - In `TransactionModal.tsx`:
-    - Track explicit user edits on either the destination amount (`toAmount`) or the exchange rate (`exchangeRate`).
-    - If the user changes `toAmount`, automatically compute and lock `exchangeRate = toAmount / fromAmount`.
-    - If the user changes `exchangeRate`, automatically compute and lock `toAmount = fromAmount * exchangeRate`.
-    - When editing an existing transfer (`editingTransaction`), preserve the existing `toAmount` and `exchangeRate` directly, setting `isCustomRate = true` so external rate fetch hooks never overwrite the stored values.
-    - Ensure `toAmount` and `exchangeRate` are strictly passed into `onSubmit` and persisted across all transaction records.
-
-### 2. System Display Currency Persistence (USD to ARS)
-* **Problem**: Changing the system display currency does not persist reliably across views, re-renders, or page refreshes.
-* **Fix**:
-  - In `App.tsx` and `types.ts`:
-    - Verify that `displayCurrency` is strictly stored and read from `localStorage` under `flowfinance_display_currency`.
-    - Sync `displayCurrency` with the user profile/settings in Firestore (when authenticated) so it survives across sessions and devices.
-    - Prevent `useEffect` triggers from resetting `displayCurrency` back to default when loading account balances or initial profiles.
-    - Ensure the header currency toggle directly commits the change without side effects resetting it.
-
-### 3. Credit Card Period Navigation Retention
-* **Problem**: Navigating credit card statement periods always snaps back to the newest statement period.
-* **Fix**:
-  - In `CreditCardDetailModal.tsx`:
-    - Replace index-based tracking with `selectedCloseDate: string | null`.
-    - Eliminate the aggressive `useEffect` dependency on `statements` which triggers `setSelectedStatementIdx(currentIdx)` on every data update or transaction change.
-    - Only initialize `selectedCloseDate` on modal open (or when `initialCloseDate` is provided).
-    - Maintain the user's active `selectedCloseDate` across transaction additions, closing rule tweaks, manual status toggles, and payment recordings.
+- **Reconciliation Model**: Cloud authority with tombstone synchronization. The cloud database is the authoritative source of truth, and local caches are reconciled against cloud state and deletion tombstones.
+- **Tombstone Strategy**: Cloud tombstones stored in `user_settings` in Supabase. When any device deletes a transaction, its ID is recorded in the user's cloud settings and filtered out immediately on all instances.
 
 ---
 
-## User Review Required
-> **Clarification confirmed with user**:
-> - Save the amount or rate manually entered by the user and calculate the other variable.
-> - Update only the global reporting display currency when changing system currency.
-> - Maintain the selected credit card period during active session and across transaction edits.
+## 1. Overview & Core Concept
+
+When an entry was deleted on Device A:
+1. The row was removed from the Supabase `transactions` table, and the ID was temporarily recorded in Device A's `localStorage` (`finance_app_deleted_tx_ids`), then quickly cleared.
+2. Device B (phone or laptop) still held the deleted entry in its own local browser storage (`localStorage`) from its previous session.
+3. Upon opening Device B, `syncFromSupabase()` fetched active transactions from Supabase.
+4. Because the deleted entry was absent from the remote list and Device B had no record in its local `deletedIds`, Device B's reconciliation logic incorrectly assumed the cached entry was a "new offline creation" (`pendingLocal`) that had not yet reached the server.
+5. Device B merged the deleted entry back into active state, and its auto-save timer re-uploaded the transaction to Supabase, resurrecting the deleted expense across all devices.
+
+This plan addresses the root cause by maintaining persistent, cloud-synchronized deletion tombstones and correcting local cache reconciliation.
 
 ---
 
-## Proposed Changes
+## 2. User Experience & Synchronization Flow
 
-### `src/components/TransactionModal.tsx`
-- Refactor cross-currency transfer state:
-  - Add explicit calculation helper: changing `toAmount` updates `exchangeRate`; changing `exchangeRate` updates `toAmount`.
-  - When editing a transfer, initialize `toAmount` and `exchangeRate` from `editingTransaction` and set `isCustomRate = true`.
-  - Disable live-rate auto-overwrite when `isCustomRate` or editing an existing transfer with custom rate.
-  - Ensure payload passed to `onSubmit` includes `toAmount`, `exchangeRate`, and `currency`.
-
-### `src/App.tsx`
-- Audit `displayCurrency` state and persistence:
-  - Ensure `displayCurrency` state initializes synchronously from `localStorage.getItem('flowfinance_display_currency') || 'USD'`.
-  - Save to `localStorage` immediately on change, and save to Firestore user settings document.
-  - Fix any unintended reset logic during accounts/transactions fetch.
-
-### `src/components/CreditCardDetailModal.tsx`
-- Fix period navigation persistence:
-  - Maintain `selectedCloseDate: string | null` state instead of volatile array index.
-  - Only reset or set default `selectedCloseDate` when `isOpen` turns true for a newly opened modal or card switch.
-  - When statements update (due to adding a transaction or payment), find and maintain the matching statement with `selectedCloseDate`.
+- **Immediate Multi-Device Deletion**: When an expense or transfer is deleted on one device, it is permanently deleted in Supabase and registered in the user's cloud tombstone registry.
+- **Zero Resurrection**: Opening the app on any secondary device, mobile browser, or new tab will fetch the cloud tombstones, discard any stale cached copies of deleted items from local storage, and never re-upload deleted entries.
+- **Offline Resilience**: Transactions legitimately created offline on a device remain preserved via the explicit offline mutation queue (`syncQueue`), rather than relying on ambiguous heuristic diffing against old cached snapshots.
 
 ---
 
-## Verification Plan
+## 3. Key Product Decisions & Trade-Offs
 
-### Automated Verification
-- Run `compile_applet` to ensure zero TypeScript errors or interface mismatches.
-- Run `lint_applet` to verify syntax and import integrity.
+- **Decision 1: Cloud-Synchronized Tombstones in `user_settings`**
+  - *Chosen Approach*: Persist a bounded array of deleted transaction IDs (`deletedTxIds`, up to 1,000 recent IDs) in Supabase `user_settings.settings.deletedTxIds`.
+  - *Why*: `user_settings` is already fetched and updated during every sync pass. Storing tombstones in cloud settings ensures every connected device and browser instance is immediately aware of deletions without requiring schema migrations.
+  - *Alternatives Considered*: Hard database deletes without tombstones (fails because secondary devices cannot distinguish between a deleted entry and a locally created unsynced entry).
 
-### Functional Verification
-1. **Multi-Currency Transfer**:
-   - Open transfer form: select Source account in USD ($100), Target account in ARS.
-   - Enter custom rate (e.g., 1200 ARS/USD) -> verify target amount updates to 120,000 ARS.
-   - Or enter custom target amount (130,000 ARS) -> verify custom rate computes to 1300 ARS/USD.
-   - Save transfer -> edit transaction -> verify 130,000 ARS and rate 1300 remain intact without being overridden by live rates.
-2. **System Currency Toggle**:
-   - Change currency from USD to ARS via the header/settings currency selector.
-   - Verify all totals and summaries update to ARS.
-   - Refresh the page and confirm ARS remains the active reporting currency.
-3. **Credit Card Period Navigation**:
-   - Open Credit Card Detail modal.
-   - Navigate to an older closed statement period (e.g. 2 or 3 periods ago).
-   - Record a payment, adjust close date, or edit an expense.
-   - Verify the view stays locked on the selected older period instead of bouncing back to the current period.
+- **Decision 2: Strict Reconciliation in `syncFromSupabase`**
+  - *Chosen Approach*: When syncing from Supabase, discard cached local transactions that are missing from `remoteTxs` unless they are currently tracked as pending creations in the offline `syncQueue`.
+  - *Why*: Eliminates the flawed assumption that any stale entry in `localStorage` is an unsaved new transaction. Legitimate offline creations are already tracked by `syncQueue`.
+  - *Alternatives Considered*: Relying on transaction timestamps (brittle due to clock skew between devices and backdated entries).
+
+- **Decision 3: Complete ID Matrix in `deleteTransactionFromSupabase`**
+  - *Chosen Approach*: Query and delete all ID permutations (`id`, `${userId}_${id}`, and stripped clean ID) in Supabase, and retain the ID in the tombstone list.
+  - *Why*: Resolves discrepancies where IDs are formatted with or without the user UUID prefix between initial creation and sync hydration.
+
+---
+
+## 4. Technical Architecture & Data Strategy
+
+### Synchronization & Deletion Lifecycle
+
+```
+[ Device A: User clicks Delete ]
+         │
+         ├──> 1. Remove from local state & localStorage
+         ├──> 2. Add ID to local & cloud tombstones (`deletedTxIds`)
+         └──> 3. Delete row in Supabase `transactions` table
+                        │
+                        ▼
+            [ Supabase Cloud Database ]
+            - `transactions`: row deleted
+            - `user_settings`: `deletedTxIds` updated
+                        │
+[ Device B: Opens app / Focuses tab ]
+         │
+         ├──> 1. Fetch remote transactions & `user_settings` (including `deletedTxIds`)
+         ├──> 2. Purge any local cached entries matching `deletedTxIds`
+         ├──> 3. Reconcile: Remote transactions + verified offline drafts only
+         └──> 4. Save clean state to Device B's `localStorage` (NO resurrection upsert)
+```
+
+### Component & Service Changes
+
+1. **`src/services/supabaseSync.ts`**:
+   - In `fetchUserDataFromSupabase`: Retrieve `userSettings.deletedTxIds` from Supabase and merge with local tombstones.
+   - In `deleteTransactionFromSupabase`: Ensure `addDeletedTxIds` writes to both `localStorage` and prepares the ID for cloud persistence; remove the premature `removeDeletedTxIds()` call that was discarding tombstones.
+   - In `saveAllUserDataToSupabase`: Include `deletedTxIds` in the payload sent to `user_settings`.
+   - Add helper `getSyncedDeletedTxIds()` to provide unified access to combined cloud and local tombstones.
+
+2. **`src/App.tsx`**:
+   - In `syncFromSupabase`:
+     - Load cloud tombstones from `data.settings.deletedTxIds` and apply them to both local storage and active filtering.
+     - Revise `pendingLocal` calculation: only retain local transactions that were created in the active session and are tracked in `syncQueue` or have a verified un-synced status, rather than blindly keeping any stale cached item from `localStorage`.
+   - In `handleDeleteTransaction`:
+     - Keep tombstone record active so subsequent auto-save passes do not re-insert the item.
+     - Call `deleteTransactionFromSupabase` and ensure cloud settings receive the updated tombstone set.
