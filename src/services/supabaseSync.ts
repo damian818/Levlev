@@ -2,7 +2,7 @@ import { getSupabaseClient } from '../lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, TabCustomizationItem, InstallmentPlan, TransactionAttachment } from '../types';
 import { enqueueMutation, isNetworkOnline, QueuedMutation } from './syncQueue';
-import { unionTombstones, filterActiveTransactions } from './tombstones';
+import { unionTombstones, filterActiveTransactions, isTombstoned } from './tombstones';
 
 const DELETED_TX_KEY = 'finance_app_deleted_tx_ids';
 
@@ -51,6 +51,23 @@ export function mergeDeletedTxIds(remoteIds?: string[]): Set<string> {
     return new Set(arr);
   } catch (e) {
     return getDeletedTxIds();
+  }
+}
+
+/**
+ * Read the server-side tombstone table (present once
+ * supabase/migrations/20261101_deletion_invariant.sql is applied). RLS scopes
+ * the rows to the caller's own + shared-workspace tombstones, which matches
+ * the global-by-id reject trigger. Missing table (pre-migration DB) is not an
+ * error: returns [].
+ */
+async function fetchServerTombstoneIds(client: SupabaseClient): Promise<string[]> {
+  try {
+    const res = await client.from('deleted_transactions').select('id').limit(2000);
+    if (res.error || !Array.isArray(res.data)) return [];
+    return res.data.map((r: any) => r?.id).filter((id: any) => typeof id === 'string' && id.length > 0);
+  } catch {
+    return [];
   }
 }
 
@@ -606,6 +623,12 @@ export async function saveAllUserDataWithClient(
     } catch (readErr) {
       console.warn('user_settings read before save failed; will skip settings upload this round:', readErr);
     }
+    // Server tombstone table is authoritative once the migration is applied;
+    // union it with the settings-document tombstones (legacy source).
+    const serverTableTombstones = await fetchServerTombstoneIds(client);
+    if (serverTableTombstones.length > 0) {
+      remoteTombstones = [...remoteTombstones, ...serverTableTombstones];
+    }
     if (remoteTombstones.length > 0) mergeDeletedTxIds(remoteTombstones);
     const tombstoneUnion = unionTombstones(data.settings?.deletedTxIds, getDeletedTxIds(), remoteTombstones);
     const activeTransactions = filterActiveTransactions(data.transactions, tombstoneUnion);
@@ -669,13 +692,33 @@ export async function saveAllUserDataWithClient(
 
       const batchSize = 250;
       for (let i = 0; i < txRows.length; i += batchSize) {
-        const batch = txRows.slice(i, i + batchSize);
+        let batch = txRows.slice(i, i + batchSize);
         let success = false;
+        let tombstoneRetryUsed = false;
         for (let attempt = 1; attempt <= 3 && !success; attempt++) {
           const { error: txErr } = await client.from('transactions').upsert(batch, { onConflict: 'id' });
           if (!txErr) {
             success = true;
           } else {
+            // 0. Server-side tombstone rejection (post-migration DBs): the row
+            // was deleted on another device and must never be written again.
+            // Refresh tombstones, record them locally so the row drops out of
+            // the local list too, drop the offenders and retry the batch once.
+            if (txErr.message?.includes('is tombstoned') && !tombstoneRetryUsed) {
+              tombstoneRetryUsed = true;
+              const refreshed = await fetchServerTombstoneIds(client);
+              if (refreshed.length > 0) {
+                mergeDeletedTxIds(refreshed);
+                const union = unionTombstones(tombstoneUnion, refreshed);
+                batch = batch.filter(r => !isTombstoned(r.id, union));
+                if (batch.length === 0) {
+                  success = true;
+                  continue;
+                }
+                attempt--; // retry this attempt with the filtered batch
+                continue;
+              }
+            }
             // 1. Fallback for CC_PAYMENT constraint in older Supabase databases
             const isTypeConstraintErr = txErr.code === '23514' || 
               txErr.message?.includes('check constraint') || 
@@ -1027,17 +1070,35 @@ export async function deleteTransactionFromSupabase(
     });
     const uniqueQueryIds = Array.from(new Set(queryIds));
 
-    const { error } = await client
-      .from('transactions')
-      .delete()
-      .in('id', uniqueQueryIds);
-
-    if (error) {
-      console.error('Error deleting transaction from Supabase:', error);
+    // Preferred path (post-migration DBs): the delete_transactions RPC
+    // tombstones and deletes atomically, so a concurrent whole-list save can
+    // never resurrect the row. Fall back to the legacy raw delete when the
+    // function is not deployed yet (undefined function / not in schema cache).
+    let deleted = false;
+    const { error: rpcErr } = await client.rpc('delete_transactions', { ids: uniqueQueryIds });
+    if (!rpcErr) {
+      deleted = true;
+    } else if (rpcErr.code !== '42883' && rpcErr.code !== 'PGRST202') {
+      console.error('Error deleting transaction via delete_transactions RPC:', rpcErr);
       if (!options?.skipEnqueue) {
         enqueueMutation('DELETE_TRANSACTION', idsArr);
       }
       return false;
+    }
+
+    if (!deleted) {
+      const { error } = await client
+        .from('transactions')
+        .delete()
+        .in('id', uniqueQueryIds);
+
+      if (error) {
+        console.error('Error deleting transaction from Supabase:', error);
+        if (!options?.skipEnqueue) {
+          enqueueMutation('DELETE_TRANSACTION', idsArr);
+        }
+        return false;
+      }
     }
 
     try {

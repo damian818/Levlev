@@ -37,6 +37,8 @@ import {
 import { WORLD_CURRENCIES, CURRENCY_MAP } from '../utils/currencyUtils';
 import { evaluateMathExpression, isMathExpression } from '../utils/calculatorUtils';
 import { AmountCalculator } from './AmountCalculator';
+import { DuplicateWarningModal } from './DuplicateWarningModal';
+import { findDuplicateCandidates, DuplicateMatch } from '../utils/duplicateDetection';
 
 export interface AddTransactionModalProps {
   isOpen: boolean;
@@ -128,6 +130,7 @@ export function AddTransactionModal({
   const [accountItems, setAccountItems] = useState<AccountItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<{ tx: Transaction; matches: DuplicateMatch[] } | null>(null);
   const prevIsOpenRef = useRef(false);
   const prevEditingTxRef = useRef<Transaction | null | undefined>(undefined);
 
@@ -1100,6 +1103,18 @@ export function AddTransactionModal({
           statementCloseDate: isCC ? statementCloseDate : undefined,
           attachments: attachments.length > 0 ? attachments : undefined,
         };
+        // Possible-duplicate warning: only for a brand-new single expense/income
+        // (not edits, not the explicit Duplicate action, not installment plans).
+        // The user confirms before anything is saved; the warning never blocks.
+        if (!editingTx) {
+          const matches = findDuplicateCandidates(existingTransactions, newTx);
+          if (matches.length > 0) {
+            setDuplicateWarning({ tx: newTx, matches });
+            isSubmittingRef.current = false;
+            setIsSubmitting(false);
+            return;
+          }
+        }
         onAddTransaction(newTx);
       }
     }
@@ -1113,6 +1128,27 @@ export function AddTransactionModal({
     setFxEditMode('AUTO');
     setDescription('');
     setNumInstallments(1);
+  };
+
+  const handleDuplicateWarningConfirm = () => {
+    if (duplicateWarning) {
+      onAddTransaction(duplicateWarning.tx);
+    }
+    setDuplicateWarning(null);
+    onClose();
+    // Same form reset as a normal save
+    setTitle('');
+    setAmount('');
+    setReceiveAmount('');
+    setCustomFxRate('');
+    setFxEditMode('AUTO');
+    setDescription('');
+    setNumInstallments(1);
+  };
+
+  const handleDuplicateWarningCancel = () => {
+    // Back to the form with everything still filled in; nothing was saved.
+    setDuplicateWarning(null);
   };
 
   return (
@@ -2079,6 +2115,12 @@ export function AddTransactionModal({
         )}
 
       </div>
+      <DuplicateWarningModal
+        isOpen={duplicateWarning !== null}
+        matches={duplicateWarning?.matches ?? []}
+        onConfirm={handleDuplicateWarningConfirm}
+        onCancel={handleDuplicateWarningCancel}
+      />
     </div>
   );
 }
