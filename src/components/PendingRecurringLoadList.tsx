@@ -26,7 +26,7 @@ export function LoadNowConfirm({ item, onConfirm, onCancel, convert, displayCurr
   convert?: (amount: number, date: string) => number; displayCurrency?: string;
 }) {
   const { t, i18n } = useTranslation();
-  const [amount, setAmount] = useState(String(item.amount));
+  const [amount, setAmount] = useState(String(Math.round(item.amount * 100) / 100));
   const [date, setDate] = useState(todayIso());
   const num = parseFloat(amount);
   const valid = num > 0 && !!date;
