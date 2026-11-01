@@ -2792,9 +2792,11 @@ export interface RecurringDeviationAlert {
 
 export interface RecurringAlertOptions {
   /**
-   * Materiality floor in display currency: attention-direction alerts with
-   * |diff| below it are classified WATCH instead of ATTENTION. Nothing is
-   * hidden. Default 0 keeps the previous behavior.
+   * Materiality floor in the current display currency: attention-direction
+   * alerts with |diff| below it are classified WATCH instead of ATTENTION.
+   * Nothing is hidden. Callers store the floor in USD and convert at the
+   * current rate before calling, so display-currency toggles keep the same
+   * materiality. Default 0 disables the floor.
    */
   minAbsDeviation?: number;
   /** Injectable clock (tests). Defaults to now. */

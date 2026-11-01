@@ -69,7 +69,7 @@ export const resources = {
         pending_desc: '{{title}} has not been registered yet this month (avg {{avg}} by this day).',
         info_desc_expense: '{{title}} is {{percent}}% below its average ({{latest}} vs {{avg}}).',
         info_desc_income: '{{title}} came in {{percent}}% above its average ({{latest}} vs {{avg}}).',
-        floor_label: 'Min variance:',
+        floor_label: 'Min variance (USD):',
         floor_off: 'Off',
       },
       txlinks: {
@@ -1249,7 +1249,7 @@ export const resources = {
         pending_desc: '{{title}} todavía no se registró este mes (promedio {{avg}} a esta fecha).',
         info_desc_expense: '{{title}} está {{percent}}% por debajo de su promedio ({{latest}} vs {{avg}}).',
         info_desc_income: '{{title}} llegó {{percent}}% por encima de su promedio ({{latest}} vs {{avg}}).',
-        floor_label: 'Diferencia mín.:',
+        floor_label: 'Diferencia mín. (USD):',
         floor_off: 'No',
       },
       txlinks: {

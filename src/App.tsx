@@ -1286,12 +1286,16 @@ export default function App() {
     }
   });
 
+  // Materiality floor for recurring-deviation alerts, stored as a USD amount
+  // (user-approved default USD 10, 2026-11-01). Components convert it to the
+  // active display currency at the current rate before classifying alerts, so
+  // toggling USD/ARS display never changes the materiality itself.
   const [recurringMinDeviation, setRecurringMinDeviation] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('finance_app_recurring_min_deviation');
-      return saved !== null ? Number(saved) : 0;
+      return saved !== null ? Number(saved) : 10;
     } catch {
-      return 0;
+      return 10;
     }
   });
 

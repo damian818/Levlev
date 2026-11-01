@@ -140,6 +140,20 @@ test('grouping by clean title keeps every variant with its own numbers (no netti
   assert.ok(groups[0].variants.every(v => v.account));
 });
 
+
+test('MTD coherence: latest is the month-to-date SUM, baseline is the sum of prior MTD fractions (same units)', () => {
+  // Two November charges (60 + 70 = 130) must compare against the SUM of what
+  // prior months had charged by day 5 (30 + 30 = 60 per month), never against
+  // a single unit amount and never against full-month totals.
+  const mk = (m: string) => [occ(m, 1, 30, `${m}a`), occ(m, 3, 30, `${m}b`), occ(m, 20, 40, `${m}c`)];
+  const history = [...mk('2026-08'), ...mk('2026-09'), ...mk('2026-10'), occ('2026-11', 2, 60, 'n1'), occ('2026-11', 4, 70, 'n2')];
+  const it = item({ history, monthlyTrend: trendOf([['2026-08', 100], ['2026-09', 100], ['2026-10', 100], ['2026-11', 130]]) });
+  const [a] = detectRecurringThresholdAlerts([it], {}, 15, { today: TODAY });
+  assert.equal(a.latestAmount, 130);
+  assert.ok(Math.abs(a.priorAvgAmount - 60) < 1e-9, `baseline ${a.priorAvgAmount}`);
+  assert.ok(Math.abs(a.deviationPercent - ((70 / 60) * 100)) < 1e-9);
+});
+
 (globalThis as any).localStorage ??= { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 const { resources } = await import('../src/i18n.ts');
 const en: any = resources.en.translation, es: any = resources.es.translation;

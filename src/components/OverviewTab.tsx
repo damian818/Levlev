@@ -313,7 +313,10 @@ export const OverviewTab = React.memo(function OverviewTab({
   const recurringAlerts = useMemo(() => {
     const rawItems = detectRecurringItems(filteredTransactions, displayCurrency, usdArsRate);
     const activeItems = rawItems.filter(item => !effectiveNonRecurringKeys.includes(item.title.toLowerCase().trim()));
-    return detectRecurringThresholdAlerts(activeItems, recurringThresholds, globalRecurringThreshold, { minAbsDeviation: recurringMinDeviation });
+    // The floor is stored in USD; convert to the current display currency at the
+    // current rate so toggling display currency keeps the same materiality.
+    const floorDisplay = recurringMinDeviation > 0 ? convertCurrency(recurringMinDeviation, 'USD', displayCurrency, usdArsRate) : 0;
+    return detectRecurringThresholdAlerts(activeItems, recurringThresholds, globalRecurringThreshold, { minAbsDeviation: floorDisplay });
   }, [filteredTransactions, displayCurrency, usdArsRate, effectiveNonRecurringKeys, recurringThresholds, globalRecurringThreshold, recurringMinDeviation]);
 
   const attentionAlerts = useMemo(() => recurringAlerts.filter(a => a.severity === 'ATTENTION' || a.severity === 'WATCH'), [recurringAlerts]);

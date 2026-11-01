@@ -312,8 +312,10 @@ export function RecurringTab({
   }, [regularRecurring, nonRecurringKeys]);
 
   const activeAlerts = useMemo(() => {
-    return detectRecurringThresholdAlerts(regularRecurring, recurringThresholds, globalRecurringThreshold, { minAbsDeviation: recurringMinDeviation });
-  }, [regularRecurring, recurringThresholds, globalRecurringThreshold, recurringMinDeviation]);
+    // The floor is stored in USD; convert to the current display currency.
+    const floorDisplay = recurringMinDeviation > 0 ? convertCurrency(recurringMinDeviation, 'USD', displayCurrency, usdArsRate) : 0;
+    return detectRecurringThresholdAlerts(regularRecurring, recurringThresholds, globalRecurringThreshold, { minAbsDeviation: floorDisplay });
+  }, [regularRecurring, recurringThresholds, globalRecurringThreshold, recurringMinDeviation, displayCurrency, usdArsRate]);
 
   // Filter items based on search and type filter
   const filteredItems = useMemo(() => {
