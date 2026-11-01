@@ -65,10 +65,10 @@ beforeEach(() => store.clear());
 test('L1 links made on device A survive a save from a stale device B that never saw them', async () => {
   const server: Server = { transactions: new Map(), settings: {} };
   const mock = makeMockClient(server);
-  await saveAllUserDataWithClient(mock, OWNER, { transactions: [mk(A, { linkId: 'g', linkRole: 'COMPRA', linkAt: 200 }), mk(B, { linkId: 'g', linkRole: 'REINTEGRO', linkAt: 200 }), mk(C)], settings: {} }, { skipEnqueue: true });
+  await saveAllUserDataWithClient(mock, OWNER, { transactions: [mk(A, { linkId: 'g', linkRole: 'COMPRA', linkAt: 200 }), mk(B, { linkId: 'g', linkRole: 'REINTEGRO', linkAt: 200 }), mk(C)], settings: {} } as any, { skipEnqueue: true });
   assert.equal(server.settings.txLinks['tx-a'].g, 'g');
   // stale device: same movements, no link info at all
-  await saveAllUserDataWithClient(mock, OWNER, { transactions: [mk(A), mk(B), mk(C)], settings: {} }, { skipEnqueue: true });
+  await saveAllUserDataWithClient(mock, OWNER, { transactions: [mk(A), mk(B), mk(C)], settings: {} } as any, { skipEnqueue: true });
   assert.equal(server.settings.txLinks['tx-a'].g, 'g');
   assert.equal(server.settings.txLinks['tx-b'].r, 'REINTEGRO');
 });
@@ -76,7 +76,7 @@ test('L1 links made on device A survive a save from a stale device B that never 
 test('L2 stale device with an OLDER link state cannot overwrite a newer unlink', async () => {
   const server: Server = { transactions: new Map(), settings: { txLinks: { 'tx-a': { g: null, at: 500 }, 'tx-b': { g: null, at: 500 } } } };
   const mock = makeMockClient(server);
-  await saveAllUserDataWithClient(mock, OWNER, { transactions: [mk(A, { linkId: 'g', linkRole: 'COMPRA', linkAt: 100 }), mk(B, { linkId: 'g', linkRole: 'REINTEGRO', linkAt: 100 })], settings: {} }, { skipEnqueue: true });
+  await saveAllUserDataWithClient(mock, OWNER, { transactions: [mk(A, { linkId: 'g', linkRole: 'COMPRA', linkAt: 100 }), mk(B, { linkId: 'g', linkRole: 'REINTEGRO', linkAt: 100 })], settings: {} } as any, { skipEnqueue: true });
   assert.equal(server.settings.txLinks['tx-a'].g, null);
   assert.equal(server.settings.txLinks['tx-b'].g, null);
 });
@@ -84,7 +84,7 @@ test('L2 stale device with an OLDER link state cannot overwrite a newer unlink',
 test('L3 a newer local link change wins; deleted movements drop out; tombstones untouched', async () => {
   const server: Server = { transactions: new Map(), settings: { deletedTxIds: [C], txLinks: { 'tx-a': { g: 'old', r: 'OTRO', at: 100 }, 'tx-c': { g: 'old', at: 100 } } } };
   const mock = makeMockClient(server);
-  await saveAllUserDataWithClient(mock, OWNER, { transactions: [mk(A, { linkId: 'new', linkRole: 'COMPRA', linkAt: 900 }), mk(B, { linkId: 'new', linkRole: 'PROPINA', linkAt: 900 })], settings: {} }, { skipEnqueue: true });
+  await saveAllUserDataWithClient(mock, OWNER, { transactions: [mk(A, { linkId: 'new', linkRole: 'COMPRA', linkAt: 900 }), mk(B, { linkId: 'new', linkRole: 'PROPINA', linkAt: 900 })], settings: {} } as any, { skipEnqueue: true });
   assert.equal(server.settings.txLinks['tx-a'].g, 'new');
   assert.equal(server.settings.txLinks['tx-c'], undefined);
   assert.ok(server.settings.deletedTxIds.includes(C));
@@ -93,6 +93,6 @@ test('L3 a newer local link change wins; deleted movements drop out; tombstones 
 test('L4 settings unreadable this round: no settings upload, so links are never blindly overwritten', async () => {
   const server: Server = { transactions: new Map(), settings: { txLinks: { 'tx-a': { g: 'g', at: 1 } } } };
   const mock = makeMockClient(server, { failSettingsRead: true });
-  await saveAllUserDataWithClient(mock, OWNER, { transactions: [mk(A)], settings: {} }, { skipEnqueue: true });
+  await saveAllUserDataWithClient(mock, OWNER, { transactions: [mk(A)], settings: {} } as any, { skipEnqueue: true });
   assert.equal(server.settings.txLinks['tx-a'].g, 'g');
 });

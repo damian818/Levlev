@@ -72,7 +72,7 @@ class Cloud {
     } as any;
   }
 }
-const save = (c: any, txs: any[], settings: any = {}) => saveAllUserDataWithClient(c, OWNER, { transactions: txs, settings }, { skipEnqueue: true });
+const save = (c: any, txs: any[], settings: any = {}) => saveAllUserDataWithClient(c, OWNER, { transactions: txs, settings } as any, { skipEnqueue: true });
 beforeEach(() => store.clear());
 
 test('RT1 round trip: save links on device A, fetch on device B returns linkId/role/linkAt and other fields untouched', async () => {

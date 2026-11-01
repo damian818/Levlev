@@ -5,6 +5,27 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 export const resources = {
   en: {
     translation: {
+      heatmap: {
+        pending_bills: 'Pending Bills', pending_inflow: 'Pending Inflow',
+        restore_all_title: 'Click to restore all dismissed recurring estimations for this month',
+        dismissed_restore: '{{count}} Dismissed (Restore)',
+        legend_none: 'None', legend_low: 'Low', legend_med: 'Med', legend_high: 'High',
+        badge_legend: '⚡ Badge indicates estimated pending recurring bills & income',
+        day_title: 'Day {{day}} ({{month}})', day_label: 'Day {{day}}',
+        actual_spent: 'Actual Spent', actual_inflow: 'Actual Inflow',
+        cc_events: 'Credit Card Events', statement_closes: 'Statement Closes', payment_due: 'Payment Due',
+        est_pending_recurring: 'Estimated Pending Recurring ({{count}})', not_yet_logged: 'Not yet logged',
+        dismiss_title: 'Dismiss this recurring estimate for this month', restore_title: 'Restore recurring estimate', restore: 'Restore',
+        actual_logged: 'Actual Logged Transactions ({{count}})', no_actual: 'No actual transactions logged for this day.',
+        transaction: 'Transaction', combined_impact: 'Combined Estimated Impact for Day {{day}}:',
+        manual_rule: 'Manual Rule', installments: 'Installments',
+        overdue: 'Overdue (Day {{day}} → Today)',
+        overdue_title: 'Originally scheduled for Day {{day}}, rolled forward to today because not yet recorded.',
+        earlier: 'earlier', dismissed_month: 'Dismissed for this Month ({{count}})',
+        spent: 'Spent {{amount}}', no_expenses: 'No logged expenses', n_pending: '{{count}} estimated pending recurring item(s)',
+        wd_short: { 0: 'S', 1: 'M', 2: 'T', 3: 'W', 4: 'T', 5: 'F', 6: 'S' },
+        wd_full: { 0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat' },
+      },
       loadnow: {
         button: 'Load now',
         desc_logged: 'Loaded from a recurring estimate',
@@ -1138,6 +1159,27 @@ export const resources = {
   },
   es: {
     translation: {
+      heatmap: {
+        pending_bills: 'Pagos pendientes', pending_inflow: 'Ingresos pendientes',
+        restore_all_title: 'Tocá para restaurar todas las estimaciones recurrentes descartadas de este mes',
+        dismissed_restore: '{{count}} descartados (restaurar)',
+        legend_none: 'Nada', legend_low: 'Bajo', legend_med: 'Medio', legend_high: 'Alto',
+        badge_legend: '⚡ La marca indica pagos e ingresos recurrentes pendientes estimados',
+        day_title: 'Día {{day}} ({{month}})', day_label: 'Día {{day}}',
+        actual_spent: 'Gasto real', actual_inflow: 'Ingreso real',
+        cc_events: 'Eventos de tarjeta de crédito', statement_closes: 'Cierre de resumen', payment_due: 'Vencimiento de pago',
+        est_pending_recurring: 'Recurrentes pendientes estimados ({{count}})', not_yet_logged: 'Aún sin cargar',
+        dismiss_title: 'Descartar esta estimación recurrente para este mes', restore_title: 'Restaurar estimación recurrente', restore: 'Restaurar',
+        actual_logged: 'Movimientos cargados ({{count}})', no_actual: 'No hay movimientos cargados para este día.',
+        transaction: 'Movimiento', combined_impact: 'Impacto estimado combinado del día {{day}}:',
+        manual_rule: 'Regla manual', installments: 'Cuotas',
+        overdue: 'Vencido (día {{day}} → hoy)',
+        overdue_title: 'Estaba programado para el día {{day}}; se pasó a hoy porque todavía no se cargó.',
+        earlier: 'anterior', dismissed_month: 'Descartados este mes ({{count}})',
+        spent: 'Gasto {{amount}}', no_expenses: 'Sin gastos cargados', n_pending: '{{count}} recurrente(s) pendiente(s) estimado(s)',
+        wd_short: { 0: 'D', 1: 'L', 2: 'M', 3: 'M', 4: 'J', 5: 'V', 6: 'S' },
+        wd_full: { 0: 'Dom', 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb' },
+      },
       loadnow: {
         button: 'Cargar ahora',
         desc_logged: 'Cargado desde un estimado recurrente',

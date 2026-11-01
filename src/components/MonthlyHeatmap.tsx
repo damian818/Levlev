@@ -149,8 +149,8 @@ export function MonthlyHeatmap({
     return 'bg-slate-100 dark:bg-[#1a2234] text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700/60';
   };
 
-  const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  const weekDaysFull = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weekDays = [0,1,2,3,4,5,6].map(i => t('heatmap.wd_short.' + i));
+  const weekDaysFull = [0,1,2,3,4,5,6].map(i => t('heatmap.wd_full.' + i));
 
   // "Cargar ahora": nothing is created until the user confirms amount and date.
   const [loadNow, setLoadNow] = useState<{ itemId: string } | null>(null);
@@ -222,24 +222,24 @@ export function MonthlyHeatmap({
           {monthPendingResult.pendingExpense > 0 && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-[11px]">
               <Repeat className="w-3.5 h-3.5" />
-              <span>Pending Bills: <strong>-{formatCurrencyCompact(monthPendingResult.pendingExpense, displayCurrency)}</strong></span>
+              <span>{t('heatmap.pending_bills')}: <strong>-{formatCurrencyCompact(monthPendingResult.pendingExpense, displayCurrency)}</strong></span>
             </div>
           )}
           {monthPendingResult.pendingIncome > 0 && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-[11px]">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Pending Inflow: <strong>+{formatCurrencyCompact(monthPendingResult.pendingIncome, displayCurrency)}</strong></span>
+              <span>{t('heatmap.pending_inflow')}: <strong>+{formatCurrencyCompact(monthPendingResult.pendingIncome, displayCurrency)}</strong></span>
             </div>
           )}
           {monthPendingResult.dismissedItems && monthPendingResult.dismissedItems.length > 0 && (
             <button
               type="button"
               onClick={handleResetAllDismissedThisMonth}
-              title="Click to restore all dismissed recurring estimations for this month"
+              title={t('heatmap.restore_all_title')}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-[11px] transition-colors cursor-pointer"
             >
               <EyeOff className="w-3.5 h-3.5 text-slate-400" />
-              <span>{monthPendingResult.dismissedItems.length} Dismissed (Restore)</span>
+              <span>{t('heatmap.dismissed_restore', { count: monthPendingResult.dismissedItems.length })}</span>
             </button>
           )}
         </div>
@@ -296,8 +296,8 @@ export function MonthlyHeatmap({
                   });
                 }
               }}
-              title={`Day ${dayNum}: ${totalSpent > 0 ? `Spent ${formatCurrency(totalSpent, displayCurrency)}` : 'No logged expenses'}${
-                hasPending ? ` • ${pendingForDay.length} estimated pending recurring item(s)` : ''
+              title={`${t('heatmap.day_label', { day: dayNum })}: ${totalSpent > 0 ? t('heatmap.spent', { amount: formatCurrency(totalSpent, displayCurrency) }) : t('heatmap.no_expenses')}${
+                hasPending ? ` • ${t('heatmap.n_pending', { count: pendingForDay.length })}` : ''
               }`}
               className={`min-h-[52px] xs:min-h-[60px] sm:min-h-[80px] lg:min-h-[92px] rounded-lg sm:rounded-xl border p-1 sm:p-2 flex flex-col justify-between transition-all ${styleClass} ${
                 isInteractive ? 'cursor-pointer hover:scale-[1.02] active:scale-95 hover:z-10 shadow-sm' : 'cursor-default opacity-80'
@@ -380,25 +380,25 @@ export function MonthlyHeatmap({
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded bg-slate-100 dark:bg-[#121620] border border-slate-300 dark:border-slate-800" />
-            <span>None</span>
+            <span>{t('heatmap.legend_none')}</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-400 dark:border-emerald-800/40" />
-            <span>Low</span>
+            <span>{t('heatmap.legend_low')}</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded bg-amber-100 dark:bg-amber-950/70 border border-amber-400 dark:border-amber-800/50" />
-            <span>Med</span>
+            <span>{t('heatmap.legend_med')}</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded bg-rose-100 dark:bg-rose-950/80 border border-rose-400 dark:border-rose-800/60" />
-            <span>High</span>
+            <span>{t('heatmap.legend_high')}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium text-[10px] sm:text-xs">
           <Repeat className="w-3 h-3 shrink-0" />
-          <span>⚡ Badge indicates estimated pending recurring bills & income</span>
+          <span>{t('heatmap.badge_legend')}</span>
         </div>
       </div>
 
@@ -410,14 +410,14 @@ export function MonthlyHeatmap({
             <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <span>Day {selectedDayDetails.day} ({activeMonth})</span>
+                  <span>{t('heatmap.day_title', { day: selectedDayDetails.day, month: activeMonth })}</span>
                 </h4>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">
                   {selectedDayDetails.totalActualSpent > 0 && (
-                    <span>Actual Spent: <strong className="text-rose-600 dark:text-rose-400">-{formatCurrency(selectedDayDetails.totalActualSpent, displayCurrency)}</strong></span>
+                    <span>{t('heatmap.actual_spent')}: <strong className="text-rose-600 dark:text-rose-400">-{formatCurrency(selectedDayDetails.totalActualSpent, displayCurrency)}</strong></span>
                   )}
                   {selectedDayDetails.totalActualIncome > 0 && (
-                    <span>Actual Inflow: <strong className="text-emerald-600 dark:text-emerald-400">+{formatCurrency(selectedDayDetails.totalActualIncome, displayCurrency)}</strong></span>
+                    <span>{t('heatmap.actual_inflow')}: <strong className="text-emerald-600 dark:text-emerald-400">+{formatCurrency(selectedDayDetails.totalActualIncome, displayCurrency)}</strong></span>
                   )}
                 </div>
               </div>
@@ -435,7 +435,7 @@ export function MonthlyHeatmap({
               <div className="space-y-2.5">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <CreditCard className="w-3.5 h-3.5" />
-                  <span>Credit Card Events</span>
+                  <span>{t('heatmap.cc_events')}</span>
                 </h5>
                 <div className="space-y-2">
                   {selectedDayDetails.ccEvents.closes.length > 0 && (
@@ -443,7 +443,7 @@ export function MonthlyHeatmap({
                       <div className="flex items-center gap-2">
                         <CreditCard className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         <div>
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Statement Closes</p>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{t('heatmap.statement_closes')}</p>
                           <p className="text-[10px] text-slate-500 dark:text-slate-400">{selectedDayDetails.ccEvents.closes.join(', ')}</p>
                         </div>
                       </div>
@@ -454,7 +454,7 @@ export function MonthlyHeatmap({
                       <div className="flex items-center gap-2">
                         <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                         <div>
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Payment Due</p>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{t('heatmap.payment_due')}</p>
                           <p className="text-[10px] text-slate-500 dark:text-slate-400">{selectedDayDetails.ccEvents.dues.join(', ')}</p>
                         </div>
                       </div>
@@ -470,9 +470,9 @@ export function MonthlyHeatmap({
                 <div className="flex items-center justify-between">
                   <h5 className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                     <Repeat className="w-3.5 h-3.5" />
-                    <span>Estimated Pending Recurring ({selectedDayDetails.pendingRecurringForDay.length})</span>
+                    <span>{t('heatmap.est_pending_recurring', { count: selectedDayDetails.pendingRecurringForDay.length })}</span>
                   </h5>
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Not yet logged</span>
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">{t('heatmap.not_yet_logged')}</span>
                 </div>
 
                 <div className="space-y-2">
@@ -490,20 +490,20 @@ export function MonthlyHeatmap({
                             </span>
                             {item.isManualRule && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                                Manual Rule
+                                {t('heatmap.manual_rule')}
                               </span>
                             )}
                             {item.isInstallment && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                                {item.installmentInfo || 'Cuotas'}
+                                {item.installmentInfo || t('heatmap.installments')}
                               </span>
                             )}
                             {item.isExpired && (
                               <span 
                                 className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
-                                title={`Originally scheduled for Day ${item.originalDayOfMonth || 'earlier'}, rolled forward to today because not yet recorded.`}
+                                title={t('heatmap.overdue_title', { day: item.originalDayOfMonth || t('heatmap.earlier') })}
                               >
-                                Overdue (Day {item.originalDayOfMonth} → Today)
+                                {t('heatmap.overdue', { day: item.originalDayOfMonth })}
                               </span>
                             )}
                           </div>
@@ -540,7 +540,7 @@ export function MonthlyHeatmap({
                           <button
                             type="button"
                             onClick={() => handleDismissPending(item)}
-                            title="Dismiss this recurring estimate for this month"
+                            title={t('heatmap.dismiss_title')}
                             className="p-1.5 rounded-lg bg-white dark:bg-slate-800 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-slate-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors shadow-xs cursor-pointer"
                           >
                             <EyeOff className="w-4 h-4" />
@@ -567,7 +567,7 @@ export function MonthlyHeatmap({
                   <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                     <span className="flex items-center gap-1.5">
                       <EyeOff className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Dismissed for this Month ({dismissedForDay.length})</span>
+                      <span>{t('heatmap.dismissed_month', { count: dismissedForDay.length })}</span>
                     </span>
                   </div>
                   <div className="space-y-1.5">
@@ -585,10 +585,10 @@ export function MonthlyHeatmap({
                           type="button"
                           onClick={() => handleRestoreDismissed(dItem)}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 text-xs font-semibold transition-colors cursor-pointer shadow-xs"
-                          title="Restore recurring estimate"
+                          title={t('heatmap.restore_title')}
                         >
                           <RotateCcw className="w-3 h-3" />
-                          <span>Restore</span>
+                          <span>{t('heatmap.restore')}</span>
                         </button>
                       </div>
                     ))}
@@ -600,12 +600,12 @@ export function MonthlyHeatmap({
             {/* Logged Transactions Section */}
             <div className="space-y-2.5">
               <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Actual Logged Transactions ({selectedDayDetails.txs.length})</span>
+                <span>{t('heatmap.actual_logged', { count: selectedDayDetails.txs.length })}</span>
               </h5>
               
               {selectedDayDetails.txs.length === 0 ? (
                 <p className="text-xs text-slate-500 dark:text-slate-400 italic p-3 bg-slate-50 dark:bg-[#121620] rounded-xl border border-slate-200 dark:border-slate-800 text-center">
-                  No actual transactions logged for this day.
+                  {t('heatmap.no_actual')}
                 </p>
               ) : (
                 <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
@@ -619,7 +619,7 @@ export function MonthlyHeatmap({
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-                            {tx.title || tx.category || 'Transaction'}
+                            {tx.title || tx.category || t('heatmap.transaction')}
                           </p>
                           <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                             {tx.category} • {tx.account}
@@ -643,7 +643,7 @@ export function MonthlyHeatmap({
             {/* Day Total Summary Box */}
             <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 flex items-center justify-between text-xs font-medium">
               <span className="text-slate-600 dark:text-slate-300">
-                Combined Estimated Impact for Day {selectedDayDetails.day}:
+                {t('heatmap.combined_impact', { day: selectedDayDetails.day })}
               </span>
               <span className="font-mono font-bold text-slate-900 dark:text-white">
                 {(() => {
