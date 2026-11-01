@@ -2759,6 +2759,8 @@ export function detectFinancialAnomalies(
   return anomalies.sort((a, b) => (b.currentAmount - b.averageAmount) - (a.currentAmount - a.averageAmount));
 }
 
+export type RecurringAlertSeverity = 'ATTENTION' | 'WATCH' | 'PENDING' | 'INFO';
+
 export interface RecurringDeviationAlert {
   id: string;
   title: string;
@@ -2774,14 +2776,60 @@ export interface RecurringDeviationAlert {
   latestDate?: string;
   diff: number;
   isTriggered: boolean;
+  /** UP when the latest amount is above baseline, DOWN when below. */
+  direction: 'UP' | 'DOWN';
+  /**
+   * ATTENTION: moved against the user (expense up / income down) and |diff| >= floor.
+   * WATCH: attention direction but |diff| below the materiality floor.
+   * PENDING: current month still in progress and running below baseline - the
+   *   expected charge may simply not be registered yet; neither good nor bad.
+   * INFO: favorable direction (expense down / income up) on a completed month.
+   */
+  severity: RecurringAlertSeverity;
+  /** True when the latest trend point is the current, unfinished month. */
+  isPartialMonth: boolean;
+}
+
+export interface RecurringAlertOptions {
+  /**
+   * Materiality floor in display currency: attention-direction alerts with
+   * |diff| below it are classified WATCH instead of ATTENTION. Nothing is
+   * hidden. Default 0 keeps the previous behavior.
+   */
+  minAbsDeviation?: number;
+  /** Injectable clock (tests). Defaults to now. */
+  today?: Date;
+}
+
+const SEVERITY_RANK: Record<RecurringAlertSeverity, number> = {
+  ATTENTION: 0,
+  WATCH: 1,
+  PENDING: 2,
+  INFO: 3,
+};
+
+/** Group alerts by clean title (case-insensitive), preserving every variant. */
+export function groupRecurringAlerts(alerts: RecurringDeviationAlert[]): { key: string; title: string; variants: RecurringDeviationAlert[] }[] {
+  const map = new Map<string, { key: string; title: string; variants: RecurringDeviationAlert[] }>();
+  alerts.forEach(a => {
+    const key = (a.cleanTitle || a.title).toLowerCase().trim();
+    if (!map.has(key)) map.set(key, { key, title: a.cleanTitle || a.title, variants: [] });
+    map.get(key)!.variants.push(a);
+  });
+  return Array.from(map.values());
 }
 
 export function detectRecurringThresholdAlerts(
   items: IdentifiedRecurringItem[],
   thresholds: Record<string, number>,
-  globalThreshold: number
+  globalThreshold: number,
+  options: RecurringAlertOptions = {}
 ): RecurringDeviationAlert[] {
   const alerts: RecurringDeviationAlert[] = [];
+  const floor = Math.max(0, options.minAbsDeviation ?? 0);
+  const today = options.today ?? new Date();
+  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const todayDay = today.getDate();
 
   items.forEach(item => {
     // We need at least 2 active months to detect deviation from historical average
@@ -2791,17 +2839,42 @@ export function detectRecurringThresholdAlerts(
 
     const trend = [...item.monthlyTrend].sort((a, b) => a.month.localeCompare(b.month));
     const latestPt = trend[trend.length - 1];
-    
+
     // Trailing 3 months, excluding the latest.
     const startIdx = Math.max(0, trend.length - 4);
     const priorPts = trend.slice(startIdx, trend.length - 1);
 
-    const priorSum = priorPts.reduce((sum, pt) => sum + pt.amountDisplay, 0);
-    const priorAvg = priorSum / priorPts.length;
-
     const latestAmount = latestPt.amountDisplay;
+    const isPartialMonth = latestPt.month === currentMonthKey;
+
+    let priorAvg: number;
+    if (isPartialMonth && item.history) {
+      // Month-to-date baseline: for each prior month, take the fraction of the
+      // month that had already been charged by this same day (computed in the
+      // item's native currency - the group key includes currency, so the ratio
+      // is dimensionless and independent of FX conversion), applied to that
+      // month's display-currency total. A charge expected on day 15 therefore
+      // does not look "missing" on day 1, and nothing historical is rewritten.
+      let sum = 0;
+      priorPts.forEach(pt => {
+        const occ = item.history.filter(o => o.month === pt.month);
+        const full = occ.reduce((s, o) => s + o.amount, 0);
+        if (full <= 0) return;
+        const mtd = occ.reduce((s, o) => {
+          const day = o.date && o.date.length >= 10 ? parseInt(o.date.substring(8, 10), 10) : 31;
+          return (isNaN(day) ? 31 : day) <= todayDay ? s + o.amount : s;
+        }, 0);
+        const frac = Math.min(1, Math.max(0, mtd / full));
+        sum += pt.amountDisplay * frac;
+      });
+      priorAvg = sum / priorPts.length;
+    } else {
+      const priorSum = priorPts.reduce((sum, pt) => sum + pt.amountDisplay, 0);
+      priorAvg = priorSum / priorPts.length;
+    }
+
     const diff = latestAmount - priorAvg;
-    
+
     // Deviation percentage of the latest occurrence compared to prior average
     const deviationPercent = priorAvg > 0 ? (Math.abs(diff) / priorAvg) * 100 : 0;
 
@@ -2812,6 +2885,22 @@ export function detectRecurringThresholdAlerts(
 
     if (isTriggered) {
       const latestOcc = item.history[item.history.length - 1];
+      const direction: 'UP' | 'DOWN' = diff > 0 ? 'UP' : 'DOWN';
+      let severity: RecurringAlertSeverity;
+      if (isPartialMonth && direction === 'DOWN') {
+        // Current month still running below baseline: the charge may simply not
+        // be registered yet. Neither an alarm nor good news.
+        severity = 'PENDING';
+      } else {
+        // INCOME: a drop needs attention. Everything else (EXPENSE, CC_PAYMENT,
+        // etc.) is money out: an increase needs attention.
+        const attentionDirection = item.type === 'INCOME' ? direction === 'DOWN' : direction === 'UP';
+        if (attentionDirection) {
+          severity = Math.abs(diff) >= floor ? 'ATTENTION' : 'WATCH';
+        } else {
+          severity = 'INFO';
+        }
+      }
       alerts.push({
         id: item.id,
         title: item.title,
@@ -2826,13 +2915,16 @@ export function detectRecurringThresholdAlerts(
         type: item.type,
         latestDate: latestOcc ? latestOcc.date : undefined,
         diff,
-        isTriggered
+        isTriggered,
+        direction,
+        severity,
+        isPartialMonth,
       });
     }
   });
 
-  // Sort by highest absolute deviation percentage
-  return alerts.sort((a, b) => b.deviationPercent - a.deviationPercent);
+  // Sort by severity, then highest absolute deviation percentage
+  return alerts.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.deviationPercent - a.deviationPercent);
 }
 
 export interface CategoryVelocityPrediction {

@@ -66,8 +66,10 @@ interface RecurringTabProps {
   onUpdateNonRecurringKeys?: (keys: string[]) => void;
   recurringThresholds?: Record<string, number>;
   globalRecurringThreshold?: number;
+  recurringMinDeviation?: number;
   onSaveRecurringThreshold?: (title: string, threshold: number) => void;
   onSaveGlobalRecurringThreshold?: (threshold: number) => void;
+  onSaveRecurringMinDeviation?: (amount: number) => void;
   onAddTransaction?: (tx: Transaction) => void;
 }
 
@@ -85,8 +87,10 @@ export function RecurringTab({
   onUpdateNonRecurringKeys,
   recurringThresholds = {},
   globalRecurringThreshold = 15,
+  recurringMinDeviation = 0,
   onSaveRecurringThreshold,
   onSaveGlobalRecurringThreshold,
+  onSaveRecurringMinDeviation,
   onAddTransaction
 }: RecurringTabProps) {
   const { t } = useTranslation();
@@ -308,8 +312,8 @@ export function RecurringTab({
   }, [regularRecurring, nonRecurringKeys]);
 
   const activeAlerts = useMemo(() => {
-    return detectRecurringThresholdAlerts(regularRecurring, recurringThresholds, globalRecurringThreshold);
-  }, [regularRecurring, recurringThresholds, globalRecurringThreshold]);
+    return detectRecurringThresholdAlerts(regularRecurring, recurringThresholds, globalRecurringThreshold, { minAbsDeviation: recurringMinDeviation });
+  }, [regularRecurring, recurringThresholds, globalRecurringThreshold, recurringMinDeviation]);
 
   // Filter items based on search and type filter
   const filteredItems = useMemo(() => {
@@ -524,6 +528,22 @@ export function RecurringTab({
                 <option value="25" className="bg-white dark:bg-[#0f131a]">25%</option>
                 <option value="30" className="bg-white dark:bg-[#0f131a]">30%</option>
                 <option value="50" className="bg-white dark:bg-[#0f131a]">50%</option>
+              </select>
+            </div>
+
+            {/* Materiality Floor Selector */}
+            <div className="flex items-center space-x-2 bg-slate-50 dark:bg-[#0f131a] border border-slate-200 dark:border-slate-700 rounded-lg py-1.5 px-3 text-xs">
+              <span className="text-slate-500 dark:text-slate-400 font-medium">{t('alerts.floor_label')}</span>
+              <select
+                value={recurringMinDeviation}
+                onChange={(e) => onSaveRecurringMinDeviation?.(Number(e.target.value))}
+                className="bg-transparent border-none p-0 text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-0 cursor-pointer text-xs"
+              >
+                <option value="0" className="bg-white dark:bg-[#0f131a]">{t('alerts.floor_off')}</option>
+                <option value="5" className="bg-white dark:bg-[#0f131a]">5</option>
+                <option value="10" className="bg-white dark:bg-[#0f131a]">10</option>
+                <option value="25" className="bg-white dark:bg-[#0f131a]">25</option>
+                <option value="50" className="bg-white dark:bg-[#0f131a]">50</option>
               </select>
             </div>
           </div>
@@ -842,10 +862,17 @@ export function RecurringTab({
                         )}
                         {(() => {
                           const itemAlert = activeAlerts.find(a => a.id === item.id);
-                          return itemAlert && (
-                            <span className="px-1.5 py-0.5 bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-[10px] font-bold rounded flex items-center gap-0.5 animate-pulse">
-                              <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
-                              <span>{itemAlert.deviationPercent.toFixed(0)}% Alert</span>
+                          if (!itemAlert) return null;
+                          const sevClasses = {
+                            ATTENTION: 'bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400 animate-pulse',
+                            WATCH: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400',
+                            PENDING: 'bg-sky-500/15 border-sky-500/30 text-sky-600 dark:text-sky-400',
+                            INFO: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400',
+                          }[itemAlert.severity];
+                          return (
+                            <span className={`px-1.5 py-0.5 border text-[10px] font-bold rounded flex items-center gap-0.5 ${sevClasses}`}>
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              <span>{itemAlert.deviationPercent.toFixed(0)}% {t(`alerts.section_${itemAlert.severity.toLowerCase()}`)}</span>
                             </span>
                           );
                         })()}
@@ -884,13 +911,20 @@ export function RecurringTab({
 
                       {(() => {
                         const itemAlert = activeAlerts.find(a => a.id === item.id);
-                        return itemAlert && (
-                          <div className="flex justify-between items-center text-[10px] text-rose-500 dark:text-rose-400 font-semibold bg-rose-500/5 dark:bg-rose-500/10 p-1.5 px-2 rounded border border-rose-500/10 dark:border-rose-500/20 mt-1">
+                        if (!itemAlert) return null;
+                        const sevClasses = {
+                          ATTENTION: 'text-rose-500 dark:text-rose-400 bg-rose-500/5 dark:bg-rose-500/10 border-rose-500/10 dark:border-rose-500/20',
+                          WATCH: 'text-amber-500 dark:text-amber-400 bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/10 dark:border-amber-500/20',
+                          PENDING: 'text-sky-500 dark:text-sky-400 bg-sky-500/5 dark:bg-sky-500/10 border-sky-500/10 dark:border-sky-500/20',
+                          INFO: 'text-emerald-500 dark:text-emerald-400 bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/10 dark:border-emerald-500/20',
+                        }[itemAlert.severity];
+                        return (
+                          <div className={`flex justify-between items-center text-[10px] font-semibold p-1.5 px-2 rounded border mt-1 ${sevClasses}`}>
                             <span className="flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3 text-rose-500" />
-                              <span>Deviation Alert:</span>
+                              <AlertCircle className="w-3 h-3" />
+                              <span>{t(`alerts.section_${itemAlert.severity.toLowerCase()}`)}:</span>
                             </span>
-                            <span>+{itemAlert.deviationPercent.toFixed(0)}% from avg</span>
+                            <span>{itemAlert.direction === 'UP' ? '+' : '-'}{itemAlert.deviationPercent.toFixed(0)}% vs avg</span>
                           </div>
                         );
                       })()}

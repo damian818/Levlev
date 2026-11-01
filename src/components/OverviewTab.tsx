@@ -30,6 +30,7 @@ interface OverviewTabProps {
   userTimezone?: string;
   recurringThresholds?: Record<string, number>;
   globalRecurringThreshold?: number;
+  recurringMinDeviation?: number;
 }
 
 export const OverviewTab = React.memo(function OverviewTab({
@@ -50,6 +51,7 @@ export const OverviewTab = React.memo(function OverviewTab({
   showSharedData = true,
   recurringThresholds = {},
   globalRecurringThreshold = 15,
+  recurringMinDeviation = 0,
 }: OverviewTabProps) {
   const { t } = useTranslation();
   const [velocityMultiplier, setVelocityMultiplier] = useState<number>(1.0);
@@ -311,8 +313,11 @@ export const OverviewTab = React.memo(function OverviewTab({
   const recurringAlerts = useMemo(() => {
     const rawItems = detectRecurringItems(filteredTransactions, displayCurrency, usdArsRate);
     const activeItems = rawItems.filter(item => !effectiveNonRecurringKeys.includes(item.title.toLowerCase().trim()));
-    return detectRecurringThresholdAlerts(activeItems, recurringThresholds, globalRecurringThreshold);
-  }, [filteredTransactions, displayCurrency, usdArsRate, effectiveNonRecurringKeys, recurringThresholds, globalRecurringThreshold]);
+    return detectRecurringThresholdAlerts(activeItems, recurringThresholds, globalRecurringThreshold, { minAbsDeviation: recurringMinDeviation });
+  }, [filteredTransactions, displayCurrency, usdArsRate, effectiveNonRecurringKeys, recurringThresholds, globalRecurringThreshold, recurringMinDeviation]);
+
+  const attentionAlerts = useMemo(() => recurringAlerts.filter(a => a.severity === 'ATTENTION' || a.severity === 'WATCH'), [recurringAlerts]);
+  const otherAlertsCount = recurringAlerts.length - attentionAlerts.length;
 
   if (transactions.length === 0) {
     return (
@@ -575,11 +580,23 @@ export const OverviewTab = React.memo(function OverviewTab({
               {recurringAlerts.length > 0 && (
                 <button
                   onClick={() => setShowRecurringDeviationModal(true)}
-                  className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 transition-colors cursor-pointer flex items-center gap-1.5 font-bold"
+                  className={`px-2.5 py-1 rounded-lg border transition-colors cursor-pointer flex items-center gap-1.5 font-bold ${
+                    attentionAlerts.length > 0
+                      ? 'bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                  }`}
                   title="View details of recurring deviations"
                 >
-                  <span>{t('overview.recurring_deviation')} ({recurringAlerts.length})</span>
-                  <ChevronRight className="w-3 h-3 text-rose-400" />
+                  <span>{t('overview.recurring_deviation')} ({attentionAlerts.length > 0 ? attentionAlerts.length : recurringAlerts.length})</span>
+                  <ChevronRight className={`w-3 h-3 ${attentionAlerts.length > 0 ? 'text-rose-400' : 'text-slate-400'}`} />
+                </button>
+              )}
+              {attentionAlerts.length > 0 && otherAlertsCount > 0 && (
+                <button
+                  onClick={() => setShowRecurringDeviationModal(true)}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 transition-colors cursor-pointer font-bold"
+                >
+                  <span>{t('alerts.more_count', { count: otherAlertsCount })}</span>
                 </button>
               )}
             </div>
@@ -600,12 +617,18 @@ export const OverviewTab = React.memo(function OverviewTab({
                 onClick={() => setShowRecurringDeviationModal(true)}
                 className="text-[11px] text-slate-400 text-left hover:text-rose-300 transition-colors cursor-pointer"
               >
-                {t('overview.deviation_desc', { 
-                  title: recurringAlerts[0].title, 
-                  percent: recurringAlerts[0].deviationPercent.toFixed(0),
-                  latest: formatCurrency(recurringAlerts[0].latestAmount, displayCurrency),
-                  avg: formatCurrency(recurringAlerts[0].priorAvgAmount, displayCurrency)
-                })} <span className="text-rose-400 underline font-medium">Click to inspect</span>
+                {(() => {
+                  const top = recurringAlerts[0];
+                  const params = {
+                    title: top.title,
+                    percent: top.deviationPercent.toFixed(0),
+                    latest: formatCurrency(top.latestAmount, displayCurrency),
+                    avg: formatCurrency(top.priorAvgAmount, displayCurrency),
+                  };
+                  if (top.severity === 'PENDING') return t('alerts.pending_desc', params);
+                  if (top.severity === 'INFO') return t(top.type === 'EXPENSE' ? 'alerts.info_desc_expense' : 'alerts.info_desc_income', params);
+                  return t('overview.deviation_desc', params);
+                })()} <span className="text-rose-400 underline font-medium">Click to inspect</span>
               </button>
             ) : (
               <p className="text-[11px] text-slate-400">

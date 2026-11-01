@@ -119,6 +119,7 @@ export interface SupabaseUserData {
     };
     recurringThresholds?: Record<string, number>;
     globalRecurringThreshold?: number;
+    recurringMinDeviation?: number;
     debts?: DebtItem[];
     debtStrategy?: DebtPayoffStrategy;
     debtExtraPayment?: number;

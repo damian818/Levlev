@@ -338,6 +338,7 @@ export default function App() {
           },
           recurringThresholds,
           globalRecurringThreshold,
+          recurringMinDeviation,
         },
       });
     }
@@ -1041,6 +1042,12 @@ export default function App() {
               localStorage.setItem('finance_app_global_recurring_threshold', String(data.settings.globalRecurringThreshold));
             } catch (e) {}
           }
+          if (data.settings.recurringMinDeviation !== undefined) {
+            setRecurringMinDeviation(data.settings.recurringMinDeviation);
+            try {
+              localStorage.setItem('finance_app_recurring_min_deviation', String(data.settings.recurringMinDeviation));
+            } catch (e) {}
+          }
           if (data.settings.debts && Array.isArray(data.settings.debts)) {
             setDebts(data.settings.debts);
             saveDebtsToStorage(data.settings.debts);
@@ -1279,6 +1286,15 @@ export default function App() {
     }
   });
 
+  const [recurringMinDeviation, setRecurringMinDeviation] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('finance_app_recurring_min_deviation');
+      return saved !== null ? Number(saved) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
   // Trigger notifications
   useEffect(() => {
     if (!notificationsEnabled || permission !== 'granted') return;
@@ -1372,6 +1388,13 @@ export default function App() {
     setGlobalRecurringThreshold(threshold);
     try {
       localStorage.setItem('finance_app_global_recurring_threshold', String(threshold));
+    } catch (e) {}
+  };
+
+  const handleSaveRecurringMinDeviation = (amount: number) => {
+    setRecurringMinDeviation(amount);
+    try {
+      localStorage.setItem('finance_app_recurring_min_deviation', String(amount));
     } catch (e) {}
   };
 
@@ -1567,6 +1590,7 @@ export default function App() {
           },
           recurringThresholds,
           globalRecurringThreshold,
+          recurringMinDeviation,
           debts,
           debtStrategy,
           debtExtraPayment,
@@ -1578,7 +1602,7 @@ export default function App() {
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [transactions, categories, accounts, budgets, installmentPlans, periodStatusOverrides, closingDateOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold, hiddenCategoryIds, debts, debtStrategy, debtExtraPayment, dismissedRecurring, tabCustomization, reportSettings]);
+  }, [transactions, categories, accounts, budgets, installmentPlans, periodStatusOverrides, closingDateOverrides, customBalances, isWorkspaceShared, workspaceMembers, localCurrency, displayCurrency, enabledCurrencies, authUser, hasInitialSynced, recurringThresholds, globalRecurringThreshold, recurringMinDeviation, hiddenCategoryIds, debts, debtStrategy, debtExtraPayment, dismissedRecurring, tabCustomization, reportSettings]);
 
   if (authLoading) {
     return (
@@ -1946,6 +1970,7 @@ export default function App() {
               userTimezone={userTimezone}
               recurringThresholds={recurringThresholds}
               globalRecurringThreshold={globalRecurringThreshold}
+              recurringMinDeviation={recurringMinDeviation}
             />
           )}
           {currentTab === 'transactions' && (
@@ -2044,8 +2069,10 @@ export default function App() {
               categoriesList={categories}
               recurringThresholds={recurringThresholds}
               globalRecurringThreshold={globalRecurringThreshold}
+              recurringMinDeviation={recurringMinDeviation}
               onSaveRecurringThreshold={handleSaveRecurringThreshold}
               onSaveGlobalRecurringThreshold={handleSaveGlobalRecurringThreshold}
+              onSaveRecurringMinDeviation={handleSaveRecurringMinDeviation}
               onAddTransaction={handleAddTransaction}
             />
           )}
