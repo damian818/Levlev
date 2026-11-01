@@ -58,6 +58,7 @@ export interface Transaction {
   isPaid?: boolean;
   planId?: string; // ID of the parent InstallmentPlan entity
   installmentPlanId?: string; // Alias for planId
+  linkId?: string; // shared id of linked movements (purchase + reintegros/propinas); see utils/transactionLinks.ts
   attachments?: TransactionAttachment[]; // Receipts, invoices, and documents
 }
 

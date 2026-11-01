@@ -151,13 +151,17 @@ export function MonthlyHeatmap({
   const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const weekDaysFull = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const handleQuickLogPending = (item: PendingRecurringItem, day: number) => {
+  // "Cargar ahora": nothing is created until the user confirms amount and date.
+  const [loadNow, setLoadNow] = useState<{ itemId: string; amount: string; date: string } | null>(null);
+  const todayIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+
+  const handleQuickLogPending = (item: PendingRecurringItem, day: number, overrides?: { amount: number; date: string }) => {
     if (!onAddTransaction) return;
-    const dateStr = `${activeMonth}-${String(day).padStart(2, '0')}`;
+    const dateStr = overrides?.date || `${activeMonth}-${String(day).padStart(2, '0')}`;
     const newTx: Transaction = {
       id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       title: item.title,
-      amount: item.amount,
+      amount: overrides?.amount ?? item.amount,
       currency: item.currency,
       type: item.type,
       category: item.category || 'General',
@@ -166,6 +170,7 @@ export function MonthlyHeatmap({
       description: item.isInstallment ? `Cuota: ${item.installmentInfo || ''}` : 'Logged from Recurring Estimate',
     };
     onAddTransaction(newTx);
+    setLoadNow(null);
     setSelectedDayDetails(null);
   };
 
@@ -486,7 +491,7 @@ export function MonthlyHeatmap({
                     return (
                       <div 
                         key={item.id} 
-                        className="flex items-center justify-between bg-amber-50/80 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-200 dark:border-amber-500/30 gap-2"
+                        className="flex flex-wrap items-center justify-between bg-amber-50/80 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-200 dark:border-amber-500/30 gap-2"
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -529,15 +534,15 @@ export function MonthlyHeatmap({
                             )}
                           </div>
 
-                          {/* Quick Log button */}
+                          {/* Cargar ahora: opens a confirmation, never logs by itself */}
                           {onAddTransaction && (
                             <button
                               type="button"
-                              onClick={() => handleQuickLogPending(item, selectedDayDetails.day)}
-                              title="Log as actual transaction"
-                              className="p-1.5 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 transition-colors shadow-xs cursor-pointer"
+                              onClick={() => setLoadNow({ itemId: item.id, amount: String(item.amount), date: todayIso })}
+                              title="Cargar ahora (te pide confirmar monto y fecha)"
+                              className="px-2 py-1.5 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 transition-colors shadow-xs cursor-pointer text-[10px] font-bold flex items-center gap-1"
                             >
-                              <PlusCircle className="w-4 h-4" />
+                              <PlusCircle className="w-4 h-4" /> Cargar ahora
                             </button>
                           )}
 
@@ -551,6 +556,21 @@ export function MonthlyHeatmap({
                             <EyeOff className="w-4 h-4" />
                           </button>
                         </div>
+                        {loadNow?.itemId === item.id && (
+                          <div className="basis-full mt-2 p-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 space-y-2">
+                            <p className="text-[10px] text-slate-600 dark:text-slate-300">
+                              Se va a crear: {item.type === 'INCOME' ? 'ingreso' : 'gasto'} "{item.title}" · {item.category} · {item.account} ({item.currency}). Confirmá monto y fecha.
+                            </p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <input type="number" step="any" value={loadNow.amount} onChange={e => setLoadNow({ ...loadNow, amount: e.target.value })} className="w-28 text-xs px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-transparent" />
+                              <input type="date" value={loadNow.date} onChange={e => setLoadNow({ ...loadNow, date: e.target.value })} className="text-xs px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-transparent" />
+                              <button type="button" disabled={!(parseFloat(loadNow.amount) > 0) || !loadNow.date}
+                                onClick={() => handleQuickLogPending(item, selectedDayDetails.day, { amount: parseFloat(loadNow.amount), date: loadNow.date })}
+                                className="px-2 py-1 text-xs font-bold rounded bg-emerald-600 text-white disabled:opacity-40">Confirmar</button>
+                              <button type="button" onClick={() => setLoadNow(null)} className="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700">Cancelar</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

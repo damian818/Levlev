@@ -1,3 +1,4 @@
+import { LinkTransactionsModal } from './LinkTransactionsModal';
 import React, { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, TransactionFilter, InflationPoint, CategoryItem, AccountItem, AccountCustomBalance, InstallmentPlan } from '../types';
@@ -5,7 +6,7 @@ import { formatCurrency, convertCurrency, getHistoricalFxRate, getCurrentMonthKe
 import { exportTransactionsToCSV } from '../utils/exportUtils';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { TransactionSearchInput } from './TransactionSearchInput';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2, Download, CreditCard, Landmark, Paperclip, FileText } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, ArrowDownRight, RefreshCcw, Plus, Trash2, X, Clock, ArrowRight, ArrowRightLeft, ArrowUpDown, ChevronUp, ChevronDown, Repeat, CheckSquare, Square, Edit, MoreHorizontal, Layers, Wallet2, Download, CreditCard, Landmark, Paperclip, FileText, Link2 } from 'lucide-react';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -62,6 +63,7 @@ export const TransactionsTab = React.memo(function TransactionsTab({
   userTimezone = 'America/Argentina/Buenos_Aires',
 }: TransactionsTabProps) {
   const { t, i18n } = useTranslation();
+  const [linkBase, setLinkBase] = useState<Transaction | null>(null);
   const [searchTerm, setSearchTerm] = useState(activeFilter?.search || '');
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const [selectedType, setSelectedType] = useState<string>(activeFilter?.type || 'ALL');
@@ -1111,6 +1113,17 @@ export const TransactionsTab = React.memo(function TransactionsTab({
                               <Paperclip className="w-3.5 h-3.5" />
                             </button>
                           )}
+                          {(tx.type === 'EXPENSE' || tx.type === 'INCOME') && (
+                            <button
+                              onClick={() => setLinkBase(tx)}
+                              className={`p-1.5 rounded-md transition-colors ${
+                                tx.linkId ? 'text-emerald-400 hover:bg-emerald-950/50' : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-950/50'
+                              }`}
+                              title={tx.linkId ? 'Linked movements (reintegros / propinas)' : 'Link reintegros / propinas'}
+                            >
+                              <Link2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {onEditTransaction && (
                             <button
                               onClick={() => onEditTransaction(tx)}
@@ -1328,6 +1341,12 @@ export const TransactionsTab = React.memo(function TransactionsTab({
         title={t('transactions.bulk_delete_title', 'Delete Selected Transactions')}
         description={t('transactions.bulk_delete_confirm', { count: selectedIds.size })}
         confirmLabel={t('common.delete', 'Delete')}
+      />
+      <LinkTransactionsModal
+        base={linkBase}
+        transactions={transactions}
+        onClose={() => setLinkBase(null)}
+        onApply={(ids, linkId) => onUpdateTransaction(ids, { linkId })}
       />
     </div>
   );

@@ -106,6 +106,7 @@ export interface SupabaseUserData {
     nonRecurringKeys?: string[];
     installmentPlans?: InstallmentPlan[];
     txPlanIds?: Record<string, string>;
+    txLinkIds?: Record<string, string>;
     txAttachments?: Record<string, any[]>;
     onboardingCompleted?: boolean;
     localCurrency?: string;
@@ -338,6 +339,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
           receiveCurrency: row.receive_currency || undefined,
           description: rawNotes,
           planId: row.plan_id || (userSettings?.txPlanIds ? (userSettings.txPlanIds[row.id] || userSettings.txPlanIds[cleanId]) : undefined),
+          linkId: userSettings?.txLinkIds ? (userSettings.txLinkIds[row.id] || userSettings.txLinkIds[cleanId]) : undefined,
           installmentPlanId: row.plan_id || (userSettings?.txPlanIds ? (userSettings.txPlanIds[row.id] || userSettings.txPlanIds[cleanId]) : undefined),
           attachments: (row.attachments && Array.isArray(row.attachments) && row.attachments.length > 0)
             ? row.attachments
@@ -967,6 +969,13 @@ export async function saveAllUserDataWithClient(
           if (pId) idsMap[t.id] = pId;
         });
         return Object.keys(idsMap).length > 0 ? idsMap : undefined;
+      })(),
+      txLinkIds: (() => {
+        const linkMap: Record<string, string> = {};
+        (data.transactions || []).forEach(t => {
+          if (t.linkId) linkMap[t.id] = t.linkId;
+        });
+        return Object.keys(linkMap).length > 0 ? linkMap : undefined;
       })(),
       txAttachments: (() => {
         const attMap: Record<string, any[]> = {};
