@@ -1,6 +1,8 @@
 import { getSupabaseClient } from '../lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, TabCustomizationItem, InstallmentPlan, TransactionAttachment } from '../types';
 import { enqueueMutation, isNetworkOnline, QueuedMutation } from './syncQueue';
+import { unionTombstones, filterActiveTransactions } from './tombstones';
 
 const DELETED_TX_KEY = 'finance_app_deleted_tx_ids';
 
@@ -539,8 +541,20 @@ export async function saveAllUserDataToSupabase(
   const { data: { session } } = await client.auth.getSession();
   if (!session?.user) return false;
 
-  const userId = session.user.id;
+  return saveAllUserDataWithClient(client, session.user.id, data, options);
+}
 
+/**
+ * Full save flow with an injected Supabase client and a resolved user id.
+ * Exported so tests can run the real orchestration against a mock client;
+ * production callers should use saveAllUserDataToSupabase.
+ */
+export async function saveAllUserDataWithClient(
+  client: SupabaseClient,
+  userId: string,
+  data: SupabaseUserData,
+  options?: { skipEnqueue?: boolean }
+): Promise<boolean> {
   try {
     // Helper to preserve shared row IDs and user_ids
     const resolveSyncId = (itemId: string | undefined | null, currentUserId: string, ownerHint?: string) => {
@@ -574,14 +588,27 @@ export async function saveAllUserDataToSupabase(
     });
 
     // 1. Transactions upsert or clear in batches of 500
-    const currentDeletedIds = getDeletedTxIds();
-    const activeTransactions = (data.transactions || []).filter(t => {
-      if (!t.id) return false;
-      if (currentDeletedIds.has(t.id)) return false;
-      const clean = t.id.includes('_') ? t.id.split('_').slice(1).join('_') : t.id;
-      if (currentDeletedIds.has(clean)) return false;
-      return true;
-    });
+    // Read cloud tombstones BEFORE writing anything: a session that saves with a
+    // stale local list would otherwise re-upload rows another device deleted and
+    // overwrite the cloud deletedTxIds with its older copy (resurrection bug).
+    let remoteTombstones: string[] = [];
+    let remoteSettingsRead = false;
+    try {
+      const setRes = await client.from('user_settings').select('settings').eq('user_id', userId).maybeSingle();
+      if (!setRes.error) {
+        const rawSettings = setRes.data?.settings;
+        const parsedSettings = typeof rawSettings === 'string' ? JSON.parse(rawSettings) : rawSettings;
+        if (parsedSettings && Array.isArray(parsedSettings.deletedTxIds)) {
+          remoteTombstones = parsedSettings.deletedTxIds;
+        }
+        remoteSettingsRead = true;
+      }
+    } catch (readErr) {
+      console.warn('user_settings read before save failed; will skip settings upload this round:', readErr);
+    }
+    if (remoteTombstones.length > 0) mergeDeletedTxIds(remoteTombstones);
+    const tombstoneUnion = unionTombstones(data.settings?.deletedTxIds, getDeletedTxIds(), remoteTombstones);
+    const activeTransactions = filterActiveTransactions(data.transactions, tombstoneUnion);
 
     if (activeTransactions.length > 0) {
       const txRows = activeTransactions.map(t => {
@@ -907,29 +934,33 @@ export async function saveAllUserDataToSupabase(
         });
         return Object.keys(attMap).length > 0 ? attMap : undefined;
       })(),
-      deletedTxIds: Array.from(new Set([
-        ...(Array.isArray(data.settings?.deletedTxIds) ? data.settings.deletedTxIds : []),
-        ...Array.from(getDeletedTxIds())
-      ])).slice(-1000),
+      deletedTxIds: Array.from(tombstoneUnion).slice(-1000),
     };
 
-    try {
-      const { error: setErr } = await client.from('user_settings').upsert({
-        id: `${userId}_settings`,
-        user_id: userId,
-        settings: settingsObj,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'id' });
+    if (remoteSettingsRead) {
+      try {
+        const { error: setErr } = await client.from('user_settings').upsert({
+          id: `${userId}_settings`,
+          user_id: userId,
+          settings: settingsObj,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
 
-      if (setErr) {
-        console.warn('User settings sync note (user_settings table):', setErr.message);
+        if (setErr) {
+          console.warn('User settings sync note (user_settings table):', setErr.message);
+        }
+      } catch (e) {
+        console.warn('user_settings table sync catch:', e);
       }
-    } catch (e) {
-      console.warn('user_settings table sync catch:', e);
+    } else {
+      // Never overwrite the settings document (which carries the cloud
+      // tombstones) without having read it first: a blind write can wipe
+      // deletedTxIds recorded by other devices.
+      console.warn('Skipped user_settings upload: cloud tombstones unreadable this round.');
     }
 
     // 6. Purge any pending cached deleted transactions in Supabase
-    const pendingDeleted = getDeletedTxIds();
+    const pendingDeleted = unionTombstones(getDeletedTxIds(), remoteTombstones);
     if (pendingDeleted.size > 0) {
       const pendingIds = Array.from(pendingDeleted);
       const queryIds: string[] = [];
