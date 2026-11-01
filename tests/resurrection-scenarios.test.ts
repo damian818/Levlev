@@ -6,7 +6,9 @@
  * transactions). They prove the client-side invariant of the patched flow;
  * they do NOT prove real SQL/RLS/concurrent behavior. True races between the
  * settings read and write remain possible (see "known limitation" test) and
- * are the reason for supabase/migrations/20261101_proposed_deletion_invariant.sql.
+ * are the reason for supabase/migrations/20261101_deletion_invariant.sql
+ * (validated by tests/deletion-invariant-db.test.ts and
+ * tests/deletion-invariant-concurrency.test.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
