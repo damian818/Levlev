@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../src/index.css';
+import './preview.css';
 import '../src/i18n';
 import i18n from 'i18next';
 import { RecurringDeviationModal } from '../src/components/AlertDetailModals';
@@ -27,7 +27,11 @@ const ALERTS: RecurringDeviationAlert[] = [
 
 function App() {
   const [open, setOpen] = useState(true);
-  const [lang, setLang] = useState('en');
+  const [lang, setLang] = useState(() => {
+    const l = location.hash.replace('#', '') === 'es' ? 'es' : 'en';
+    i18n.changeLanguage(l);
+    return l;
+  });
   const change = (l: string) => { i18n.changeLanguage(l); setLang(l); };
   return (
     <div className="min-h-screen bg-[#0a0b0d] p-6 text-slate-200">
