@@ -2046,6 +2046,7 @@ export default function App() {
               globalRecurringThreshold={globalRecurringThreshold}
               onSaveRecurringThreshold={handleSaveRecurringThreshold}
               onSaveGlobalRecurringThreshold={handleSaveGlobalRecurringThreshold}
+              onAddTransaction={handleAddTransaction}
             />
           )}
           {currentTab === 'debt-payoff' && (

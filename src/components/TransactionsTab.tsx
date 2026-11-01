@@ -1346,7 +1346,7 @@ export const TransactionsTab = React.memo(function TransactionsTab({
         base={linkBase}
         transactions={transactions}
         onClose={() => setLinkBase(null)}
-        onApply={(ids, linkId) => onUpdateTransaction(ids, { linkId })}
+        onApply={(patches) => Object.entries(patches).forEach(([id, patch]) => onUpdateTransaction(id, patch))}
       />
     </div>
   );

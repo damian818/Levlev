@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LoadNowConfirm } from './PendingRecurringLoadList';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem, AccountItem } from '../types';
 import { 
@@ -152,8 +153,7 @@ export function MonthlyHeatmap({
   const weekDaysFull = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   // "Cargar ahora": nothing is created until the user confirms amount and date.
-  const [loadNow, setLoadNow] = useState<{ itemId: string; amount: string; date: string } | null>(null);
-  const todayIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  const [loadNow, setLoadNow] = useState<{ itemId: string } | null>(null);
 
   const handleQuickLogPending = (item: PendingRecurringItem, day: number, overrides?: { amount: number; date: string }) => {
     if (!onAddTransaction) return;
@@ -538,7 +538,7 @@ export function MonthlyHeatmap({
                           {onAddTransaction && (
                             <button
                               type="button"
-                              onClick={() => setLoadNow({ itemId: item.id, amount: String(item.amount), date: todayIso })}
+                              onClick={() => setLoadNow({ itemId: item.id })}
                               title="Cargar ahora (te pide confirmar monto y fecha)"
                               className="px-2 py-1.5 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 transition-colors shadow-xs cursor-pointer text-[10px] font-bold flex items-center gap-1"
                             >
@@ -557,19 +557,7 @@ export function MonthlyHeatmap({
                           </button>
                         </div>
                         {loadNow?.itemId === item.id && (
-                          <div className="basis-full mt-2 p-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 space-y-2">
-                            <p className="text-[10px] text-slate-600 dark:text-slate-300">
-                              Se va a crear: {item.type === 'INCOME' ? 'ingreso' : 'gasto'} "{item.title}" · {item.category} · {item.account} ({item.currency}). Confirmá monto y fecha.
-                            </p>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <input type="number" step="any" value={loadNow.amount} onChange={e => setLoadNow({ ...loadNow, amount: e.target.value })} className="w-28 text-xs px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-transparent" />
-                              <input type="date" value={loadNow.date} onChange={e => setLoadNow({ ...loadNow, date: e.target.value })} className="text-xs px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-transparent" />
-                              <button type="button" disabled={!(parseFloat(loadNow.amount) > 0) || !loadNow.date}
-                                onClick={() => handleQuickLogPending(item, selectedDayDetails.day, { amount: parseFloat(loadNow.amount), date: loadNow.date })}
-                                className="px-2 py-1 text-xs font-bold rounded bg-emerald-600 text-white disabled:opacity-40">Confirmar</button>
-                              <button type="button" onClick={() => setLoadNow(null)} className="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700">Cancelar</button>
-                            </div>
-                          </div>
+                          <LoadNowConfirm item={item} onCancel={() => setLoadNow(null)} onConfirm={(amount, date) => handleQuickLogPending(item, selectedDayDetails.day, { amount, date })} />
                         )}
                       </div>
                     );

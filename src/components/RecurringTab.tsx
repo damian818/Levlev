@@ -20,6 +20,7 @@ import {
   getEffectiveRecurringItems,
   detectRecurringThresholdAlerts
 } from '../utils/financeUtils';
+import { PendingRecurringLoadList } from './PendingRecurringLoadList';
 import { RecurringTrendModal } from './RecurringTrendModal';
 import { RecurringCategoryTrendModal } from './RecurringCategoryTrendModal';
 import { RecurringRuleModal } from './RecurringRuleModal';
@@ -67,6 +68,7 @@ interface RecurringTabProps {
   globalRecurringThreshold?: number;
   onSaveRecurringThreshold?: (title: string, threshold: number) => void;
   onSaveGlobalRecurringThreshold?: (threshold: number) => void;
+  onAddTransaction?: (tx: Transaction) => void;
 }
 
 export function RecurringTab({ 
@@ -84,7 +86,8 @@ export function RecurringTab({
   recurringThresholds = {},
   globalRecurringThreshold = 15,
   onSaveRecurringThreshold,
-  onSaveGlobalRecurringThreshold
+  onSaveGlobalRecurringThreshold,
+  onAddTransaction
 }: RecurringTabProps) {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
@@ -432,6 +435,7 @@ export function RecurringTab({
 
   return (
     <div id="recurring-tab-container" className="space-y-6">
+      <PendingRecurringLoadList transactions={transactions} recurringRules={recurringRules} nonRecurringKeys={nonRecurringKeys} displayCurrency={displayCurrency} usdArsRate={usdArsRate} onAddTransaction={onAddTransaction} />
       {/* Overview Banner */}
       <div className="bg-white dark:bg-[#161b22] p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">

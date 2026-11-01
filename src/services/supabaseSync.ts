@@ -2,6 +2,7 @@ import { getSupabaseClient } from '../lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Transaction, CategoryItem, AccountItem, BudgetGoal, CreditCardClosingRule, AccountCustomBalance, SharedMember, RecurringRule, DebtItem, DebtPayoffStrategy, TabCustomizationItem, InstallmentPlan, TransactionAttachment } from '../types';
 import { enqueueMutation, isNetworkOnline, QueuedMutation } from './syncQueue';
+import { toStoredLinks, mergeStoredLinks, applyStoredLink, StoredLinkMap } from '../utils/transactionLinks';
 import { unionTombstones, filterActiveTransactions, isTombstoned } from './tombstones';
 
 const DELETED_TX_KEY = 'finance_app_deleted_tx_ids';
@@ -106,7 +107,7 @@ export interface SupabaseUserData {
     nonRecurringKeys?: string[];
     installmentPlans?: InstallmentPlan[];
     txPlanIds?: Record<string, string>;
-    txLinkIds?: Record<string, string>;
+    txLinks?: StoredLinkMap;
     txAttachments?: Record<string, any[]>;
     onboardingCompleted?: boolean;
     localCurrency?: string;
@@ -339,7 +340,7 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
           receiveCurrency: row.receive_currency || undefined,
           description: rawNotes,
           planId: row.plan_id || (userSettings?.txPlanIds ? (userSettings.txPlanIds[row.id] || userSettings.txPlanIds[cleanId]) : undefined),
-          linkId: userSettings?.txLinkIds ? (userSettings.txLinkIds[row.id] || userSettings.txLinkIds[cleanId]) : undefined,
+          ...applyStoredLink(row.id, userSettings?.txLinks, cleanId),
           installmentPlanId: row.plan_id || (userSettings?.txPlanIds ? (userSettings.txPlanIds[row.id] || userSettings.txPlanIds[cleanId]) : undefined),
           attachments: (row.attachments && Array.isArray(row.attachments) && row.attachments.length > 0)
             ? row.attachments
@@ -612,6 +613,7 @@ export async function saveAllUserDataWithClient(
     // overwrite the cloud deletedTxIds with its older copy (resurrection bug).
     let remoteTombstones: string[] = [];
     let remoteSettingsRead = false;
+    let remoteTxLinks: StoredLinkMap | undefined;
     try {
       const setRes = await client.from('user_settings').select('settings').eq('user_id', userId).maybeSingle();
       if (!setRes.error) {
@@ -619,6 +621,9 @@ export async function saveAllUserDataWithClient(
         const parsedSettings = typeof rawSettings === 'string' ? JSON.parse(rawSettings) : rawSettings;
         if (parsedSettings && Array.isArray(parsedSettings.deletedTxIds)) {
           remoteTombstones = parsedSettings.deletedTxIds;
+        }
+        if (parsedSettings && parsedSettings.txLinks && typeof parsedSettings.txLinks === 'object') {
+          remoteTxLinks = parsedSettings.txLinks;
         }
         remoteSettingsRead = true;
       }
@@ -970,12 +975,9 @@ export async function saveAllUserDataWithClient(
         });
         return Object.keys(idsMap).length > 0 ? idsMap : undefined;
       })(),
-      txLinkIds: (() => {
-        const linkMap: Record<string, string> = {};
-        (data.transactions || []).forEach(t => {
-          if (t.linkId) linkMap[t.id] = t.linkId;
-        });
-        return Object.keys(linkMap).length > 0 ? linkMap : undefined;
+      txLinks: (() => {
+        const merged = mergeStoredLinks(toStoredLinks(data.transactions || []), remoteTxLinks, id => isTombstoned(id, tombstoneUnion));
+        return Object.keys(merged).length > 0 ? merged : undefined;
       })(),
       txAttachments: (() => {
         const attMap: Record<string, any[]> = {};
