@@ -18,16 +18,19 @@ import { dirname, join } from 'node:path';
 
 let EmbeddedPostgres: any;
 let pg: any;
+let depsOk = true;
 try {
   ({ default: EmbeddedPostgres } = await import('embedded-postgres'));
   ({ default: pg } = await import('pg'));
 } catch {
+  depsOk = false;
   test('deletion-invariant concurrency tests skipped (install embedded-postgres and pg to run)', (t) => {
     t.skip('optional dependencies not installed');
   });
-  // eslint-disable-next-line no-throw-literal
-  throw { __skip: true };
 }
+
+// Everything below only runs when the optional deps are installed (clean skip otherwise).
+if (depsOk) {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const baseSchema = readFileSync(join(here, '..', 'supabase-schema.sql'), 'utf8')
@@ -168,3 +171,5 @@ test('a blind tombstone from another user does not block my future id', async ()
     await mine.end();
   }
 });
+
+}

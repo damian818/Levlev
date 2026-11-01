@@ -1119,7 +1119,7 @@ export const TransactionsTab = React.memo(function TransactionsTab({
                               className={`p-1.5 rounded-md transition-colors ${
                                 tx.linkId ? 'text-emerald-400 hover:bg-emerald-950/50' : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-950/50'
                               }`}
-                              title={tx.linkId ? 'Linked movements (reintegros / propinas)' : 'Link reintegros / propinas'}
+                              title={tx.linkId ? t('txlinks.icon_linked') : t('txlinks.icon_unlinked')}
                             >
                               <Link2 className="w-3.5 h-3.5" />
                             </button>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LoadNowConfirm } from './PendingRecurringLoadList';
+import { LoadNowConfirm, buildTxFromPending } from './PendingRecurringLoadList';
 import { useTranslation } from 'react-i18next';
 import { Transaction, DisplayCurrency, RecurringRule, PendingRecurringItem, AccountItem } from '../types';
 import { 
@@ -158,17 +158,7 @@ export function MonthlyHeatmap({
   const handleQuickLogPending = (item: PendingRecurringItem, day: number, overrides?: { amount: number; date: string }) => {
     if (!onAddTransaction) return;
     const dateStr = overrides?.date || `${activeMonth}-${String(day).padStart(2, '0')}`;
-    const newTx: Transaction = {
-      id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      title: item.title,
-      amount: overrides?.amount ?? item.amount,
-      currency: item.currency,
-      type: item.type,
-      category: item.category || 'General',
-      account: item.account || 'BBVA',
-      date: dateStr,
-      description: item.isInstallment ? `Cuota: ${item.installmentInfo || ''}` : 'Logged from Recurring Estimate',
-    };
+    const newTx: Transaction = buildTxFromPending(item, overrides?.amount ?? item.amount, dateStr);
     onAddTransaction(newTx);
     setLoadNow(null);
     setSelectedDayDetails(null);
@@ -539,10 +529,10 @@ export function MonthlyHeatmap({
                             <button
                               type="button"
                               onClick={() => setLoadNow({ itemId: item.id })}
-                              title="Cargar ahora (te pide confirmar monto y fecha)"
+                              title={t('loadnow.button_title')}
                               className="px-2 py-1.5 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 transition-colors shadow-xs cursor-pointer text-[10px] font-bold flex items-center gap-1"
                             >
-                              <PlusCircle className="w-4 h-4" /> Cargar ahora
+                              <PlusCircle className="w-4 h-4" /> {t('loadnow.button')}
                             </button>
                           )}
 
@@ -557,7 +547,7 @@ export function MonthlyHeatmap({
                           </button>
                         </div>
                         {loadNow?.itemId === item.id && (
-                          <LoadNowConfirm item={item} onCancel={() => setLoadNow(null)} onConfirm={(amount, date) => handleQuickLogPending(item, selectedDayDetails.day, { amount, date })} />
+                          <LoadNowConfirm item={item} displayCurrency={displayCurrency} convert={(amount, date) => convertCurrency(amount, item.currency, displayCurrency, usdArsRate, date, transactions)} onCancel={() => setLoadNow(null)} onConfirm={(amount, date) => handleQuickLogPending(item, selectedDayDetails.day, { amount, date })} />
                         )}
                       </div>
                     );

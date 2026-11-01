@@ -17,15 +17,18 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 let PGlite: any;
+let depsOk = true;
 try {
   ({ PGlite } = await import('@electric-sql/pglite'));
 } catch {
+  depsOk = false;
   test('deletion-invariant DB tests skipped (install @electric-sql/pglite to run)', (t) => {
     t.skip('optional dependency @electric-sql/pglite not installed');
   });
-  // eslint-disable-next-line no-throw-literal
-  throw { __skip: true }; // stop evaluating the rest of the module
 }
+
+// Everything below only runs when the optional deps are installed (clean skip otherwise).
+if (depsOk) {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const baseSchema = readFileSync(join(here, '..', 'supabase-schema.sql'), 'utf8')
@@ -216,3 +219,5 @@ test('re-adding with a fresh id keeps working (normal app flow unaffected)', asy
   });
   await db.close();
 });
+
+}

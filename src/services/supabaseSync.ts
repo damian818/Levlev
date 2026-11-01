@@ -132,7 +132,11 @@ export interface SupabaseUserData {
 export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | null> {
   const client = getSupabaseClient();
   if (!client) return null;
+  return fetchUserDataWithClient(client);
+}
 
+/** Same as fetchUserDataFromSupabase with an injectable client (used by isolated round-trip tests). */
+export async function fetchUserDataWithClient(client: NonNullable<ReturnType<typeof getSupabaseClient>>): Promise<SupabaseUserData | null> {
   const { data: { session } } = await client.auth.getSession();
   if (!session?.user) return null;
 
@@ -569,6 +573,39 @@ export async function saveAllUserDataToSupabase(
  * Exported so tests can run the real orchestration against a mock client;
  * production callers should use saveAllUserDataToSupabase.
  */
+/**
+ * Links are written inside the shared settings document, which saveAll replaces as a whole
+ * (read-merge-write, NOT atomic). Two devices saving at the same moment can drop each other's
+ * link entries. Mitigation, in order:
+ *  1. Fresh re-read of the cloud links right before the write (see saveAll), then
+ *  2. verify-and-repair: re-read the document after our write and, if our link entries
+ *     are missing or older there, write back ONLY txLinks on top of the fresh document (so other keys
+ *     written by other devices are preserved). Narrows the window to a read-write gap; it does not
+ *     close it. The only atomic fix is server-side (docs/proposals/tx-links-merge-trigger.proposal.sql, NOT applied). A repair write racing with another save can still lose a link until the next save,
+ *     because every device re-sends its own links on each save.
+ */
+export async function reconcileTxLinksAfterWrite(client: any, userId: string, links: StoredLinkMap, tombstones: Set<string>, maxAttempts = 3): Promise<'ok' | 'repaired' | 'gave-up' | 'skipped'> {
+  let repaired = false;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const res = await client.from('user_settings').select('settings').eq('user_id', userId).maybeSingle();
+      if (res.error) return 'skipped';
+      const raw = res.data?.settings;
+      const fresh = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+      const merged = mergeStoredLinks(links, fresh.txLinks, id => isTombstoned(id, tombstones));
+      const same = JSON.stringify(Object.keys(merged).sort().map(k => [k, merged[k]])) ===
+        JSON.stringify(Object.keys(fresh.txLinks || {}).sort().map(k => [k, (fresh.txLinks || {})[k]]));
+      if (same) return repaired ? 'repaired' : 'ok';
+      const { error } = await client.from('user_settings').upsert({
+        id: `${userId}_settings`, user_id: userId, settings: { ...fresh, txLinks: merged }, updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+      if (error) return 'skipped';
+      repaired = true;
+    } catch { return 'skipped'; }
+  }
+  return 'gave-up';
+}
+
 export async function saveAllUserDataWithClient(
   client: SupabaseClient,
   userId: string,
@@ -909,6 +946,18 @@ export async function saveAllUserDataWithClient(
       )
     );
 
+    // Re-read the cloud links right before building the document: the early read happened before the
+    // (possibly long) transaction upload, and every ms between this read and the write is a lost-update window.
+    try {
+      const freshRes = await client.from('user_settings').select('settings').eq('user_id', userId).maybeSingle();
+      if (!freshRes.error) {
+        const rawFresh = freshRes.data?.settings;
+        const parsedFresh = typeof rawFresh === 'string' ? JSON.parse(rawFresh) : rawFresh;
+        if (parsedFresh && parsedFresh.txLinks && typeof parsedFresh.txLinks === 'object') {
+          remoteTxLinks = mergeStoredLinks(remoteTxLinks, parsedFresh.txLinks);
+        }
+      }
+    } catch { /* keep the early read */ }
     const settingsObj = {
       ccRulesMap: { ...ccRulesMapFromAccs, ...(data.settings?.ccRulesMap || {}) },
       ccMap: { ...ccMapFromAccs, ...(data.settings?.ccMap || {}) },
@@ -1002,6 +1051,9 @@ export async function saveAllUserDataWithClient(
 
         if (setErr) {
           console.warn('User settings sync note (user_settings table):', setErr.message);
+        }
+        if (!setErr && settingsObj.txLinks) {
+          await reconcileTxLinksAfterWrite(client, userId, settingsObj.txLinks as StoredLinkMap, tombstoneUnion);
         }
       } catch (e) {
         console.warn('user_settings table sync catch:', e);

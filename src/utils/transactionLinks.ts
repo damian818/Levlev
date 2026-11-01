@@ -34,8 +34,8 @@ export interface LinkableTx {
 
 export interface LinkSuggestion<T extends LinkableTx = LinkableTx> {
   tx: T;
-  /** Hint only (never applied by itself). */
-  hint: string;
+  /** Why it is a candidate (hint only, never applied by itself). */
+  hint: 'account' | 'type' | 'both';
   daysApart: number;
   inOtherGroup: boolean;
 }
@@ -65,7 +65,7 @@ export function suggestLinks<T extends LinkableTx>(base: T, all: T[], windowDays
     if (!diffAcct && !diffType) continue; // same type + same account = duplicate, not a link
     const daysApart = Math.abs(dayNumber(t.date) - baseDay);
     if (!Number.isFinite(daysApart) || daysApart > windowDays) continue;
-    const hint = diffType && diffAcct ? 'otra cuenta y otro tipo' : diffType ? 'otro tipo' : 'otra cuenta';
+    const hint = diffType && diffAcct ? 'both' : diffType ? 'type' : 'account';
     out.push({ tx: t, hint, daysApart, inOtherGroup: !!t.linkId && t.linkId !== base.linkId });
   }
   out.sort((a, b) => a.daysApart - b.daysApart);
