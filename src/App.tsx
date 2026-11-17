@@ -15,7 +15,7 @@ import { useBrowserNotifications } from './hooks/useBrowserNotifications';
 import { initializeGlobalFxRates } from './utils/currencyUtils';
 import { persistAttachmentDataUrl, retrieveAttachmentDataUrl } from './utils/attachmentStorage';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
-import { fetchUserDataFromSupabase, fetchSyncFingerprint, SYNC_FINGERPRINT_KEY, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase, getDeletedTxIds, mergeDeletedTxIds, addDeletedTxIds, executeQueuedMutation } from './services/supabaseSync';
+import { fetchUserDataFromSupabase, fetchSyncFingerprint, SYNC_FINGERPRINT_KEY, isRepeatPulledPayload, rememberPulledPayloadKey, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase, getDeletedTxIds, mergeDeletedTxIds, addDeletedTxIds, executeQueuedMutation } from './services/supabaseSync';
 import { initSyncQueueAutoFlush, flushSyncQueue, subscribeToSyncQueue, getSyncQueue } from './services/syncQueue';
 import { Navbar } from './components/Navbar';
 
@@ -902,7 +902,18 @@ export default function App() {
       }
       const fingerprintBefore = await fetchSyncFingerprint();
       const data = await fetchUserDataFromSupabase();
+      let payloadKey: string | null = null;
       if (data) {
+        try { payloadKey = JSON.stringify(data); } catch { payloadKey = null; }
+      }
+      // Another device's save bumps the fingerprint, so the gate above lets
+      // this pull through - but the content is often identical (its autosave
+      // re-uploads unchanged data). Skip the whole merge in that case so no
+      // state reference changes and the autosave stays quiet; applying it
+      // would re-enter the pull -> autosave -> bump -> pull loop.
+      const skipMerge = !!payloadKey && isRepeatPulledPayload(payloadKey);
+      if (data && !skipMerge) {
+        rememberPulledPayloadKey(payloadKey);
         setTransactions(prev => {
           // Cloud tombstones merged into local storage
           const deletedIds = mergeDeletedTxIds(data.settings?.deletedTxIds);

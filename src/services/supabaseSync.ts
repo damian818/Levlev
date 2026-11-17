@@ -151,6 +151,33 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
 
 export const SYNC_FINGERPRINT_KEY = 'finance_app_sync_fingerprint';
 
+// ---------------------------------------------------------------------------
+// Repeat-pull detection: another device's save bumps the sync fingerprint, so
+// this device pulls - but when the pulled payload is byte-identical to the
+// previous pull there is nothing new to merge. Applying it anyway rebuilds
+// every state array/object, which wakes the 1s-debounced autosave, saves back,
+// bumps user_settings.updated_at and triggers yet another pull (the
+// pull -> autosave -> bump -> pull loop). The caller stringifies the fetched
+// payload once and skips the whole merge when the key repeats.
+// ---------------------------------------------------------------------------
+
+let lastPulledPayloadKey: string | null = null;
+
+/** True when this exact payload key was already applied by the last pull. */
+export function isRepeatPulledPayload(payloadKey: string | null): boolean {
+  return payloadKey !== null && payloadKey === lastPulledPayloadKey;
+}
+
+/** Record the payload key that the current pull is about to apply. */
+export function rememberPulledPayloadKey(payloadKey: string | null): void {
+  lastPulledPayloadKey = payloadKey;
+}
+
+/** Test hook: clears the remembered payload key. */
+export function resetPulledPayloadKeyForTests(): void {
+  lastPulledPayloadKey = null;
+}
+
 /**
  * Bump user_settings.updated_at so other devices' sync fingerprint notices a
  * change even on write paths that don't otherwise write the settings row
