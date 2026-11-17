@@ -151,6 +151,25 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
 
 export const SYNC_FINGERPRINT_KEY = 'finance_app_sync_fingerprint';
 
+/**
+ * Bump user_settings.updated_at so other devices' sync fingerprint notices a
+ * change even on write paths that don't otherwise write the settings row
+ * (e.g. category/account deletes, or a saveAll whose settings pre-read
+ * failed). A column-scoped UPDATE, never an upsert: an upsert with partial
+ * fields would replace the row and wipe the settings document.
+ */
+async function touchSettingsUpdatedAt(client: SupabaseClient, userId: string): Promise<void> {
+  try {
+    const { error } = await client
+      .from('user_settings')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('user_id', userId);
+    if (error) console.warn('touchSettingsUpdatedAt note:', error.message);
+  } catch (e) {
+    console.warn('touchSettingsUpdatedAt failed:', e);
+  }
+}
+
 export async function fetchSyncFingerprint(): Promise<string | null> {
   const client = getSupabaseClient();
   if (!client) return null;
@@ -1114,6 +1133,10 @@ export async function saveAllUserDataWithClient(
       // tombstones) without having read it first: a blind write can wipe
       // deletedTxIds recorded by other devices.
       console.warn('Skipped user_settings upload: cloud tombstones unreadable this round.');
+      // The settings upsert above was skipped, so updated_at would stay stale
+      // and other devices' sync fingerprint would miss this save. Bump it with
+      // a column-scoped update instead (never an upsert of a partial row).
+      await touchSettingsUpdatedAt(client, userId);
     }
 
     // 6. Purge any pending cached deleted transactions in Supabase
@@ -1450,6 +1473,9 @@ export async function deleteCategoryFromSupabase(
       }
       return false;
     }
+    // This path writes no settings row: bump updated_at so the sync
+    // fingerprint on other devices notices the deletion.
+    await touchSettingsUpdatedAt(client, session.user.id);
     return true;
   } catch (e) {
     if (!options?.skipEnqueue) {
@@ -1491,6 +1517,9 @@ export async function deleteAccountFromSupabase(
       }
       return false;
     }
+    // This path writes no settings row: bump updated_at so the sync
+    // fingerprint on other devices notices the deletion.
+    await touchSettingsUpdatedAt(client, session.user.id);
     return true;
   } catch (e) {
     if (!options?.skipEnqueue) {

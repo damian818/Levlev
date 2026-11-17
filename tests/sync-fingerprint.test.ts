@@ -73,6 +73,22 @@ test('fingerprint changes when an attachment is added or removed', async () => {
   assert.notEqual(fp1, await fetchSyncFingerprintWithClient(makeMockClient({ ...base, attCount: 4 })));
 });
 
+test('edit in place (counts unchanged) is still detected via updated_at', async () => {
+  // A recategorization or title fix changes no row counts: only the settings
+  // bump reveals it.
+  const base = { txCount: 100, delCount: 5, attCount: 3 };
+  const fp1 = await fetchSyncFingerprintWithClient(makeMockClient({ ...base, updatedAt: '2026-11-17T10:00:00Z' }));
+  const fp2 = await fetchSyncFingerprintWithClient(makeMockClient({ ...base, updatedAt: '2026-11-17T10:05:00Z' }));
+  assert.notEqual(fp1, fp2);
+});
+
+test('delete + add leaving the count unchanged is still detected via updated_at', async () => {
+  const base = { txCount: 100, delCount: 6, attCount: 3 };
+  const fp1 = await fetchSyncFingerprintWithClient(makeMockClient({ ...base, updatedAt: '2026-11-17T10:00:00Z' }));
+  const fp2 = await fetchSyncFingerprintWithClient(makeMockClient({ ...base, updatedAt: '2026-11-17T10:06:00Z' }));
+  assert.notEqual(fp1, fp2);
+});
+
 test('returns null when there is no session (caller falls back to full pull)', async () => {
   const client = makeMockClient({ updatedAt: '2026-11-17T10:00:00Z' }, { session: false });
   assert.equal(await fetchSyncFingerprintWithClient(client), null);
