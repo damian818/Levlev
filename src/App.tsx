@@ -877,6 +877,15 @@ export default function App() {
   const [hasInitialSynced, setHasInitialSynced] = useState(false);
 
   // Sync Supabase user data
+  // Content equality for the sync merge guards below: identical pulled data
+  // must not create new state references, or the 1s-debounced autosave would
+  // save it back, bump user_settings.updated_at and trigger another full pull
+  // forever (pull -> autosave -> bump -> pull loop).
+  const syncJsonEqual = (a: any, b: any): boolean => {
+    if (a === b) return true;
+    try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
+  };
+
   const syncFromSupabase = React.useCallback(async (isRaceRetry = false) => {
     try {
       // Egress gate (Supabase free plan): the full pull below downloads every
@@ -945,33 +954,34 @@ export default function App() {
           });
 
           const merged = [...pendingLocal, ...remoteTxs];
+          if (syncJsonEqual(prev, merged)) return prev;
           try {
             localStorage.setItem('finance_app_transactions', JSON.stringify(merged));
           } catch (e) {}
           return merged;
         });
         if (data.categories && data.categories.length > 0) {
-          setCategories(data.categories);
+          setCategories(prev => syncJsonEqual(prev, data.categories) ? prev : data.categories);
           try {
             localStorage.setItem('finance_app_custom_categories', JSON.stringify(data.categories));
           } catch (e) {}
         }
         if (Array.isArray(data.settings?.hiddenCategoryIds)) {
-          setHiddenCategoryIds(data.settings.hiddenCategoryIds);
+          setHiddenCategoryIds(prev => syncJsonEqual(prev, data.settings.hiddenCategoryIds) ? prev : data.settings.hiddenCategoryIds);
           try {
             localStorage.setItem('finance_app_hidden_category_ids', JSON.stringify(data.settings.hiddenCategoryIds));
           } catch (e) {}
         }
         if (data.accounts && data.accounts.length > 0) {
-          setAccounts(data.accounts);
+          setAccounts(prev => syncJsonEqual(prev, data.accounts) ? prev : data.accounts);
           try {
             localStorage.setItem('finance_app_custom_accounts', JSON.stringify(data.accounts));
           } catch (e) {}
         }
-        setBudgets(data.budgets || []);
+        setBudgets(prev => { const next = data.budgets || []; return syncJsonEqual(prev, next) ? prev : next; });
 
         if (data.installmentPlans && Array.isArray(data.installmentPlans)) {
-          setInstallmentPlans(data.installmentPlans);
+          setInstallmentPlans(prev => syncJsonEqual(prev, data.installmentPlans) ? prev : data.installmentPlans);
           try {
             localStorage.setItem('finance_app_installment_plans', JSON.stringify(data.installmentPlans));
           } catch (e) {}
@@ -999,22 +1009,22 @@ export default function App() {
             }
           }
           if (Array.isArray(data.settings.enabledCurrencies) && data.settings.enabledCurrencies.length > 0) {
-            setEnabledCurrencies(data.settings.enabledCurrencies);
+            setEnabledCurrencies(prev => syncJsonEqual(prev, data.settings.enabledCurrencies) ? prev : data.settings.enabledCurrencies);
           }
           if (data.settings.ccPeriodStatuses) {
-            setPeriodStatusOverrides(data.settings.ccPeriodStatuses);
+            setPeriodStatusOverrides(prev => syncJsonEqual(prev, data.settings.ccPeriodStatuses) ? prev : data.settings.ccPeriodStatuses);
             try {
               localStorage.setItem('finance_app_cc_period_statuses', JSON.stringify(data.settings.ccPeriodStatuses));
             } catch (e) {}
           }
           if (data.settings.ccClosingDateOverrides) {
-            setClosingDateOverrides(data.settings.ccClosingDateOverrides);
+            setClosingDateOverrides(prev => syncJsonEqual(prev, data.settings.ccClosingDateOverrides) ? prev : data.settings.ccClosingDateOverrides);
             try {
               localStorage.setItem('finance_app_cc_closing_date_overrides', JSON.stringify(data.settings.ccClosingDateOverrides));
             } catch (e) {}
           }
           if (data.settings.customBalances) {
-            setCustomBalances(data.settings.customBalances);
+            setCustomBalances(prev => syncJsonEqual(prev, data.settings.customBalances) ? prev : data.settings.customBalances);
             try {
               localStorage.setItem('finance_app_account_balances', JSON.stringify(data.settings.customBalances));
             } catch (e) {}
@@ -1037,14 +1047,14 @@ export default function App() {
               } catch (e) {}
             }
             if (data.settings.workspaceSharing.members) {
-              setWorkspaceMembers(data.settings.workspaceSharing.members);
+              setWorkspaceMembers(prev => syncJsonEqual(prev, data.settings.workspaceSharing.members) ? prev : data.settings.workspaceSharing.members);
               try {
                 localStorage.setItem('finance_app_workspace_members', JSON.stringify(data.settings.workspaceSharing.members));
               } catch (e) {}
             }
           }
           if (data.settings.recurringThresholds) {
-            setRecurringThresholds(data.settings.recurringThresholds);
+            setRecurringThresholds(prev => syncJsonEqual(prev, data.settings.recurringThresholds) ? prev : data.settings.recurringThresholds);
             try {
               localStorage.setItem('finance_app_recurring_thresholds', JSON.stringify(data.settings.recurringThresholds));
             } catch (e) {}
@@ -1062,7 +1072,7 @@ export default function App() {
             } catch (e) {}
           }
           if (data.settings.debts && Array.isArray(data.settings.debts)) {
-            setDebts(data.settings.debts);
+            setDebts(prev => syncJsonEqual(prev, data.settings.debts) ? prev : data.settings.debts);
             saveDebtsToStorage(data.settings.debts);
           }
           if (data.settings.debtStrategy) {
@@ -1074,16 +1084,16 @@ export default function App() {
             saveExtraPaymentToStorage(data.settings.debtExtraPayment);
           }
           if (data.settings.dismissedRecurring && Array.isArray(data.settings.dismissedRecurring)) {
-            setDismissedRecurring(data.settings.dismissedRecurring);
+            setDismissedRecurring(prev => syncJsonEqual(prev, data.settings.dismissedRecurring) ? prev : data.settings.dismissedRecurring);
             saveDismissedRecurring(data.settings.dismissedRecurring);
           }
           if (data.settings.tabSettings && Array.isArray(data.settings.tabSettings)) {
             const merged = mergeTabOrder(data.settings.tabSettings);
-            setTabCustomization(merged);
+            setTabCustomization(prev => syncJsonEqual(prev, merged) ? prev : merged);
             saveTabCustomizationToStorage(merged);
           }
           if (data.settings.reportSettings && Array.isArray(data.settings.reportSettings)) {
-            setReportSettings(data.settings.reportSettings);
+            setReportSettings(prev => syncJsonEqual(prev, data.settings.reportSettings) ? prev : data.settings.reportSettings);
             saveSelectedReports(data.settings.reportSettings);
           }
         }
