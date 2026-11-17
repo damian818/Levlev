@@ -136,6 +136,56 @@ export async function fetchUserDataFromSupabase(): Promise<SupabaseUserData | nu
   return fetchUserDataWithClient(client);
 }
 
+// ---------------------------------------------------------------------------
+// Sync fingerprint (egress control, Supabase free plan)
+//
+// The full pull in fetchUserDataWithClient downloads every row of every table
+// (several MB) and the app syncs every 45s per visible tab plus on every
+// window focus, which alone exceeds the free plan's monthly egress quota.
+// Every write path in this module also upserts user_settings with a fresh
+// updated_at, so (updated_at, row counts) is a cheap "did the cloud change?"
+// signal (~1 KB) that lets callers skip the full pull when nothing changed.
+// All devices share one auth user, so one device's saves bump the same
+// user_settings row the other devices fingerprint.
+// ---------------------------------------------------------------------------
+
+export const SYNC_FINGERPRINT_KEY = 'finance_app_sync_fingerprint';
+
+export async function fetchSyncFingerprint(): Promise<string | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+  return fetchSyncFingerprintWithClient(client);
+}
+
+/** Same as fetchSyncFingerprint with an injectable client (used by isolated tests). */
+export async function fetchSyncFingerprintWithClient(client: NonNullable<ReturnType<typeof getSupabaseClient>>): Promise<string | null> {
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return null;
+
+  try {
+    const [setRes, txRes, delRes, attRes] = await Promise.all([
+      client.from('user_settings').select('updated_at').eq('user_id', session.user.id).maybeSingle(),
+      client.from('transactions').select('id', { count: 'exact', head: true }),
+      client.from('deleted_transactions').select('id', { count: 'exact', head: true }),
+      client.from('transaction_attachments').select('id', { count: 'exact', head: true }),
+    ]);
+
+    // If every probe failed we cannot know the cloud state: let the caller fall
+    // back to a full pull instead of trusting a fingerprint built from nothing.
+    if (setRes.error && txRes.error && delRes.error && attRes.error) return null;
+
+    // A failing probe contributes a constant, so it degrades (stops detecting
+    // that table's changes) without ever producing false "changed" signals.
+    const updatedAt = setRes.error ? 'settings-error' : (setRes.data?.updated_at ?? 'no-settings-row');
+    const txCount = txRes.error ? 'count-error' : String(txRes.count ?? 0);
+    const delCount = delRes.error ? 'count-error' : String(delRes.count ?? 0);
+    const attCount = attRes.error ? 'count-error' : String(attRes.count ?? 0);
+    return `${updatedAt}|tx:${txCount}|del:${delCount}|att:${attCount}`;
+  } catch {
+    return null;
+  }
+}
+
 /** Same as fetchUserDataFromSupabase with an injectable client (used by isolated round-trip tests). */
 export async function fetchUserDataWithClient(client: NonNullable<ReturnType<typeof getSupabaseClient>>): Promise<SupabaseUserData | null> {
   const { data: { session } } = await client.auth.getSession();

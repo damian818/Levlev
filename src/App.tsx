@@ -15,7 +15,7 @@ import { useBrowserNotifications } from './hooks/useBrowserNotifications';
 import { initializeGlobalFxRates } from './utils/currencyUtils';
 import { persistAttachmentDataUrl, retrieveAttachmentDataUrl } from './utils/attachmentStorage';
 import { getSupabaseClient, signInWithGoogle, signOutFromSupabase } from './lib/supabase';
-import { fetchUserDataFromSupabase, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase, getDeletedTxIds, mergeDeletedTxIds, addDeletedTxIds, executeQueuedMutation } from './services/supabaseSync';
+import { fetchUserDataFromSupabase, fetchSyncFingerprint, SYNC_FINGERPRINT_KEY, saveAllUserDataToSupabase, deleteAllUserDataFromSupabase, deleteTransactionFromSupabase, deleteCategoryFromSupabase, deleteAccountFromSupabase, getDeletedTxIds, mergeDeletedTxIds, addDeletedTxIds, executeQueuedMutation } from './services/supabaseSync';
 import { initSyncQueueAutoFlush, flushSyncQueue, subscribeToSyncQueue, getSyncQueue } from './services/syncQueue';
 import { Navbar } from './components/Navbar';
 
@@ -877,8 +877,21 @@ export default function App() {
   const [hasInitialSynced, setHasInitialSynced] = useState(false);
 
   // Sync Supabase user data
-  const syncFromSupabase = React.useCallback(async () => {
+  const syncFromSupabase = React.useCallback(async (isRaceRetry = false) => {
     try {
+      // Egress gate (Supabase free plan): the full pull below downloads every
+      // row of every table (several MB) and this callback runs every 45s per
+      // visible tab plus on every window focus. Probe a ~1 KB fingerprint
+      // first and skip the pull entirely when the cloud did not change.
+      if (!isRaceRetry) {
+        const lastFingerprint = localStorage.getItem(SYNC_FINGERPRINT_KEY);
+        const hasLocalData = !!localStorage.getItem('finance_app_transactions');
+        if (lastFingerprint && hasLocalData) {
+          const fingerprint = await fetchSyncFingerprint();
+          if (fingerprint && fingerprint === lastFingerprint) return;
+        }
+      }
+      const fingerprintBefore = await fetchSyncFingerprint();
       const data = await fetchUserDataFromSupabase();
       if (data) {
         setTransactions(prev => {
@@ -1074,6 +1087,15 @@ export default function App() {
             saveSelectedReports(data.settings.reportSettings);
           }
         }
+      }
+      const fingerprintAfter = await fetchSyncFingerprint();
+      if (fingerprintAfter) {
+        try { localStorage.setItem(SYNC_FINGERPRINT_KEY, fingerprintAfter); } catch {}
+      }
+      // A save that landed on the server while we were pulling would otherwise
+      // go unnoticed until the next change. Re-pull exactly once in that case.
+      if (data && !isRaceRetry && fingerprintBefore && fingerprintAfter && fingerprintBefore !== fingerprintAfter) {
+        return syncFromSupabase(true);
       }
     } catch (err) {
       console.warn('Failed to fetch user data from Supabase:', err);
